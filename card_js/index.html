@@ -1,0 +1,98 @@
+<head>
+    <meta charset="utf-8">
+    <title>SHUFFLE IT UP BITCH</title>
+    <meta name="author" content="Floris Veldhuizen">
+
+</head>
+
+<body>
+  <style>
+    #mydiv {
+    }
+    #mydivheader {
+        padding: 10px;
+        cursor: move;
+        background-color: #2196F3;
+        color: #fff;
+    }
+    .card{
+      overflow:hidden;
+      position: absolute;
+      transition: top 0.5s ease-in-out, left 0.5s ease-in-out, transform 0.5s ease-in-out, margin 0.5s cubic-bezier(.25,.8,.25,1), box-shadow 0.5s cubic-bezier(.25,.8,.25,1);
+      touch-action: none;
+      background-color: #f1f1f1;
+      border: 1px solid #d3d3d3;
+      box-shadow: 0 2px 1px rgba(0,0,0,0.12), 0 1px 0px rgba(0,0,0,0.24);
+      text-align: center;
+      height: 300px;
+      width: 300px;
+      border-radius: 15px;
+    }
+    .lifted{
+      transition: margin 0.2s cubic-bezier(.25,.8,.25,1), box-shadow 0.2s cubic-bezier(.25,.8,.25,1);
+      box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+      margin-top: -10px;
+    }
+  </style>
+  <!--Draggable DIV Stack:-->
+  <div id="stack" style="position:absolute;top:200px;left:500px;">
+    <div id="mydiv">
+      <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+      <div id="mydivheader">Click here to move</div>
+      <h1>Picobelly</h1>
+      <p>welcome to this shit</p>
+      <p>DIV</p>
+      <p> BITCH ASS NIGGA </p>
+    </div>
+    <div>
+      <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+      <div>Div number 2 bitchesss</div>
+      <p>Move</p>
+      <p>this</p>
+      <p>DIV</p>
+    </div>
+    <div>
+      <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+      <div>Div number 3 bitchesss</div>
+      <p>Move</p>
+      <p>this</p>
+      <p>DIV</p>
+    </div>
+    <div>
+      <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+      <div>Div number 4 bitchesss</div>
+      <p>Move</p>
+      <p>this</p>
+      <p>DIV</p>
+    </div>
+    <div>
+      <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+      <div>Div number 5 bitchesss</div>
+      <p>Move</p>
+      <p>this</p>
+      <p>DIV</p>
+    </div>
+    <div>
+      <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+      <div>Div number 6 bitchesss</div>
+      <p>Move</p>
+      <p>this</p>
+      <p>DIV</p>
+    </div>
+    <div>
+      <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+      <div>Div number 7 bitchesss</div>
+      <p>Move</p>
+      <p>this</p>
+      <p>DIV</p>
+    </div>
+    <div>
+      <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+      <div>Div number 8 bitchesss</div>
+      <p>Move</p>
+      <p>this</p>
+      <p>DIV</p>
+    </div>
+  </div>
+  <script type="text/javascript" src="js/main.js"></script>
+</body>
