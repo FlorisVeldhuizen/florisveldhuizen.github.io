@@ -86,8 +86,8 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
 
     function dragMouseDown(e) {
       e = e || window.event;
-      //e.preventDefault();
-      //console.log(e.target);
+      e.preventDefault();
+      console.log(e.target);
       if (!pickedup) {
         cardlift();
       }
