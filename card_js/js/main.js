@@ -85,23 +85,22 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
     }
 
     function dragMouseDown(e) {
-      if(e.path[0].tagName.toUpperCase()!=="A"){ //check if the clicked element is a link
-        e = e || window.event;
-        e.preventDefault();
-        if (!pickedup) {
-          cardlift();
-        }
-        //get mousepos relative to active div
-        offsetX = e.clientX-elmnt.offsetLeft;
-        offsetY = e.clientY-elmnt.offsetTop;
-        document.addEventListener("mouseup",  closeDragElement);
-        document.addEventListener("mousemove",  elementDrag);
-        if(TOUCH){ //get touchpos relative to active div
-          offsetX = e.touches[0].clientX-elmnt.offsetLeft;
-          offsetY = e.touches[0].clientY-elmnt.offsetTop;
-          document.addEventListener("touchend",  closeDragElement);
-          document.addEventListener("touchmove",  elementDrag);
-        }
+      e = e || window.event;
+      //e.preventDefault();
+      //console.log(e.target);
+      if (!pickedup) {
+        cardlift();
+      }
+      //get mousepos relative to active div
+      offsetX = e.clientX-elmnt.offsetLeft;
+      offsetY = e.clientY-elmnt.offsetTop;
+      document.addEventListener("mouseup",  closeDragElement);
+      document.addEventListener("mousemove",  elementDrag);
+      if(TOUCH){ //get touchpos relative to active div
+        offsetX = e.touches[0].clientX-elmnt.offsetLeft;
+        offsetY = e.touches[0].clientY-elmnt.offsetTop;
+        document.addEventListener("touchend",  closeDragElement);
+        document.addEventListener("touchmove",  elementDrag);
       }
     }
 
