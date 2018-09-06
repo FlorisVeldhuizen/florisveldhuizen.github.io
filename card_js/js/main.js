@@ -85,8 +85,7 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
     }
 
     function dragMouseDown(e) {
-      console.log(e.path[0]);
-      if(e.path[0].tagName!=="A"){ //check if the clicked element is a link
+      if(e.path[0].tagName.toUpperCase()!=="A"){ //check if the clicked element is a link
         e = e || window.event;
         e.preventDefault();
         if (!pickedup) {
