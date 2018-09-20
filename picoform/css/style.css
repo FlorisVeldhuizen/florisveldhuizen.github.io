@@ -1,7 +1,7 @@
-@import url(https://fonts.googleapis.com/css?family=Montserrat:400,700);
+@import url(https://fonts.googleapis.com/css?family=Open+Sans);
 
 html {
-  font-family: 'Montserrat', Arial, sans-serif;
+  font-family: 'Open Sans', Arial, sans-serif;
   -ms-text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
 }
@@ -47,6 +47,7 @@ form {
 label{
   display: block;
   margin: 5px auto 10px;
+  font-weight: bold;
 }
 
 fieldset{
@@ -61,7 +62,6 @@ h1 {
   font-weight: 700;
   letter-spacing: 7px;
   text-align: center;
-  text-transform: uppercase;
 }
 
 .underline {
@@ -125,7 +125,6 @@ input[type=range]:focus::-webkit-slider-runnable-track {
   background: #474544;
 }
 
-
 input[type='text'], [type='email'], [type='tel'],  [type='date'], select, textarea {
 	background: none;
   border: none;
@@ -136,7 +135,6 @@ input[type='text'], [type='email'], [type='tel'],  [type='date'], select, textar
   letter-spacing: 1px;
 	margin: 0em 0 1.875em 0;
 	padding: 0 0 0.875em 0;
-  text-transform: uppercase;
 	width: 100%;
 	-webkit-box-sizing: border-box;
 	-moz-box-sizing: border-box;
