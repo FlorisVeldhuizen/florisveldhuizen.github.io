@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html >
+<head>
+  <meta charset="UTF-8">
+  <title>Picobelly Cooking form</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+  <div id="container">
+    <h1>&bull; Post a Meal &bull;</h1>
+    <div class="underline"></div>
+    <div class="icon_wrapper">
+      <img class="icon" src="img/logo.png"></img>
+    </div>
+    <form id="meal_form">
+      <fieldset>
+        <legend>Contact</legend>
+        <div class="form-group ">
+          <label for="frmName" class="label-control">Name</label>
+          <input type="text" name="name" id="frmName" class="form-control validate" placeholder="My name is" autocomplete="name" autofocus required>
+        </div>
+        <div class="form-group leftform">
+          <label for="frmEmail" class="label-control">Email</label>
+          <input type="email" name="email" id="frmEmail" class="form-control validate" placeholder="My e-mail is" autocomplete="email" required>
+        </div>
+        <div class="form-group rightform">
+          <label for="frmEmailC" class="label-control">Confirm Email</label>
+          <input type="email" name="emailC" id="frmEmailC" class="form-control validate" placeholder="My e-mail is still" autocomplete="email" required>
+        </div>
+        <div class="form-group fullform">
+          <label for="frmPhoneNum" class="label-control">Phone</label>
+          <input type="tel" name="phone" id="frmPhoneNum" class="form-control validate" placeholder="06-12345678" autocomplete="tel" required>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Adress</legend>
+        <div class="form-group leftform">
+          <label for="frmZip" class="label-control">Zip</label>
+          <input type="text" name="zip" id="frmZip" class="form-control validate" placeholder="1234 AB" autocomplete="shipping postal-code" required>
+        </div>
+        <div class="form-group rightform">
+          <label for="frmHouseNum" class="label-control">Housenumber</label>
+          <input type="text" name="housenumber" id="frmHouseNum" class="form-control validate" placeholder="10" required>
+        </div>
+        <div class="form-group leftform">
+          <label for="frmStreet" class="label-control">Street</label>
+          <p>AUTO COMPLETE STRAAT</p>
+        </div>
+        <div class="form-group rightform">
+          <label for="frmCity" class="label-control">City</label>
+          <p>AUTO COMPLETE PLAATS</p>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Meal</legend>
+          <div class="form-group leftform">
+            <label for="frmMeal" class="label-control">Meal</label>
+            <input type="text" name="meal" id="frmMeal" placeholder="I want to cook" required>
+          </div>
+          <div class="form-group rightform">
+            <label for="frmDate" class="label-control">Date</label>
+            <input type="date" name="date" id="frmDate" required>
+          </div>
+          <div class="form-group leftform">
+            <label for="frmPrice" class="label-control">Price: {{price}}</label>
+            <input type="range" name="price" id="frmPrice" min="2.50" max="10.00" step="0.25" value="6.50" oninput="setPrice(this.value)" required>
+            <p id="meal_price"></p>
+          </div>
+          <div class="form-group rightform">
+            <label for="frmSpots" class="label-control">Available spots: {{spots}}</label>
+            <input type="range" name="spots" id="frmSpots" min="1" max="10" step="1" value="5" oninput="setSpots(this.value)" required>
+            <p id="available_spots"></p>
+          </div>
+      </fieldset>
+      <button type="submit" id="butCheckout" class="btn btn-primary submit">Submit</button>
+    </form>
+  </div><!-- // End #container -->
+</body>
+</html>
