@@ -74,6 +74,24 @@
             <input type="range" name="spots" id="frmSpots" min="1" max="10" step="1" value="5" oninput="setSpots(this.value)" required>
             <p id="available_spots"></p>
           </div>
+          <div class="form-group leftform">
+            <label for="frmDiet" class="label-control">Is it a vegetarian or vegan dish?</label>
+            <label class="radiocontainer">
+              <input type="radio" name="diet" id="frmDiet" value="NaN" checked="checked">
+              <span class="checkmark"></span>
+              <p>No</p>
+            </label>
+            <label class="radiocontainer">
+              <input type="radio" name="diet" id="frmDiet" value="vegetarian">
+              <span class="checkmark"></span>
+              <p>Vegetarian</p>
+            </label>
+            <label class="radiocontainer">
+              <input type="radio" name="diet" id="frmDiet" value="vegan">
+              <span class="checkmark"></span>
+              <p>Vegan</p>
+            </label>
+          </div>
       </fieldset>
       <button type="submit" id="butCheckout" class="btn btn-primary submit">Submit</button>
     </form>
