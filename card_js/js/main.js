@@ -15,7 +15,7 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
   var i = 0;
   cards.forEach(function(element) {
     element.classList.add("card");
-    element.style.zIndex = cards.length - i;
+    element.style.zIndex = element.style.zIndex + (cards.length - i);
     if(i<maxStacksize-1){
       element.style.top = element.style.top + i*4 + "px";
       bottomPos = element.offsetTop;
@@ -85,7 +85,7 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
     }
 
     function dragMouseDown(e) {
-      e = e || window.event;
+      e = e || window.event; //kijk hier ff naar bitch
       e.preventDefault();
       console.log(e.target);
       if (!pickedup) {
