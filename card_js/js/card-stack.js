@@ -11,10 +11,17 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
   if(cards.length<maxStacksize){
     maxStacksize = cards.length;
   }
-  //go through each card in the stack, assign the ".card" class and set z-index
+
   var i = 0;
-  cards.forEach(function(element) {
-    element.classList.add("card");
+  cards.forEach(function(element) { //go through each card in the stack
+    element.classList.add("card");//every element in the cardstack is a card
+
+    var label = document.createElement("div"); //create new div that becomes the cardlabel
+    var textnode = document.createTextNode(i+1); //add number of the card
+    label.appendChild(textnode);
+    label.classList.add("label");
+    element.appendChild(label);//add the label to the card
+
     element.style.zIndex = element.style.zIndex + (cards.length - i);
     if(i<maxStacksize-1){
       element.style.top = element.style.top + i*4 + "px";
@@ -44,12 +51,12 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
       }
       i++;
     });
-    dragElement(cards[0],cards);
+    dragElement(cards[0]);
   }
 
   function dragElement(elmnt) {
     //lock element in starting position
-    var pickedup = false, offsetX = 0, offsetY = 0, curLeft = 0, curTop = 0, dragHandle = 0;
+    var offsetX = 0, offsetY = 0, curLeft = 0, curTop = 0, dragHandle = 0, hoverValue = 10;
     var startpos = {x: 0, y: 0};
 
     (function setup(){
@@ -63,9 +70,9 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
         /* otherwise, move the DIV from anywhere inside the DIV:*/
         dragHandle = elmnt;
       }
-      dragHandle.addEventListener("mousedown",  dragMouseDown);
+      dragHandle.addEventListener("mouseenter", hoverCard);
       dragHandle.addEventListener("touchstart", function(){TOUCH=true});
-      dragHandle.addEventListener("touchstart", dragMouseDown);
+      dragHandle.addEventListener("touchstart", dragFingerDown);
     })();
 
     function translateEZ(x, y){ //this is based on the current position of the card, not an absolute value
@@ -75,45 +82,68 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
 
     function cardlift(){
       elmnt.classList.add("lifted");
-      pickedup = true;
     }
 
     function carddrop(){
       elmnt.classList.remove("lifted");
       elmnt.style.transform = "";
-      pickedup = false;
+    }
+
+    function hoverCard(e){
+      e = e || window.event; //kijk hier ff naar bitch
+      e.preventDefault();
+      cardlift();
+      hoverValue = 10;
+      dragHandle.addEventListener("mousedown",  dragMouseDown);
+      dragHandle.addEventListener("mouseleave", stopHoverCard);
+    }
+
+    function stopHoverCard(e){
+      e = e || window.event; //kijk hier ff naar bitch
+      e.preventDefault();
+      carddrop();
+      dragHandle.removeEventListener("mousedown",  dragMouseDown);
+      dragHandle.removeEventListener("mouseleave", stopHoverCard);
     }
 
     function dragMouseDown(e) {
       e = e || window.event; //kijk hier ff naar bitch
       e.preventDefault();
-      console.log(e.target);
-      if (!pickedup) {
-        cardlift();
-      }
+      cardlift();
       //get mousepos relative to active div
       offsetX = e.clientX-elmnt.offsetLeft;
       offsetY = e.clientY-elmnt.offsetTop;
       document.addEventListener("mouseup",  closeDragElement);
-      document.addEventListener("mousemove",  elementDrag);
-      if(TOUCH){ //get touchpos relative to active div
-        offsetX = e.touches[0].clientX-elmnt.offsetLeft;
-        offsetY = e.touches[0].clientY-elmnt.offsetTop;
-        document.addEventListener("touchend",  closeDragElement);
-        document.addEventListener("touchmove",  elementDrag);
-      }
+      document.addEventListener("mousemove", elementDrag);
+    }
+
+    function dragFingerDown(e) {
+      e = e || window.event; //kijk hier ff naar bitch
+      e.preventDefault();
+      cardlift();
+      offsetX = e.touches[0].clientX-elmnt.offsetLeft;
+      offsetY = e.touches[0].clientY-elmnt.offsetTop;
+      document.addEventListener("touchend",  closeDragElement);
+      document.addEventListener("touchmove",  elementDrag_touch);
     }
 
     function elementDrag(e) {
       e = e || window.event;
       e.preventDefault();
+      dragHandle.removeEventListener("mouseleave", stopHoverCard);
       // calculate the new div position (based on cursor pos, starting pos, and cursor offset on active div):
       curLeft = e.clientX-offsetX;
-      curTop = e.clientY-offsetY;
-      if(TOUCH){
-        curLeft = e.touches[0].clientX-offsetX;
-        curTop = e.touches[0].clientY-offsetY;
-      }
+      curTop = e.clientY-offsetY+hoverValue;
+      // set the element's new position:
+      elmnt.style.transform = "translate("+curLeft+"px,"+curTop+"px) rotate("+curLeft/30+"deg)";
+    }
+
+    function elementDrag_touch(e) {
+      e = e || window.event;
+      e.preventDefault();
+      // calculate the new div position (based on cursor pos, starting pos, and cursor offset on active div):
+      curLeft = e.touches[0].clientX-offsetX;
+      curTop = e.touches[0].clientY-offsetY;
       // set the element's new position:
       elmnt.style.transform = "translate("+curLeft+"px,"+curTop+"px) rotate("+curLeft/30+"deg)";
     }
@@ -126,12 +156,15 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
       document.removeEventListener("mousemove", elementDrag);
       // stop moving when touch is released:
       document.removeEventListener("touchend", closeDragElement);
-      document.removeEventListener("touchmove", elementDrag);
+      document.removeEventListener("touchmove", elementDrag_touch);
       //return element to the stack
       carddrop();
+      hoverValue = 0;
+      //add timeout for card animation
       if(Math.abs(curLeft)>tresholdValue){
+        dragHandle.removeEventListener("mouseenter", hoverCard);
         dragHandle.removeEventListener("mousedown",  dragMouseDown);
-        dragHandle.removeEventListener("touchstart",  dragMouseDown);
+        dragHandle.removeEventListener("touchstart", dragFingerDown);
         dragHandle.removeEventListener("touchstart", function(){TOUCH=true});
         TOUCH = false;
         translateEZ(0, bottomPos);

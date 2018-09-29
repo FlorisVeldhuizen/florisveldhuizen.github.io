@@ -7,6 +7,17 @@
 
 <body>
   <style>
+    @import url(https://fonts.googleapis.com/css?family=Open+Sans);
+    @import url(https://fonts.googleapis.com/css?family=Raleway:400,100,200,300,500,600,700,800);
+
+    html {
+      font-family: 'Raleway', Arial, sans-serif;
+      -ms-text-size-adjust: 100%;
+      -webkit-text-size-adjust: 100%;
+    }
+    h1, h2{
+      font-family: 'Raleway', Arial, sans-serif;
+    }
     .card{
       overflow:hidden;
       position: absolute;
@@ -19,14 +30,50 @@
       height: 420px;
       width: 300px;
       border-radius: 15px;
+      z-index:100;
+      cursor:pointer;
     }
-    .card p{
-      color: #666666;
+    .card-text{
+      color: #404040;
+      font-family: 'Open Sans', Arial, sans-serif;
+      display: block;
+      margin-block-start: 0.5em;
+      margin-block-end: 0.5em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      margin: 10px 20px 10px 20px;
+      font-size: 1rem;
+      font-weight: 500;
+      line-height: 1.5;
+      text-align: justify;
     }
-    .card h3{
+    .card-title{
       color: #000;
+      font-family: 'Raleway', Arial, sans-serif;
+      display: block;
+      margin-block-start: 0.5em;
+      margin-block-end: 0.5em;
+      margin-inline-start: 0px;
+      margin-inline-end: 0px;
+      margin-bottom: .5rem;
+      font-size: 1.75rem;
+      font-weight: 500;
+      line-height: 1.2;
     }
-    .cardImg{
+    .card .label{
+      position: absolute;
+      right:7px;
+      bottom:7px;
+      width:35px;
+      height:35px;
+      background:white;
+      border-radius:60px;
+      color:black;
+      text-align: center;
+      font-weight: 900;
+      padding-top: 5px;
+    }
+    .card-image{
       margin:20px;
       padding:10px;
       width:100%-20px;
@@ -42,74 +89,87 @@
       z-index:1000!important; /*make sure that the active card is always on top */
       margin-top: -10px;
     }
-    .cardstripe{
+    .card-stripe{
+      display: block;
       border-bottom:2px solid #fff;
-      margin:5px 20px 15px 20px;
+      margin:5px 20px 5px 20px;
     }
   </style>
+  <div>
   <div style="position:absolute;top:100px;left:500px;">
-    <h1 style="font-family:Arial"> How to use Picobelly </h1>
+    <h1><strong> How to use Picobelly? </strong> Swipe to find out! </h1>
+    <h2> Want to eat? </h2>
     <!--Draggable DIV Stack:-->
-    <div id="stack" style="position:absolute;top:100px">
+    <div id="stack" style="position:relative;">
       <div>
         <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
-        <div class="cardImg" style="background-image:url(img/eater_1.png)"></div>
-        <div class="cardstripe"></div>
-        <h3 style="font-family:arial;">Find a meal online</h3>
-        <p style="margin:20px;font-family:arial;text-align:justify">Pick a delicious homemade meal that you like in our Facebook group.</p>
+        <div class="card-image" style="background-image:url(img/eater_1.png)"></div>
+        <div class="card-stripe"></div>
+        <div class="card-title">Find a meal online</div>
+        <div class="card-text">Pick a delicious homemade meal that you like in our Facebook group.</div>
       </div>
       <div>
         <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
-        <div class="cardImg" style="background-image:url(img/eater_2.png)"></div>
-        <div class="cardstripe"></div>
-        <h3 style="font-family:arial;">Reserve & pay</h3>
-        <p style="margin:20px;font-family:arial;text-align:justify">Pay beforehand to reserve a meal for you.</p>
+        <div class="card-image" style="background-image:url(img/eater_2.png)"></div>
+        <div class="card-stripe"></div>
+        <div class="card-title">Reserve & pay</div>
+        <div class="card-text">Pay beforehand to reserve a meal for you!</div>
       </div>
       <div>
         <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
-        <div class="cardImg" style="background-image:url(img/eater_3.png)"></div>
-        <div class="cardstripe"></div>
-        <h3 style="font-family:arial;">Pick up your meal!</h3>
-        <p style="margin:20px;font-family:arial;text-align:justify">Pick up your homemade meal at the promised date and time.</p>
+        <div class="card-image" style="background-image:url(img/eater_3.png)"></div>
+        <div class="card-stripe"></div>
+        <div class="card-title">Pick up your meal!</div>
+        <div class="card-text">Pick up your homemade meal at the promised date and time.</div>
       </div>
       <div>
         <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
-        <div class="cardImg" style="background-image:url(img/eater_4.png)"></div>
-        <div class="cardstripe"></div>
-        <h3 style="font-family:arial;">Show some love!</h3>
-        <p style="margin:20px;font-family:arial;text-align:justify">If you liked it, send a message to the cook or leave a small review! ❤️</p>
-      </div>
-    </div>
-    <div id="stack2" style="position:absolute;left:500px;top:100px">
-      <div>
-        <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
-        <div class="cardImg" style="background-image:url(img/cook_1.png)"></div>
-        <div class="cardstripe"></div>
-        <h3 style="font-family:arial;">Feel like cooking?</h3>
-        <p style="margin:20px;font-family:arial;text-align:justify">Everything starts with a great meal idea. What would you like to cook?</p>
-      </div>
-      <div>
-        <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
-        <div class="cardImg" style="background-image:url(img/cook_2.png)"></div>
-        <div class="cardstripe"></div>
-        <h3 style="font-family:arial;">Getting ready!</h3>
-        <p style="margin:20px;font-family:arial;text-align:justify">Wait until enough people have reserved your homemade meal before you do your groceries!</p>
-      </div>
-      <div>
-        <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
-        <div class="cardImg" style="background-image:url(img/cook_3.png)"></div>
-        <div class="cardstripe"></div>
-        <h3 style="font-family:arial;">Prepare your dish</h3>
-        <p style="margin:20px;font-family:arial;text-align:justify">Get crazy in the kitchen and create something delicous!</p>
-      </div>
-      <div>
-        <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
-        <div class="cardImg" style="background-image:url(img/cook_4.png)"></div>
-        <div class="cardstripe"></div>
-        <h3 style="font-family:arial;">Hand out your meal!</h3>
-        <p style="margin:20px;font-family:arial;text-align:justify">Make your guests happy and give them your homemade meal!</p>
+        <div class="card-image" style="background-image:url(img/eater_4.png)"></div>
+        <div class="card-stripe"></div>
+        <div class="card-title">Show some love!</div>
+        <div class="card-text">If you liked it, send a message to the cook or leave a small review! ❤️</div>
       </div>
     </div>
   </div>
-  <script type="text/javascript" src="js/main.js"></script>
+    <div style="position:absolute;left:1000px;top:153px;">
+      <h2> Want to cook? </h2>
+      <div id="stack2" style="position:relative;">
+        <div>
+          <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+          <div class="card-image" style="background-image:url(img/cook_1.png)"></div>
+          <div class="card-stripe"></div>
+          <div class="card-title">Feel like cooking?</div>
+          <div class="card-text">Everything starts with a great meal idea. What would you like to cook?</div>
+        </div>
+        <div>
+          <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+          <div class="card-image" style="background-image:url(img/cook_form.png)"></div>
+          <div class="card-stripe"></div>
+          <div class="card-title">Fill in our form!</div>
+          <div class="card-text">Fill in our meal form to easily post your meal on the Picobelly Facebook group!</div>
+        </div>
+        <div>
+          <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+          <div class="card-image" style="background-image:url(img/cook_2.png)"></div>
+          <div class="card-stripe"></div>
+          <div class="card-title">Getting ready!</div>
+          <div class="card-text">Wait until enough people have reserved your homemade meal before you do your groceries!</div>
+        </div>
+        <div>
+          <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+          <div class="card-image" style="background-image:url(img/cook_3.png)"></div>
+          <div class="card-stripe"></div>
+          <div class="card-title">Prepare your dish</div>
+          <div class="card-text">Now you are all ready to have some fun and start cooking your delicious homemade meal!</div>
+        </div>
+        <div>
+          <!--Include a header DIV with the same name as the draggable DIV, followed by "header":-->
+          <div class="card-image" style="background-image:url(img/cook_4.png)"></div>
+          <div class="card-stripe"></div>
+          <div class="card-title">Hand out your meal!</div>
+          <div class="card-text">Wait until your guests arrive at your place and give them your homemade meal!</div>
+        </div>
+      </div>
+    </div>
+  <script type="text/javascript" src="js/card-stack.js"></script>
 </body>
