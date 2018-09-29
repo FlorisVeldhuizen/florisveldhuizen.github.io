@@ -52,7 +52,7 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
 
   function dragElement(elmnt) {
     //lock element in starting position
-    var offsetX = 0, offsetY = 0, hoverValue = 10;
+    var offsetX = 0, offsetY = 0, curLeft = 0, curTop = 0, hoverValue = 10;
     (function setup(){
       elmnt.addEventListener("mouseenter", hoverCard);
       elmnt.addEventListener("touchstart", dragFingerDown);
@@ -115,8 +115,8 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
       e.preventDefault();
       elmnt.removeEventListener("mouseleave", stopHoverCard);
       // calculate the new div position (based on cursor pos, starting pos, and cursor offset on active div):
-      var curLeft = e.clientX-offsetX;
-      var curTop = e.clientY-offsetY+hoverValue;
+      curLeft = e.clientX-offsetX;
+      curTop = e.clientY-offsetY+hoverValue;
       // set the element's new position:
       elmnt.style.transform = "translate("+curLeft+"px,"+curTop+"px) rotate("+curLeft/30+"deg)";
     }
@@ -125,8 +125,8 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
       e = e || window.event;
       e.preventDefault();
       // calculate the new div position (based on cursor pos, starting pos, and cursor offset on active div):
-      var curLeft = e.touches[0].clientX-offsetX;
-      var curTop = e.touches[0].clientY-offsetY;
+      curLeft = e.touches[0].clientX-offsetX;
+      curTop = e.touches[0].clientY-offsetY;
       // set the element's new position:
       elmnt.style.transform = "translate("+curLeft+"px,"+curTop+"px) rotate("+curLeft/30+"deg)";
     }
