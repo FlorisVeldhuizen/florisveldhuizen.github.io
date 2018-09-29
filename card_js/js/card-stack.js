@@ -1,4 +1,3 @@
-var TOUCH = false;
 var tresholdValue = 200;
 
 function handleStack(stack_elem,maxStacksize){ //first param is the cardstack div, second is the visible size of the stack
@@ -11,17 +10,14 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
   if(cards.length<maxStacksize){
     maxStacksize = cards.length;
   }
-
   var i = 0;
   cards.forEach(function(element) { //go through each card in the stack
     element.classList.add("card");//every element in the cardstack is a card
-
     var label = document.createElement("div"); //create new div that becomes the cardlabel
     var textnode = document.createTextNode(i+1); //add number of the card
     label.appendChild(textnode);
     label.classList.add("label");
     element.appendChild(label);//add the label to the card
-
     element.style.zIndex = element.style.zIndex + (cards.length - i);
     if(i<maxStacksize-1){
       element.style.top = element.style.top + i*4 + "px";
@@ -56,23 +52,10 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
 
   function dragElement(elmnt) {
     //lock element in starting position
-    var offsetX = 0, offsetY = 0, curLeft = 0, curTop = 0, dragHandle = 0, hoverValue = 10;
-    var startpos = {x: 0, y: 0};
-
+    var offsetX = 0, offsetY = 0, hoverValue = 10;
     (function setup(){
-      var rect = elmnt.getBoundingClientRect();
-      startpos.x = rect.left;
-      startpos.y = rect.top;
-      if (document.getElementById(elmnt.id + "header")) {
-        /* if present, the header is where you move the DIV from:*/
-        dragHandle = document.getElementById(elmnt.id + "header");
-      } else {
-        /* otherwise, move the DIV from anywhere inside the DIV:*/
-        dragHandle = elmnt;
-      }
-      dragHandle.addEventListener("mouseenter", hoverCard);
-      dragHandle.addEventListener("touchstart", function(){TOUCH=true});
-      dragHandle.addEventListener("touchstart", dragFingerDown);
+      elmnt.addEventListener("mouseenter", hoverCard);
+      elmnt.addEventListener("touchstart", dragFingerDown);
     })();
 
     function translateEZ(x, y){ //this is based on the current position of the card, not an absolute value
@@ -90,30 +73,30 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
     }
 
     function hoverCard(e){
-      e = e || window.event; //kijk hier ff naar bitch
+      e = e || window.event;
       e.preventDefault();
       cardlift();
       hoverValue = 10;
-      dragHandle.addEventListener("mousedown",  dragMouseDown);
-      dragHandle.addEventListener("mouseleave", stopHoverCard);
+      elmnt.addEventListener("mousedown",  dragMouseDown);
+      elmnt.addEventListener("mouseleave", stopHoverCard);
     }
 
     function stopHoverCard(e){
       e = e || window.event; //kijk hier ff naar bitch
       e.preventDefault();
       carddrop();
-      dragHandle.removeEventListener("mousedown",  dragMouseDown);
-      dragHandle.removeEventListener("mouseleave", stopHoverCard);
+      elmnt.removeEventListener("mousedown",  dragMouseDown);
+      elmnt.removeEventListener("mouseleave", stopHoverCard);
     }
 
     function dragMouseDown(e) {
-      e = e || window.event; //kijk hier ff naar bitch
+      e = e || window.event;
       e.preventDefault();
       cardlift();
       //get mousepos relative to active div
       offsetX = e.clientX-elmnt.offsetLeft;
       offsetY = e.clientY-elmnt.offsetTop;
-      document.addEventListener("mouseup",  closeDragElement);
+      document.addEventListener("mouseup",  closeDragMouse);
       document.addEventListener("mousemove", elementDrag);
     }
 
@@ -123,17 +106,17 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
       cardlift();
       offsetX = e.touches[0].clientX-elmnt.offsetLeft;
       offsetY = e.touches[0].clientY-elmnt.offsetTop;
-      document.addEventListener("touchend",  closeDragElement);
+      document.addEventListener("touchend",  closeDragTouch);
       document.addEventListener("touchmove",  elementDrag_touch);
     }
 
     function elementDrag(e) {
       e = e || window.event;
       e.preventDefault();
-      dragHandle.removeEventListener("mouseleave", stopHoverCard);
+      elmnt.removeEventListener("mouseleave", stopHoverCard);
       // calculate the new div position (based on cursor pos, starting pos, and cursor offset on active div):
-      curLeft = e.clientX-offsetX;
-      curTop = e.clientY-offsetY+hoverValue;
+      var curLeft = e.clientX-offsetX;
+      var curTop = e.clientY-offsetY+hoverValue;
       // set the element's new position:
       elmnt.style.transform = "translate("+curLeft+"px,"+curTop+"px) rotate("+curLeft/30+"deg)";
     }
@@ -142,31 +125,43 @@ function handleStack(stack_elem,maxStacksize){ //first param is the cardstack di
       e = e || window.event;
       e.preventDefault();
       // calculate the new div position (based on cursor pos, starting pos, and cursor offset on active div):
-      curLeft = e.touches[0].clientX-offsetX;
-      curTop = e.touches[0].clientY-offsetY;
+      var curLeft = e.touches[0].clientX-offsetX;
+      var curTop = e.touches[0].clientY-offsetY;
       // set the element's new position:
       elmnt.style.transform = "translate("+curLeft+"px,"+curTop+"px) rotate("+curLeft/30+"deg)";
     }
 
-    function closeDragElement(e) {
+    function closeDragMouse(e) {
       e = e || window.event;
       e.preventDefault();
       // stop moving when mouse button is released:
-      document.removeEventListener("mouseup", closeDragElement);
+      document.removeEventListener("mouseup", closeDragMouse);
       document.removeEventListener("mousemove", elementDrag);
-      // stop moving when touch is released:
-      document.removeEventListener("touchend", closeDragElement);
-      document.removeEventListener("touchmove", elementDrag_touch);
       //return element to the stack
       carddrop();
       hoverValue = 0;
       //add timeout for card animation
       if(Math.abs(curLeft)>tresholdValue){
-        dragHandle.removeEventListener("mouseenter", hoverCard);
-        dragHandle.removeEventListener("mousedown",  dragMouseDown);
-        dragHandle.removeEventListener("touchstart", dragFingerDown);
-        dragHandle.removeEventListener("touchstart", function(){TOUCH=true});
-        TOUCH = false;
+        elmnt.removeEventListener("mouseenter", hoverCard);
+        elmnt.removeEventListener("mousedown",  dragMouseDown);
+        elmnt.removeEventListener("touchstart", dragFingerDown);
+        translateEZ(0, bottomPos);
+        nextCard();
+      }
+    }
+
+    function closeDragTouch(e) {
+      e = e || window.event;
+      e.preventDefault();
+      // stop moving when touch is released:
+      document.removeEventListener("touchend", closeDragTouch);
+      document.removeEventListener("touchmove", elementDrag_touch);
+      //return element to the stack
+      carddrop();
+      //add timeout for card animation
+      if(Math.abs(curLeft)>tresholdValue){
+        elmnt.removeEventListener("mouseenter", hoverCard);
+        elmnt.removeEventListener("touchstart", dragFingerDown);
         translateEZ(0, bottomPos);
         nextCard();
       }
