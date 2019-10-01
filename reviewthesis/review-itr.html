@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<head>
+
+<!-- Basic Page Needs
+================================================== -->
+<title>Listeo</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+<!-- CSS
+================================================== -->
+
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style-pico.css">
+<link rel="stylesheet" href="css/rangeslider-form.css">
+<style>
+	input {
+		display:inline-block;
+	}
+	a {
+		color: #46aeeb;
+	}
+	.checkboxtext {
+		display:inline;
+		font-size: 14px;
+	}
+	form .statement {
+	  display:block;
+	  font-size: 14px;
+	  font-weight: bold;
+	  padding: 15px 0 30px 12px;
+	}
+	form .likert {
+	  list-style:none;
+	  width:100%;
+	  margin:0;
+	  padding:0 0 35px;
+	  display:block;
+	  border-bottom:2px solid #efefef;
+	}
+	form .likert:last-of-type {border-bottom:0;}
+	form .likert:before {
+	  content: '';
+	  position:relative;
+	  top:11px;
+	  left:16%;
+	  display:block;
+	  background-color:#efefef;
+	  height:4px;
+	  width:65%;
+	}
+	form .likert li {
+	  display:inline-block;
+	  width:32%;
+	  text-align:center;
+	  vertical-align: top;
+	}
+	form .likert li input[type=radio] {
+	  display:block;
+	  position:relative;
+	  top:0;
+	  left:50%;
+	  margin-left:-6px;
+
+	}
+	form .likert li label {width:100%;}
+</style>
+
+<link rel="stylesheet" href="css/colors/main.css" id="colors">
+
+</head>
+
+<body>
+
+<!-- Wrapper -->
+<div id="wrapper">
+
+
+
+
+
+<!-- Content
+================================================== -->
+<div class="container">
+	<div class="row sticky-wrapper">
+		<form>
+			<div class="col-lg-12 col-md-12 margin-top-25">
+				<h1>3. Intention to review:</h1>
+				<p class="margin-top-25">Intention to review is a metric that defines how much a user wants to leave a review after using an online service. Imagine this situation: you rented a room on Airbnb. You spent your entire weekend in another city and have enjoyed your stay. Once you return, you spend a night at home and while sitting on your couch, you check your phone. </p>
+				<label class="statement">1. A notification from Airbnb opens up: "Help us out, please leave a review!". <br> Would this trigger you to leave a review?</label>
+				<ul class='likert'>
+		      <li>
+		        <input type="radio" name="prompt" value="1" required>
+		        <label>No</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="prompt" value="2">
+		        <label>That depends</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="prompt" value="3">
+		        <label>Yes</label>
+		      </li>
+					<label class="statement">Why?</label>
+					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="prompttext" required></textarea>
+		    </ul>
+
+				<label class="statement">2. Forget about the notification. Intead of a notification, you know that Airbnb will offer you a discount on your next booking if you leave a review after your stay. <br> Would this trigger you to leave a review?</label>
+				<ul class='likert'>
+		      <li>
+		        <input type="radio" name="credits" value="1" required>
+		        <label>No</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="credits" value="2">
+		        <label>That depends</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="credits" value="3">
+		        <label>Yes</label>
+		      </li>
+					<label class="statement">Why?</label>
+					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="creditstext" required></textarea>
+		    </ul>
+				<label class="statement">3. Instead of the previous options, Airbnb offers you platform credits that show on your profile after leaving a review. These credits could earn you different badges and platform privileges <i>(E.g. more accomodation options in the future)</i>.<br>Would these credits trigger you to leave a review?</label>
+				<ul class='likert'>
+		      <li>
+		        <input type="radio" name="credits" value="1" required>
+		        <label>No</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="credits" value="2">
+		        <label>That depends</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="credits" value="3">
+		        <label>Yes</label>
+		      </li>
+					<label class="statement">Why?</label>
+					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="creditstext" required></textarea>
+		    </ul>
+				<label class="statement">4. Instead of the previous options, Airbnb sends you a notification that lets you know that your host has left a review for you. You can only see what your host wrote about you if you leave a review too! <br> Would this trigger you to leave a review?</label>
+				<ul class='likert'>
+		      <li>
+		        <input type="radio" name="credits" value="1" required>
+		        <label>No</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="credits" value="2">
+		        <label>That depends</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="credits" value="3">
+		        <label>Yes</label>
+		      </li>
+					<label class="statement">Why?</label>
+					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="creditstext" required></textarea>
+		    </ul>
+
+				<div class="mx-auto margin-top-50 margin-bottom-50">
+					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="location.href='review-itrreflection';"> Next page </button>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+
+
+<!-- Back To Top Button -->
+<div id="backtotop"><a href="#"></a></div>
+
+
+</div>
+<!-- Wrapper / End -->
+
+
+<!-- Scripts
+================================================== -->
+<script type="text/javascript" src="scripts/jquery-2.2.0.min.js"></script>
+<script type="text/javascript" src="scripts/mmenu.min.js"></script>
+<script type="text/javascript" src="scripts/chosen.min.js"></script>
+<script type="text/javascript" src="scripts/slick.min.js"></script>
+<script type="text/javascript" src="scripts/rangeslider.min.js"></script>
+<script type="text/javascript" src="scripts/magnific-popup.min.js"></script>
+<script type="text/javascript" src="scripts/waypoints.min.js"></script>
+<script type="text/javascript" src="scripts/counterup.min.js"></script>
+<script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
+<script type="text/javascript" src="scripts/tooltips.min.js"></script>
+<script type="text/javascript" src="scripts/custom.js"></script>
+<script type="text/javascript" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/14082/FileSaver.js"></script>
+<script type="text/javascript" src="scripts/usertest.js"></script>
+
+
+</body>
+</html>

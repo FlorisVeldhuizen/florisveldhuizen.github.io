@@ -1,0 +1,399 @@
+@charset "UTF-8";
+
+html, body {
+  overflow-x: hidden;
+}
+body {
+  position: relative;
+}
+
+#register-background {
+  padding-top: 40px;
+  padding-bottom: 40px;
+  background-color: blue;
+
+  background-image: linear-gradient(
+      rgba(0, 0, 0, 0.3),
+      rgba(0, 0, 0, 0.3)
+    ), url("images/chef.jpg");
+
+
+  background-image: {max-height: 100%};
+}
+
+#sign-in-dialog {
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+  margin-top: 0px;
+  margin-right: auto;
+  margin-bottom: 0px;
+  margin-left: auto;
+}
+
+#logo img { max-height: 38px; width: auto; transform: none; }
+
+#logo2 img { max-height: 38px; width: auto; transform: none; }
+
+#logo2 {
+  float: left;
+  padding-right: 20px;
+}
+
+#bannerwindow {
+  background-color: white;
+  box-shadow: 0 4px 8px 0 rgba(255, 255, 255, 0.2), 0 6px 20px 0 rgba(255, 255, 255, 0.19);
+  border-radius: 5px;
+
+  position: relative;
+  vertical-align: middle;
+}
+
+#chefbanner.parallax {
+  /* The image used */
+  background-image: linear-gradient(
+      rgba(0, 0, 0, 0.3),
+      rgba(0, 0, 0, 0.3)
+    ), url("images/rice2.jpg");
+
+  /* Set a specific height */
+  height: 590px;
+
+  /* Create the parallax scrolling effect */
+  background-attachment: fixed;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+#header.cloned #logo img {
+    transform: none;
+    max-width: 120px;
+    margin-top: 1px;
+}
+
+.dashboard #logo a img {
+    top: 25%;
+    position: relative;
+    transform: none;
+}
+
+.icon-box-2 i {
+	width: 60%;
+	height: auto;
+	background-color: transparent;
+	border-radius: 0%;
+	line-height: 80px;
+	font-size: 60px;
+	display: inline-block;
+	margin-bottom: 10px;
+	text-align: center;
+	overflow: hidden;
+	color: #66676b;
+	position: relative;
+	z-index: 11;
+}
+
+.main  { background: #00a948; }
+
+.header-text {
+	font-weight: bold;
+	color: white!important;
+}
+
+.logo-text {
+	display:inline;
+	margin-left:14px;
+}
+
+img.footer-logo{
+	max-height:60px;
+}
+/* Listing stuff */
+.header-avatar{
+  border-radius:50%;
+  overflow:hidden;
+}
+.hosted-by-avatar{
+	max-width: none;
+}
+
+/* Start Animations*/
+#starEffect {
+  position: fixed;
+  background: transparent;
+  height: 100%;
+  width: 100%;
+  z-index: 0 !important; }
+
+/* Shaphy Animations*/
+#geometric {
+  position: absolute;
+  top: 0;
+  left: 0; }
+
+.accent {
+  background: linear-gradient(to bottom right, #2CDAB1, #94E19E);
+	z-index: 0;
+	position: absolute;
+	opacity: 0.9;
+	top: 0px;
+	width: 100%;
+}
+
+.controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 200; }
+
+#bubbles {
+  opacity: 0.5; }
+
+#bubbles div {
+  border: solid 2px white;
+  border-radius: 100%;
+  position: absolute;
+  visibility: hidden;
+  -webkit-animation: fade 10s infinite; }
+
+@-webkit-keyframes fade {
+  from {
+    bottom: -24px;
+    opacity: 1;
+    visibility: visible; }
+  to {
+    bottom: 120%; } }
+@keyframes fade {
+  from {
+    bottom: -24px;
+    opacity: 1;
+    visibility: visible; }
+  to {
+    bottom: 120%; } }
+
+.graphic-right{
+	 max-width: 100%;
+	 float: left;
+	 padding: 0px 30px 30px 30px;
+}
+
+.graphic-left{
+	 max-width: 100%;
+	 float: left;
+}
+
+@media only screen and (max-width: 1026px) {
+  .graphic-left{
+    padding: 0px 30px 30px 30px;
+  }
+}
+
+@media screen and (max-width: 420px) {
+	.logo-text {
+		display:block;
+		margin-left: auto;
+	}
+	#navigation.style-1 {
+		padding-top: 20px;
+	}
+}
+
+/*Chef front*/
+.background-img{
+  background-image:
+    linear-gradient(
+      rgba(0, 0, 0, 0.5),
+      rgba(0, 0, 0, 0.5)
+    ), url('images/rice2.jpg');
+
+  max-width: 100%;
+}
+
+@media only screen and (max-width: 1026px) {
+    #c1 {
+        display: none;
+    }
+}
+
+.fr-title{
+  font-weight: bold;
+  color: #fff;
+}
+
+.fr-text{
+  color:#fff;
+}
+.caption-text .fr-text{
+	line-height: 40px;
+}
+
+.faq-inner{
+  font-size: 15px;
+  padding-left: 20px;
+  padding-right: 40px;
+}
+
+.fb-banner{
+  background: #3b5998!important;
+	margin: 0 auto 40px auto!important;
+	text-align: center!important;
+}
+
+.fb-banner:hover{
+  color: white!important;
+}
+.caption-highlight{
+	color: #fcab55;
+	font-size:24px;
+	pointer-events:none;
+}
+.round { border-radius: 50%; }
+
+.quote-text{
+  font-size: 30px;
+  text-align: left;
+  line-height: 40px;
+}
+
+.quote-end{
+  text-align: right;
+  padding-right: 50px;
+}
+
+/*make the sharing buttons juicy*/
+.share-buttons li a {
+	cursor:pointer;
+}
+
+/*SMARTPHONE MEUK*/
+#fb-img img{
+	bottom: 0px;
+	max-height:100%;
+	position: absolute;
+	display: block;
+	margin: 0px auto;
+}
+@media screen and (max-width: 992px) {
+	#fb-img img{
+		position: relative;
+	}
+	.fb-banner{
+		display: block!important;
+		width: 200px!important;
+
+	}
+}
+
+
+/* pop-up SUBMIT */
+.submit-mfp-zoom-in .zoom-anim-dialog {
+	opacity: 0;
+	-webkit-transition: all 0.2s ease-in-out;
+	-moz-transition: all 0.2s ease-in-out;
+	-o-transition: all 0.2s ease-in-out;
+	transition: all 0.2s ease-in-out;
+	-webkit-transform: scale(0.8);
+	-moz-transform: scale(0.8);
+	-ms-transform: scale(0.8);
+	-o-transform: scale(0.8);
+	transform: scale(0.8);
+}
+
+/* animate in */
+.submit-mfp-zoom-in.mfp-ready .zoom-anim-dialog {
+	opacity: 1;
+	-webkit-transform: scale(1);
+	-moz-transform: scale(1);
+	-ms-transform: scale(1);
+	-o-transform: scale(1);
+	transform: scale(1);
+}
+
+/* animate out */
+.submit-mfp-zoom-in.mfp-removing .zoom-anim-dialog {
+	-webkit-transform: scale(0.8);
+	-moz-transform: scale(0.8);
+	-ms-transform: scale(0.8);
+	-o-transform: scale(0.8);
+	transform: scale(0.8);
+	opacity: 0;
+}
+
+/* Dark overlay, start state */
+.submit-mfp-zoom-in.mfp-bg {
+	opacity: 0.001; /* Chrome opacity transition bug */
+	-webkit-transition: opacity 0.3s ease-out;
+	-moz-transition: opacity 0.3s ease-out;
+	-o-transition: opacity 0.3s ease-out;
+	transition: opacity 0.3s ease-out;
+}
+/* animate in */
+.submit-mfp-zoom-in.mfp-ready.mfp-bg {
+	opacity: 0.5;
+}
+/* animate out */
+.submit-mfp-zoom-in.mfp-removing.mfp-bg {
+	opacity: 0;
+}
+
+#myProgress {
+  width: 100%;
+  background-color: #ddd;
+  border-radius: 5px;
+}
+
+#myBar {
+  width: 1%;
+  height: 30px;
+  background-color: #4CAF50;
+  border-radius: 5px;
+}
+
+/* become a chef page */
+body p {
+  font-size: 16px;
+  line-height: 38px;
+}
+
+h4.headline {
+  font-size: 26px;
+  line-height: 36px;
+}
+
+.row{
+  padding: 15px 0px 0px 0px;
+}
+
+.absolutebar {
+  position: absolute;
+  z-index: 1;
+  background-color: #f1f1f1;
+  left:250px;
+}
+
+/* The progress container (grey background) */
+.howtochef-progress-container {
+  position: relative;
+  height: 100%;
+  width: 8px;
+  background: #ccc;
+  overflow-y: hidden;
+}
+
+/* The progress bar (scroll indicator) */
+.howtochef-bar {
+  position: relative;
+  width: 8px;
+  background: #fcab55;
+  height: 0%;
+}
+
+.nodeStyle {
+  position: absolute;
+  border-radius: 100%;
+  width: 45px;
+  height: 45px;
+  padding: 8px 18px;
+  background: #ccc;
+  left: -18px;
+  color: white;
+}

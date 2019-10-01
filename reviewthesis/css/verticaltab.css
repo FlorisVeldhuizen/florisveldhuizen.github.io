@@ -1,0 +1,101 @@
+@charset "UTF-8";
+
+* {box-sizing: border-box}
+
+#parent {
+  display: flex;
+  width: 100%;
+}
+#narrow {
+  width: 500px;
+  margin: 20px;
+  /* Just so it's visible */
+}
+#wide {
+  flex: 1;
+  /* Grow to rest of container */
+  /* Just so it's visible */
+}
+
+/* Style the tab */
+.tab {
+    float: left;
+    border: none;
+    background-color: #ffffff;
+    width: 100%;
+    height: 100%;
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    border-radius: 15px;
+}
+
+/* Style the buttons inside the tab */
+.tab button {
+    display: block;
+    background-color: inherit;;
+    padding: 5px 20px;
+    width: 100%;
+    border: none;
+    outline: none;
+    text-align: left;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.first {
+    border-top-right-radius: 15px;
+    border-top-left-radius: 15px;
+}
+
+.last {
+    border-bottom-right-radius: 15px;
+    border-bottom-left-radius: 15px;
+}
+
+.off {
+    visibility: hidden;
+    position: absolute;
+    top: -9999px;
+}
+
+.on {
+    visibility: visible;
+    position: static;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+    background-color: #ddd;
+}
+
+/* Create an active/current "tab button" class */
+.tab button.active {
+  background: #f8f8f8;
+}
+
+.unused {
+  /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#90fee3+0,94e29f+100 */
+  background: #90fee3; /* Old browsers */
+  background: -moz-linear-gradient(-45deg, #90fee3 0%, #94e29f 100%); /* FF3.6-15 */
+  background: -webkit-linear-gradient(-45deg, #90fee3 0%,#94e29f 100%); /* Chrome10-25,Safari5.1-6 */
+  background: linear-gradient(135deg, #90fee3 0%,#94e29f 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#90fee3', endColorstr='#94e29f',GradientType=1 ); /* IE6-9 fallback on horizontal gradient */
+}
+
+.tabcontentborder {
+    width: 100%;
+    float: right;
+    border: none #ccc;
+    border-left: none;
+    height: 100%;
+
+}
+/* Style the tab content */
+.tabcontent {
+    width: 80%;
+    border: none #ccc;
+    border-left: none;
+}
+
+.tabcontent img{
+    max-width: 100%;
+  }
