@@ -50,7 +50,7 @@
 			<p>	There are no risks in participating, this research project has been reviewed and approved by the EEMCS Ethics Committee. If any questions arise, feel free to contact me (Floris Veldhuizen, at <a href="mailto:f.l.m.veldhuizen@student.utwente.nl">f.l.m.veldhuizen@student.utwente.nl</a>) or my supervisor (Dennis Reidsma, at <a href="mailto:d.reidsma@utwente.nl">d.reidsma@utwente.nl</a>). Finally, you could also reach the Ethics Committee at <a href="mailto:ethics-comm-ewi@utwente.nl"> ethics-comm-ewi@utwente.nl</a>.</p>
 		</div>
 		<div class="col-lg-6 col-md-6 margin-top-75">
-			<form class="margin-top-90">
+			<form id="introductionform" class="margin-top-90">
 				<div class="col-lg-4 col-md-4">
 					Gender:<br>
 					<input type="radio" name="gender" value="male" checked> Male<br>
@@ -60,7 +60,7 @@
 
 				<div class="col-lg-8 col-md-8">
 					Age:<br>
-			  	<input type="text" name="firstname"><br>
+			  	<input required name="age" min="16" type="number"><br>
 				</div>
 				<div class="col-lg-12 col-md-12">
 					<input class="margin-top-25" type="checkbox" required style="width:auto;height:auto">
@@ -72,7 +72,7 @@
 					<!-- <input class="margin-top-25" type="checkbox" required style="width:auto;height:auto">
 					<p class="checkboxtext"> Click <a href="review-mashup"> here </a> to accept terms and start the user test </p> -->
 					<div class="mx-auto margin-top-50">
-						<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="nextPage('review-mashup');"> Start Test </button>
+						<button type="submit" class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('introduction','review-mashup');"> Start Test </button>
 					</div>
 				</div>
 			</form>

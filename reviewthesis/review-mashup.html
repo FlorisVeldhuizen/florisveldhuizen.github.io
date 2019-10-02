@@ -76,6 +76,62 @@
 		bottom: 475px;
 		padding: 20px 0;
 	}
+	input {
+		display:inline-block;
+	}
+	a {
+		color: #46aeeb;
+	}
+	.checkboxtext {
+		display:inline;
+		font-size: 14px;
+	}
+	#coffeeform{
+		border-radius: 15px;
+    background-color: white;
+    padding: 25px;
+	}
+	form .statement {
+	  display:block;
+	  font-size: 14px;
+	  font-weight: bold;
+	  padding: 30px 0 30px 12px;
+	  margin-bottom:10px;
+	}
+	form .likert {
+	  list-style:none;
+	  width:100%;
+	  margin:0;
+	  padding:0 0 35px;
+	  display:block;
+	  border-bottom:2px solid #efefef;
+	}
+	form .likert:last-of-type {border-bottom:0;}
+	form .likert:before {
+	  content: '';
+	  position:relative;
+	  top:11px;
+	  left:7.5%;
+	  display:block;
+	  background-color:#efefef;
+	  height:4px;
+	  width:82%;
+	}
+	form .likert li {
+	  display:inline-block;
+	  width:16%;
+	  text-align:center;
+	  vertical-align: top;
+	}
+	form .likert li input[type=radio] {
+	  display:block;
+	  position:relative;
+	  top:0;
+	  left:50%;
+	  margin-left:-6px;
+
+	}
+	form .likert li label {width:100%;}
 </style>
 
 
@@ -232,11 +288,40 @@
 		<div class="col-lg-12 col-md-12 margin-top-25">
 
 			<!-- feedback + next page stuff -->
-			<!-- <form> -->
-				<div class="mx-auto margin-top-50 margin-bottom-50">
-					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="nextPage('review-credibility');"> Next page </button>
+			<form id="coffeeform" class="margin-bottom-25">
+				<label class="statement">1. Which of these coffee machines would you buy?</label>
+				<ul class='likert'>
+		      <li>
+		        <input type="radio" name="coffeemachine" value="1" required>
+		        <label>1</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="coffeemachine" value="2">
+		        <label>2</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="coffeemachine" value="3">
+		        <label>3</label>
+		      </li>
+					<li>
+		        <input type="radio" name="coffeemachine" value="4">
+		        <label>4</label>
+		      </li>
+					<li>
+		        <input type="radio" name="coffeemachine" value="5">
+		        <label>5</label>
+		      </li>
+					<li>
+		        <input type="radio" name="coffeemachine" value="6">
+		        <label>6</label>
+		      </li>
+					<label class="statement">Why?</label>
+					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="coffeemachinetext" required></textarea>
+		    </ul>
+				<div class="mx-auto margin-top-25 margin-bottom-25">
+					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('review-mashup','review-credibility');"> Next page </button>
 				</div>
-			<!-- </form> -->
+			</form>
 		</div>
 	</div>
 </div>

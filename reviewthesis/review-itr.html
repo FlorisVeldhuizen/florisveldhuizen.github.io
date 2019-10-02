@@ -83,7 +83,7 @@
 ================================================== -->
 <div class="container">
 	<div class="row sticky-wrapper">
-		<form>
+		<form id="itrform">
 			<div class="col-lg-12 col-md-12 margin-top-25">
 				<h1>3. Intention to review:</h1>
 				<p class="margin-top-25">Intention to review is a metric that defines how much a user wants to leave a review after using an online service. Imagine this situation: you rented a room on Airbnb. You spent your entire weekend in another city and have enjoyed your stay. Once you return, you spend a night at home and while sitting on your couch, you check your phone. </p>
@@ -108,19 +108,19 @@
 				<label class="statement">2. Forget about the notification. Intead of a notification, you know that Airbnb will offer you a discount on your next booking if you leave a review after your stay. <br> Would this trigger you to leave a review?</label>
 				<ul class='likert'>
 		      <li>
-		        <input type="radio" name="credits" value="1" required>
+		        <input type="radio" name="discount" value="1" required>
 		        <label>No</label>
 		      </li>
 		      <li>
-		        <input type="radio" name="credits" value="2">
+		        <input type="radio" name="discount" value="2">
 		        <label>That depends</label>
 		      </li>
 		      <li>
-		        <input type="radio" name="credits" value="3">
+		        <input type="radio" name="discount" value="3">
 		        <label>Yes</label>
 		      </li>
 					<label class="statement">Why?</label>
-					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="creditstext" required></textarea>
+					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="discounttext" required></textarea>
 		    </ul>
 				<label class="statement">3. Instead of the previous options, Airbnb offers you platform credits that show on your profile after leaving a review. These credits could earn you different badges and platform privileges <i>(E.g. more accomodation options in the future)</i>.<br>Would these credits trigger you to leave a review?</label>
 				<ul class='likert'>
@@ -142,23 +142,23 @@
 				<label class="statement">4. Instead of the previous options, Airbnb sends you a notification that lets you know that your host has left a review for you. You can only see what your host wrote about you if you leave a review too! <br> Would this trigger you to leave a review?</label>
 				<ul class='likert'>
 		      <li>
-		        <input type="radio" name="credits" value="1" required>
+		        <input type="radio" name="doubleblind" value="1" required>
 		        <label>No</label>
 		      </li>
 		      <li>
-		        <input type="radio" name="credits" value="2">
+		        <input type="radio" name="doubleblind" value="2">
 		        <label>That depends</label>
 		      </li>
 		      <li>
-		        <input type="radio" name="credits" value="3">
+		        <input type="radio" name="doubleblind" value="3">
 		        <label>Yes</label>
 		      </li>
 					<label class="statement">Why?</label>
-					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="creditstext" required></textarea>
+					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="doubleblindtext" required></textarea>
 		    </ul>
 
 				<div class="mx-auto margin-top-50 margin-bottom-50">
-					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="nextPage('review-itrreflection');"> Next page </button>
+					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('review-itr','review-itrreflection');"> Next page </button>
 				</div>
 			</div>
 		</form>
