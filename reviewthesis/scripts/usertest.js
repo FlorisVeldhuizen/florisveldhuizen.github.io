@@ -31,6 +31,7 @@ function setSessionID(){
 function getSessionID(){
 	let vars = getUrlVars();
 	console.log(vars.id);
+	curID = vars.id;
 	return vars.id;
 }
 
@@ -38,6 +39,13 @@ function fillData(){
 	curObj.id = curID;
 	curObj.q1 = "question 1 answer";
 	curObj.q2 = "question 2 answer";
+}
+
+function nextPage(page){
+	const path = window.location.href;
+	const url = new URL(page,path);
+	url.searchParams.set('id', curID);
+	window.location.href = url;
 }
 
 function updateData(key,value){
@@ -50,10 +58,18 @@ function updateData(key,value){
 }
 
 // fillData();
-setSessionID();
-getSessionID();
-updateData("oi","test");
-updateData("yo","test");
+function init(){
+	setSessionID();
+	updateData("oi","test");
+	updateData("yo","test");
+}
+
+function setPage(){
+	getSessionID();
+	updateData("oi","test");
+	updateData("yo","test");
+}
+
 
 let strcurObj = JSON.stringify(curObj);
 // console.log(strcurObj);

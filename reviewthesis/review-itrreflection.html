@@ -70,7 +70,7 @@
 
 </head>
 
-<body>
+<body onload="setPage();">
 
 <!-- Wrapper -->
 <div id="wrapper">
@@ -105,7 +105,7 @@
 					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="prompttext" required></textarea>
 		    </ul>
 				<div class="mx-auto margin-top-50 margin-bottom-50">
-					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="location.href='review-debrief';"> Next page </button>
+					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="nextPage('review-debrief');"> Next page </button>
 				</div>
 			</div>
 		</form>
