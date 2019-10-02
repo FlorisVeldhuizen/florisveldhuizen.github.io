@@ -51,16 +51,14 @@ function setPageData(curpage,nextpage){
 		if(form.checkValidity()){
 			updateData("gender",getcheckedItem('gender'));
 			updateData("age",form.age.value);
-			nextPage(nextpage);
-			return false;
+			return nextPage(nextpage);
 	  }
 	} else if (curpage === "review-mashup"){
 		let form = document.getElementById('coffeeform');
 		if(form.checkValidity()){
 			updateData("coffeemachine",getcheckedItem('coffeemachine'));
 			updateData("coffeemachinetext",form.coffeemachinetext.value);
-			nextPage(nextpage);
-			return false;
+			return nextPage(nextpage);
 		}
 	} else if (curpage === "review-credibility"){
 		let form = document.getElementById('credibilityform');
@@ -73,8 +71,7 @@ function setPageData(curpage,nextpage){
 			updateData("endorsed",getcheckedItem('endorsed'));
 			updateData("userfeedback",getcheckedItem('userfeedback'));
 			updateData("picture",getcheckedItem('picture'));
-			nextPage(nextpage);
-			return false;
+			return nextPage(nextpage);
 	  }
 	} else if (curpage === "review-itr"){
 		let form = document.getElementById('itrform');
@@ -87,16 +84,15 @@ function setPageData(curpage,nextpage){
 			updateData("creditstext",form.creditstext.value);
 			updateData("doubleblind",getcheckedItem('doubleblind'));
 			updateData("doubleblindtext",form.doubleblindtext.value);
-			nextPage(nextpage);
-			return false;
+			return nextPage(nextpage);
+
 		}
   } else if (curpage === "review-itrreflection"){
 		let form = document.getElementById('itrreflectionform');
 		if(form.checkValidity()){
 			updateData("reflection",getcheckedItem('reflection'));
 			updateData("reflectiontext",form.reflectiontext.value);
-			nextPage(nextpage);
-			return false;
+			return nextPage(nextpage);
 	  }
 	}
 }
@@ -106,6 +102,7 @@ function nextPage(nextpage){
 	const url = new URL(nextpage,path);
 	url.searchParams.set('id', curID);
 	window.location.href = url;
+	return false;
 }
 
 function updateData(key,value){
@@ -127,11 +124,5 @@ function init(){
 
 function setPage(){
 	getSessionID();
+	console.log(JSON.parse(localStorage["id"+curID]));
 }
-
-
-let strcurObj = JSON.stringify(curObj);
-// console.log(strcurObj);
-//localStorage.setItem("id"+curID,strcurObj);
-
-console.log(localStorage);
