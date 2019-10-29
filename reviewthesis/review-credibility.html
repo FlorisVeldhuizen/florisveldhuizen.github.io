@@ -24,6 +24,12 @@
 		display:inline;
 		font-size: 14px;
 	}
+	.pagenumber{
+		position: fixed;
+    bottom: 20px;
+    left: 35px;
+    font-size: 20px;
+	}
 	form .statement {
 	  display:block;
 	  font-size: 14px;
@@ -252,7 +258,30 @@
 		        <label>Very Important</label>
 		      </li>
 		    </ul>
-				<label class="statement">8. How important do you think that adding a picture to a review <i>(E.g. "this is a picture of how my box arrived")</i> is for the credibility of a review?</label>
+				<label class="statement">8. How important do you think that a response on a review from the seller is for the credibility of a review?</label>
+				<ul class='likert'>
+		      <li>
+		        <input type="radio" name="sellerresponse" value="1" required>
+		        <label>Unimportant</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="sellerresponse" value="2">
+		        <label>Slightly Important</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="sellerresponse" value="3">
+		        <label>Moderately Important</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="sellerresponse" value="4">
+		        <label>Important</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="sellerresponse" value="5">
+		        <label>Very Important</label>
+		      </li>
+		    </ul>
+				<label class="statement">9. How important do you think that adding a picture to a review <i>(E.g. "this is a picture of how my box arrived")</i> is for the credibility of a review?</label>
 				<ul class='likert'>
 		      <li>
 		        <input type="radio" name="picture" value="1" required>
@@ -275,8 +304,34 @@
 		        <label>Very Important</label>
 		      </li>
 		    </ul>
+
+				<label class="statement">10. How important do you think your own privacy is online?</label>
+				<ul class='likert'>
+		      <li>
+		        <input type="radio" name="privacy" value="1" required>
+		        <label>Unimportant</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="privacy" value="2">
+		        <label>Slightly Important</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="privacy" value="3">
+		        <label>Moderately Important</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="privacy" value="4">
+		        <label>Important</label>
+		      </li>
+		      <li>
+		        <input type="radio" name="privacy" value="5">
+		        <label>Very Important</label>
+		      </li>
+		    </ul>
+				<label class="statement">11. How did your concern for your own privacy influence the answers you gave above? Please elaborate.</label>
+				<textarea rows="4" spellcheck="true" placeholder="Explain your thoughts in a few words!" name="privacytext" required></textarea>
 				<div class="mx-auto margin-top-50 margin-bottom-50">
-					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('review-credibility','review-itr');"> Next page </button>
+					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('review-credibility.html','review-itr.html');"> Next page </button>
 				</div>
 			</div>
 		</form>
@@ -286,7 +341,7 @@
 
 <!-- Back To Top Button -->
 <div id="backtotop"><a href="#"></a></div>
-
+<div class="pagenumber"><b>(2/4)</b></div>
 
 </div>
 <!-- Wrapper / End -->
@@ -306,6 +361,7 @@
 <script type="text/javascript" src="scripts/tooltips.min.js"></script>
 <script type="text/javascript" src="scripts/custom.js"></script>
 <script type="text/javascript" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/14082/FileSaver.js"></script>
+<script type="text/javascript" src="datahandler.js"></script>
 <script type="text/javascript" src="scripts/usertest.js"></script>
 
 

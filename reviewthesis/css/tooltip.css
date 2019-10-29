@@ -18,7 +18,7 @@
   word-spacing: normal;
   white-space: normal;
   line-break: auto;
-  font-size: 0.875rem;
+  font-size:1.4rem;
   word-wrap: break-word;
   opacity: 0;
 }
@@ -102,8 +102,8 @@
 }
 
 .tooltip-inner {
-  max-width: 200px;
-  padding: 0.25rem 0.5rem;
+  max-width: 360px;
+  padding: 0.5rem 0.75rem;
   color: #fff;
   text-align: center;
   background-color: #000;

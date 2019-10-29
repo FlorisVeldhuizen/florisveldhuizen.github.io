@@ -2,13 +2,6 @@ let localObj = {};
 let curObj = {};
 let curID;
 
-function saveFile(data,filename){
-	text = data.toString();
-	//filename = "test";
-	let blob = new Blob([text], {type: "text/plain;charset=utf-8"});
-	saveAs(blob, filename+".txt");
-}
-
 function getUrlVars() {
   let vars = {};
   let parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
@@ -18,7 +11,7 @@ function getUrlVars() {
 }
 
 function setSessionID(){
-	curID = Object.keys(localStorage).length;
+	curID = addUser();
 	let url = new URL(window.location.href);
 	url.searchParams.set('id', curID);
 	if (window.history.replaceState) {
@@ -53,27 +46,30 @@ function setPageData(curpage,nextpage){
 			updateData("age",form.age.value);
 			return nextPage(nextpage);
 	  }
-	} else if (curpage === "review-mashup"){
+	} else if (curpage === "review-mashup.html"){
 		let form = document.getElementById('coffeeform');
 		if(form.checkValidity()){
 			updateData("coffeemachine",getcheckedItem('coffeemachine'));
 			updateData("coffeemachinetext",form.coffeemachinetext.value);
 			return nextPage(nextpage);
 		}
-	} else if (curpage === "review-credibility"){
+	} else if (curpage === "review-credibility.html"){
 		let form = document.getElementById('credibilityform');
 		if(form.checkValidity()){
-			updateData("fullname",getcheckedItem('fullname'));
-			updateData("nickname",getcheckedItem('nickname'));
-			updateData("socialmedia",getcheckedItem('socialmedia'));
-			updateData("avatar",getcheckedItem('avatar'));
-			updateData("verified",getcheckedItem('verified'));
-			updateData("endorsed",getcheckedItem('endorsed'));
-			updateData("userfeedback",getcheckedItem('userfeedback'));
-			updateData("picture",getcheckedItem('picture'));
+			updateData("fullname",getcheckedItem('fullname')); //1
+			updateData("nickname",getcheckedItem('nickname')); //2
+			updateData("socialmedia",getcheckedItem('socialmedia')); //3
+			updateData("avatar",getcheckedItem('avatar')); //4
+			updateData("verified",getcheckedItem('verified')); //5
+			updateData("endorsed",getcheckedItem('endorsed')); //6
+			updateData("userfeedback",getcheckedItem('userfeedback')); //7
+			updateData("sellerresponse",getcheckedItem('sellerresponse')); //8
+			updateData("picture",getcheckedItem('picture')); //9
+			updateData("privacy",getcheckedItem('privacy')); //10
+			updateData("privacytext",form.privacytext.value); //11
 			return nextPage(nextpage);
 	  }
-	} else if (curpage === "review-itr"){
+	} else if (curpage === "review-itr.html"){
 		let form = document.getElementById('itrform');
 		if(form.checkValidity()){
 			updateData("prompt",getcheckedItem('prompt'));
@@ -87,7 +83,7 @@ function setPageData(curpage,nextpage){
 			return nextPage(nextpage);
 
 		}
-  } else if (curpage === "review-itrreflection"){
+  } else if (curpage === "review-itrreflection.html"){
 		let form = document.getElementById('itrreflectionform');
 		if(form.checkValidity()){
 			updateData("reflection",getcheckedItem('reflection'));
@@ -114,15 +110,23 @@ function updateData(key,value){
 	localStorage.setItem(sessionID,strtempObj);
 }
 
+function sumbitTest(){
+	console.log('Submitting data for user ' + curID + '...');
+	updateLocalTextFile("user"+curID,JSON.parse(localStorage["id"+curID]),true);
+}
+
 function init(){
 	if(getSessionID()===undefined||getSessionID()===null){
 		console.log('no session ID has been set, setting session ID...');
 		setSessionID();
 		console.log('session ID has been set to ' + curID + '.')
+	} else {
+		console.log('session ID is set to ' + getSessionID() + '.')
 	}
 }
 
 function setPage(){
 	getSessionID();
+	curuser = curID;
 	console.log(JSON.parse(localStorage["id"+curID]));
 }

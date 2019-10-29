@@ -11,6 +11,8 @@
 ================================================== -->
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/colors/main.css" id="colors">
+<link rel="stylesheet" href="css/tooltip.css">
+
 <style>
 	body{
 		height:100%;
@@ -19,6 +21,12 @@
 	#wrapper{
 		background-color: #eee;
 	}
+	.pagenumber{
+		position: fixed;
+    bottom: 20px;
+    left: 35px;
+    font-size: 20px;
+	}
 	.avatar{
 		left:auto;
 	}
@@ -26,9 +34,8 @@
 		display: inline-block;
     float: left;
     padding: 0 20px 0 0;
-    position: absolute;
-		left: 37px;
-    bottom: 57px;
+    position: relative;
+		top: 100px;
 	}
 	.extrasymbolimg{
 		max-height: 40px;
@@ -73,7 +80,6 @@
 		width: 70px;
 		font-size: 20px;
 		right: 150px;
-		bottom: 475px;
 		padding: 20px 0;
 	}
 	input {
@@ -131,9 +137,11 @@
 	  margin-left:-6px;
 
 	}
+	.hoverable{
+		cursor:pointer;
+	}
 	form .likert li label {width:100%;}
 </style>
-
 
 </head>
 
@@ -148,7 +156,7 @@
 	<div class="row sticky-wrapper">
 		<div class="col-lg-12 col-md-12 margin-top-25">
 			<h1>1. What coffee machine would you buy? </h1>
-			<p> You have the money to buy a new coffee machine. You can pick any out of the six machines presented below. Which one would you pick? A selection of machines and reviews is made from different online platforms.</p>
+			<p> You have the money to buy a new coffee machine. You can pick any machine out of the six machines presented below. Which one would you pick? A selection of machines and reviews gathered from different online platforms is presented below.</p>
 			<div id="listing-reviews" class="listing-section">
 				<h3 class="listing-desc-headline margin-top-20 margin-bottom-20">Reviews <span>(6)</span></h3>
 
@@ -168,15 +176,15 @@
 							<div class="productcontainer">
 								<div class="productimg"><img src="images/coffee1.jpg" alt="" /></div>
 								<h2> Coffee machine Krups </h2>
-								<div class="actionsale"><b>€150</b></div>
+								<div class="actionsale" style="top: 236px;"><b>€150</b></div>
 							</div>
 							<div class="avatar"><img src="https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mm&amp;s=70" alt="" /></div>
-							<div class="extrasymbol"><img class="extrasymbolimg" src="images/facebook.png" alt="This user linked their social media platform to their account." /></div>
+							<div class="extrasymbol hoverable" data-toggle="tooltip" data-placement="bottom" title="This user has linked their Facebook profile to their account. For privacy reasons, this link is disabled here." ><img class="extrasymbolimg" src="images/facebook.png" alt="This user linked their social media platform to their account." /></div>
 							<div class="comment-content"><div class="arrow-comment"></div>
-								<div class="comment-by">Kathy Brown<span class="date">June 2017</span>
-									<div class="star-rating" data-rating="5"></div>
+								<div class="comment-by">Marcus Bretagnio<span class="date">June 2019</span>
+									<div class="star-rating" data-rating="4.5"></div>
 								</div>
-								<p>Morbi velit eros, sagittis in facilisis non, rhoncus et erat. Nam posuere tristique sem, eu ultricies tortor imperdiet vitae. Curabitur lacinia neque non metus</p>
+								<p>Wonderful how easy to use this thing proved to be. You can do other things while this brews your coffee for you. Grinds beans, packs the puck, does the brew, ejects the puck, and continues as directed. Used coffee grounds hopper is super easy to empty, while the drip tray is just as easy to rinse out when you are finished. LOVE THIS MACHINE!</p>
 
 							</div>
 						</li>
@@ -186,19 +194,14 @@
 							<div class="productcontainer">
 								<div class="productimg"><img src="images/coffee2.jpg" alt="" /></div>
 								<h2> Coffee machine Gaggia Anima </h2>
-								<div class="actionsale"><b>€150</b></div>
+								<div class="actionsale" style="top: 210px;"><b>€150</b></div>
 							</div>
 							<div class="avatar"><img src="https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mm&amp;s=70" alt="" /></div>
 							<div class="comment-content"><div class="arrow-comment"></div>
-								<div class="comment-by">Kathy Brown<span class="date">June 2017</span>
-									<div class="star-rating" data-rating="5"></div>
+								<div class="comment-by">Elizabeth Rouler <img class="hoverable" style="max-width:15px" src="images/verified.png" data-toggle="tooltip" data-placement="bottom" title="This user is verified by the platform. The verified badge lets people know that an account is authentic." /><span class="date">June 2019</span>
+									<div class="star-rating" data-rating="4.5"></div>
 								</div>
-								<p>Morbi velit eros, sagittis in facilisis non, rhoncus et erat. Nam posuere tristique sem, eu ultricies tortor imperdiet vitae. Curabitur lacinia neque non metus</p>
-
-								<div class="review-images mfp-gallery-container">
-									<a href="images/review-image-01.jpg" class="mfp-gallery"><img src="images/review-image-01.jpg" alt=""></a>
-								</div>
-								<a href="#" class="rate-review"><i class="sl sl-icon-like"></i> Helpful Review <span>12</span></a>
+								<p>This machine exceeded all of my expectations. The lattes are delicious, even when using generic espresso. The frothing wand turned out to be the biggest surprise, as it heats the milk quickly without the loud noise of other machines that I've used.</p>
 							</div>
 						</li>
 
@@ -207,19 +210,16 @@
 							<div class="productcontainer">
 								<div class="productimg"><img src="images/coffee3.jpg" alt="" /></div>
 								<h2> Coffee machine Philips EP2220</h2>
-								<div class="actionsale"><b>€150</b></div>
+								<div class="actionsale" style="top: 200px;"><b>€150</b></div>
 							</div>
 							<div class="avatar"><img src="https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mm&amp;s=70" alt="" /></div>
+							<div class="extrasymbol hoverable" data-toggle="tooltip" data-placement="bottom" title="This user is endorsed by the platform, and considered an exceptional reviewer." ><img style="max-height: 57px;" src="images/medal.png" alt="This user endorsed by the platform." /></div>
 							<div class="comment-content"><div class="arrow-comment"></div>
-								<div class="comment-by">Kathy Brown<span class="date">June 2017</span>
-									<div class="star-rating" data-rating="5"></div>
+								<div class="comment-by">Deborah van Putten<span class="date">July 2019</span>
+									<div class="star-rating" data-rating="4.5"></div>
 								</div>
-								<p>Morbi velit eros, sagittis in facilisis non, rhoncus et erat. Nam posuere tristique sem, eu ultricies tortor imperdiet vitae. Curabitur lacinia neque non metus</p>
+								<p>Had this machine a month now and am very happy it is part of our morning routine. If you take care of this machine as the instructions suggest, this machine will serve flawlessly for many years, I believe. The machine is very easy to clean per the instructions, I expect no trouble in the future. If anything goes wrong I'll come back and edit this review, but for today, this was a very worthwhile purchase.</p>
 
-								<div class="review-images mfp-gallery-container">
-									<a href="images/review-image-01.jpg" class="mfp-gallery"><img src="images/review-image-01.jpg" alt=""></a>
-								</div>
-								<a href="#" class="rate-review"><i class="sl sl-icon-like"></i> Helpful Review <span>12</span></a>
 							</div>
 						</li>
 					 </ul>
@@ -234,15 +234,15 @@
 						<div class="productcontainer">
 							<div class="productimg"><img src="images/coffee4.jpg" alt="" /></div>
 							<h2> Coffee machine DeLonghi </h2>
-							<div class="actionsale"><b>€150</b></div>
+							<div class="actionsale" style="top: 273px;"><b>€150</b></div>
 						</div>
 						<div class="avatar"><img src="https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mm&amp;s=70" alt="" /></div>
 						<div class="comment-content"><div class="arrow-comment"></div>
-							<div class="comment-by">Kathy Brown<span class="date">June 2017</span>
-								<div class="star-rating" data-rating="5"></div>
+							<div class="comment-by">Kathy Brown<span class="date">July 2019</span>
+								<div class="star-rating" data-rating="4.5"></div>
 							</div>
-							<p>Morbi velit eros, sagittis in facilisis non, rhoncus et erat. Nam posuere tristique sem, eu ultricies tortor imperdiet vitae. Curabitur lacinia neque non metus</p>
-							<a href="#" class="rate-review"><i class="sl sl-icon-like"></i> Helpful Review <span>12</span></a>
+							<p>We spent more time looking at espresso machines than we did looking at our new house... Anyway, after much back and forth, we went with this one. It does not disappoint. It has been used daily (or more) for 1.5 years and still going strong. Great machine!</p>
+							<a class="rate-review hoverable" data-toggle="tooltip" data-placement="bottom" title="12 people found this review helpful."><i class="sl sl-icon-like"></i> Helpful Review <span>12</span></a>
 						</div>
 					</li>
 
@@ -251,17 +251,17 @@
 						<div class="productcontainer">
 							<div class="productimg"><img src="images/coffee5.jpg" alt="" /></div>
 							<h2> Coffee machine Philips HD8827 </h2>
-							<div class="actionsale"><b>€150</b></div>
+							<div class="actionsale" style="top: 225px;"><b>€150</b></div>
 						</div>
 						<div class="avatar"><img src="https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mm&amp;s=70" alt="" /></div>
 						<div class="comment-content"><div class="arrow-comment"></div>
-							<div class="comment-by">Kathy Brown<span class="date">June 2017</span>
-								<div class="star-rating" data-rating="5"></div>
+							<div class="comment-by">Joris Akkerman<span class="date">June 2019</span>
+								<div class="star-rating" data-rating="4.5"></div>
 							</div>
-							<p>Morbi velit eros, sagittis in facilisis non, rhoncus et erat. Nam posuere tristique sem, eu ultricies tortor imperdiet vitae. Curabitur lacinia neque non metus</p>
+							<p>This is a great machine. It is easy to use and makes a high quality espresso. The frother is also very good. I have had it for 6 months and no issues. It is also fairly compact and doesn't take up much counter space. I included a picture of me making my coffee this morning!</p>
 
 							<div class="review-images mfp-gallery-container">
-								<a href="images/review-image-01.jpg" class="mfp-gallery"><img src="images/review-image-01.jpg" alt=""></a>
+								<a href="images/review-image-coffee.jpg" class="mfp-gallery"><img src="images/review-image-coffee.jpg" alt=""></a>
 							</div>
 						</div>
 					</li>
@@ -271,14 +271,14 @@
 						<div class="productcontainer">
 							<div class="productimg"><img src="images/coffee6.png" alt="" /></div>
 							<h2> Coffee machine Caffe Corso </h2>
-							<div class="actionsale"><b>€150</b></div>
+							<div class="actionsale" style="top: 210px;"><b>€150</b></div>
 						</div>
 						<div class="avatar"><img src="images/real-avatar.jpg" alt="" /></div>
 						<div class="comment-content"><div class="arrow-comment"></div>
-							<div class="comment-by">Gerda de Vries<span class="date">June 2017</span>
-								<div class="star-rating" data-rating="5"></div>
+							<div class="comment-by">Gerda de Vries<span class="date">July 2019</span>
+								<div class="star-rating" data-rating="4.5"></div>
 							</div>
-							<p>Morbi velit eros, sagittis in facilisis non, rhoncus et erat. Nam posuere tristique sem, eu ultricies tortor imperdiet vitae. Curabitur lacinia neque non metus</p>
+							<p>Insanely happy with this machine! Upon receiving I was a tad overwhelmed with the instruction manual and the thought of how often it needed to be cleaned/maintained but honestly it's been a breeze! The coffee that is made with this machine is superb compared to local cafes and I love the many options available; strength, brew time, size, etc. I've only used whole beans, so I can't speak to how well it is with pre-ground coffee, but I can't imagine it's much different! So happy with this!</p>
 						</div>
 					</li>
 
@@ -319,7 +319,7 @@
 					<textarea rows="4" spellcheck="true" placeholder="Explain why you think so in a few words (more words is better)!" name="coffeemachinetext" required></textarea>
 		    </ul>
 				<div class="mx-auto margin-top-25 margin-bottom-25">
-					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('review-mashup','review-credibility');"> Next page </button>
+					<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('review-mashup.html','review-credibility.html');"> Next page </button>
 				</div>
 			</form>
 		</div>
@@ -328,6 +328,7 @@
 
 <!-- Back To Top Button -->
 <div id="backtotop"><a href="#"></a></div>
+<div class="pagenumber"><b>(1/4)</b></div>
 
 
 </div>
@@ -337,6 +338,8 @@
 <!-- Scripts
 ================================================== -->
 <script type="text/javascript" src="scripts/jquery-2.2.0.min.js"></script>
+<script type="text/javascript" src="scripts/popper.min.js"></script>
+<script type="text/javascript" src="scripts/bootstrap.min.js"></script>
 <script type="text/javascript" src="scripts/mmenu.min.js"></script>
 <script type="text/javascript" src="scripts/chosen.min.js"></script>
 <script type="text/javascript" src="scripts/slick.min.js"></script>
@@ -348,7 +351,13 @@
 <script type="text/javascript" src="scripts/tooltips.min.js"></script>
 <script type="text/javascript" src="scripts/custom.js"></script>
 <script type="text/javascript" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/14082/FileSaver.js"></script>
+<script type="text/javascript" src="datahandler.js"></script>
 <script type="text/javascript" src="scripts/usertest.js"></script>
+<script>
+	jQuery(document).ready(function () {
+	  jQuery('[data-toggle="tooltip"]').tooltip();
+	});
+</script>
 
 </body>
 </html>
