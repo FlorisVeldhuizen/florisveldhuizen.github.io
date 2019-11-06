@@ -1,7 +1,7 @@
 let raindrops = [];
 let gravity = 0.1;
 let terminalvelocity = 20;
-let rainy = 240;
+let rainy = 180;
 let mousesize = 100;
 
 function setup() {
@@ -13,18 +13,16 @@ function setup() {
 
 function draw(){
 	background(0,0,0,100);
-
-	for (let i = 0; i < raindrops.length; i = i + 1) {
-    raindrops[i].show();
-    raindrops[i].fall();
+	for (let i = 0; i < raindrops.length; i++) {
 		raindrops[i].wind();
+    raindrops[i].fall();
+		raindrops[i].show();
   }
 }
 
 function Drop(){
 	this.x = random(width);
   this.y = random(-10, -height);
-  this.length = 10;
   this.speed = random(0, 2);
 	this.falling = true;
 	this.splash = false;
@@ -47,46 +45,42 @@ function Drop(){
 				this.splash = false;
 				this.falling = true;
 				this.splashprocess = 0;
-				this.y = -10;
-				if(this.speed > terminalvelocity)
-					this.speed = terminalvelocity;
 			}
 		}
 		if (this.falling) {
 		 	stroke(255);
 		 	line(this.x, this.y, this.x + this.windpower, this.y + this.speed);
  		}
- 	};
+ 	}
+
+	this.fall = function() {
+		if(this.falling){
+			this.x = this.x + this.windpower;
+			this.y = this.y + this.speed;
+			this.speed = this.speed + gravity;
+			if(this.y > height){
+				resetRain(this,height);
+			}
+			else if(collisionRain(this.x,this.y)) {
+				resetRain(this,this.y);
+			}
+			if(this.x > width){
+				this.x = 0;
+			}
+			if(this.x < 0){
+				this.x = width;
+			}
+		}
+  }
 
 	this.wind = function(){
 		this.windpower = -(width/2-mouseX)/100;
 	}
-
-	this.fall = function() {
-		//wind
-		this.speed = this.speed + gravity;
-		this.x = this.x + this.windpower;
-		this.y = this.y + this.speed;
-
-		if(this.y > height && this.falling){
-			resetRain(this,height)
-		} else {
-			if(collisionRain(this.x,this.y) && this.falling) {
-				resetRain(this,this.y);
-			}
-		}
-		if(this.x > width){
-			this.x = 0;
-		}
-		if(this.x < 0){
-			this.x = width;
-		}
-  };
 }
 
 function collisionRain(x,y) {
 	if(x > mouseX - (mousesize/2) && x < mouseX + (mousesize/2) && y > mouseY && y < mouseY + mousesize) {
-		return true //if hit
+		return true; //if hit
 	} else {
 		return false;
 	}
@@ -97,14 +91,16 @@ function resetRain(that,splashlocy){
 	that.falling = false;
 	that.splashlocy = splashlocy;
 	that.splashlocx = that.x;
-	that.x = that.x = random(width);
+	that.x = random(width);
+	that.y = -10;
+	if(that.speed > terminalvelocity)
+		that.speed = terminalvelocity;
 }
 
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-	for (let i = 0; i < raindrops.length; i++) {
-		raindrops[i].speed = random(0, 2);
-    raindrops[i].x = random(width);
-	  raindrops[i].y = random(-10, -height);
-  }
+	raindrops = [];
+	for (let i = 0; i < rainy; i++) {
+		 raindrops.push(new Drop());
+	}
 }
