@@ -23,7 +23,7 @@ function setSessionID(){
 
 function getSessionID(){
 	let vars = getUrlVars();
-	curID = vars.id;
+  curID = vars.id;
 	return vars.id;
 }
 
@@ -53,6 +53,38 @@ function setPageData(curpage,nextpage){
 			updateData("coffeemachinetext",form.coffeemachinetext.value);
 			return nextPage(nextpage);
 		}
+  } else if (curpage === "review-platform.html"){
+		let form = document.getElementById('platformform');
+		if(form.checkValidity()){
+			updateData("platformuser",getcheckedItem('platformuser'));
+			updateData("platformusertext",form.platformusertext.value);
+			return nextPage(nextpage);
+		}
+  } else if (curpage === "review-headphones.html"){
+		let form = document.getElementById('headphonesform');
+		if(form.checkValidity()){
+      updateData("headphonesreviewcontent",favreview);
+			updateData("headphonesreviewtext",form.headphonesreviewtext.value);
+      updateData("interestreviewtext",form.interestreviewtext.value);
+			return nextPage(nextpage);
+		}
+  } else if (curpage === "review-ushaped.html"){
+		let form = document.getElementById('ushapeform');
+		if(form.checkValidity()){
+			updateData("middleexperiencetext",form.middleexperiencetext.value);
+      updateData("simpleratingtext",form.simpleratingtext.value);
+      updateData("fairratingtext",form.fairratingtext.value);
+			return nextPage(nextpage);
+		}
+  } else if (curpage === "review-gamification.html"){
+    let form = document.getElementById('gamificationform');
+    if(form.checkValidity()){
+      updateData("gamificationrewardtext",form.gamificationrewardtext.value);
+      updateData("gamificationchallengetext",form.gamificationchallengetext.value);
+      updateData("gamificationmeaningfultext",form.gamificationmeaningfultext.value);
+      updateData("gamificationinteractivitytext",form.gamificationinteractivitytext.value);
+      return nextPage(nextpage);
+    }
 	} else if (curpage === "review-credibility.html"){
 		let form = document.getElementById('credibilityform');
 		if(form.checkValidity()){
@@ -133,17 +165,17 @@ function setPage(){
 
 let credcontent = {
   daysago :
-    [ //deze zinnen iets meer laten verschillen!
-      "3 days ago I got my hands on this.",
-      "I got it last week.",
-      "I bought this one a month ago.",
+    [ 
+      "3 days ago I got my hands on these headphones.",
+      "I got my fresh pair of Sony headphones last week.",
+      "One month ago I decided to get new headphones.",
       "I've had this product for about six months.",
-      "I have used it for the past year.",
-      "I bought it 1.5 years ago."
+      "Last year I purchased them, and I have used it over the year.",
+      "I bought my pair 1.5 years ago."
     ],
   details :
     [
-      "It is very durable, it feels strong. When I dropped it, there wasn't a single scratch!",
+      "The headphones are very durable, the material feels strong. When I dropped them, there wasn't a single scratch!",
       "The rich deep bass works really well for upbeat tracks, like I'm standing right in the club.",
       "It feels very comfortable on my head, I can wear it all day long.",
       "It looks amazing and finishes a few of my outfits. Its neutral color makes it easy to match with everything!",
@@ -195,7 +227,7 @@ const persons = [
 
 const pictures = [
   "natural-female.jpg",
-  "selfie-female",
+  "selfie-female.jpg",
   "selfie-creepydude.jpg",
   "natural-male.jpg",
   "pose-male.jpg",
@@ -271,7 +303,7 @@ function generateReview(){
         tempcontent = tempcontent + " " + _credcontent[key][index];
         _credcontent[key].splice( index, 1 ); // Remove the item from the array
       });
-      reviewdetails.stars = (Math.floor(Math.random() * 4))/2 + 4;
+      reviewdetails.stars = (Math.floor(Math.random() * 3))/2 + 4;
     }
     else if(badreview[i] == 1) {
       Object.keys(_credcontent).forEach(function(key) {
@@ -317,46 +349,56 @@ function generateReview(){
   return details;
 }
 
+function capturePerson(review){
+  let person = {};
+  person.gender = review.gender;
+  person.name = review.person;
+  person.picture = false;
+  if(review.picture !== undefined)
+    person.picture = true;
+  person.review = review.content;
+  return person;
+}
 
 function selectItem(){
-  console.log(this);
-  // for(let i = 0; i < reviewdivs.length; i++){
-  //   reviewdivs[i].addEventListener("click", modifyText, false);
-  // }
-}
-const reviewdivs = document.getElementsByClassName("productreview");
-for(let i = 0; i < reviewdivs.length; i++){
-  console.log('test')
-  reviewdivs[i].addEventListener("click", selectItem, false);
-}
-
-
-  usernames[i].innerHTML = reviewbundle[i].person;
-  reviewlocs[i].innerHTML = reviewbundle[i].content;
-  ratings[i].setAttribute("data-rating",reviewbundle[i].stars);
-  console.log(reviewbundle[i]);
-  if(reviewbundle[i].picture !== undefined) {
-    console.log("adding pic");
-    commentcontent[i].insertAdjacentHTML( 'beforeend', '<div class="review-images mfp-gallery-container">' + reviewbundle[i].picture + '</a></div>' );
+  for(let i = 0; i < reviewdivs.length; i++){
+    reviewdivs[i].style.border = "none";
   }
+  reviewoptions[this.value-1].checked = true;
+  favreview = capturePerson(reviewbundle[this.value-1]);
+  this.style.border = "2px solid #0000FF";
+  console.log(favreview);
+}
+
+function selectRadio(){
+  for(let i = 0; i < reviewdivs.length; i++){
+    reviewdivs[i].style.border = "none";
+  }
+  reviewdivs[this.value-1].style.border = "2px solid #0000FF";
+  favreview = capturePerson(reviewbundle[this.value-1]);
+  console.log(favreview);
 }
 
 let reviewbundle = generateReview();
+let favreview;
 
+const reviewoptions = document.getElementsByName("headphonesreview");
+const reviewdivs = document.getElementsByClassName("productreview");
 const reviewlocs = document.getElementsByClassName("review-content");
 const commentcontent = document.getElementsByClassName("comment-content");
 const usernames = document.getElementsByClassName("username");
 const ratings = document.getElementsByClassName("star-rating");
 
-console.log(reviewlocs);
+for(let i = 0; i < reviewdivs.length; i++){
+  reviewdivs[i].addEventListener("click", selectItem, false);
+  reviewoptions[i].addEventListener("click", selectRadio, false);
+}
 
 for(let i = 0; i < reviewlocs.length; i++){
   usernames[i].innerHTML = reviewbundle[i].person;
   reviewlocs[i].innerHTML = reviewbundle[i].content;
   ratings[i].setAttribute("data-rating",reviewbundle[i].stars);
-  console.log(reviewbundle[i]);
   if(reviewbundle[i].picture !== undefined) {
-    console.log("adding pic");
     commentcontent[i].insertAdjacentHTML( 'beforeend', '<div class="review-images mfp-gallery-container">' + reviewbundle[i].picture + '</a></div>' );
   }
 }

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<head>
+
+<!-- Basic Page Needs
+================================================== -->
+<title>User test 2 - Study information</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+<!-- CSS
+================================================== -->
+
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style-pico.css">
+<link rel="stylesheet" href="css/rangeslider-form.css">
+<style>
+	input {
+		display:inline-block;
+	}
+	a {
+		color: #46aeeb;
+	}
+	.checkboxtext {
+		display:inline;
+		font-size: 14px;
+	}
+</style>
+
+<link rel="stylesheet" href="css/colors/main.css" id="colors">
+
+</head>
+
+<body onload="init();">
+
+<!-- Wrapper -->
+<div id="wrapper">
+
+
+
+
+
+<!-- Content
+================================================== -->
+<div class="container">
+	<div class="row sticky-wrapper">
+		<div class="col-lg-6 col-md-6 margin-top-75">
+			<h1> Study information: </h1>
+			<!-- <p class="margin-top-25"> Hi, I'm Floris. Thank you for showing interest in my research! The goal of this research is to gain more insight into how people behave in an online shopping environment, with a focus on how people perceive and write online reviews. With the obtained data, more insightful review systems can be designed in the future. The obtained data will be anonymous, the only personal data needed is your age (you must be 16+ years old to participate) and your gender.</p> -->
+			<p class="margin-top-25"> Hello, it's me again, Floris! For new people: I am researching the behaviour of people in an online shopping environment. This is my second research, which is based on interesting findings of my first test. If you helped me out with the first test, thank you so much! This test will be shorter than the first one. Just like in the previous test, the obtained data will be anonymous, the only personal data needed is your age (you must be 16+ years old to participate) and your gender.</p>
+			<p>	If at any point during the user test you wish to stop participating, you can just close the webpage. You don’t have to give a reason for this. </p>
+			<p>	There are no risks in participating, this research project has been reviewed and approved by the EEMCS Ethics Committee. If any questions arise, feel free to contact me (Floris Veldhuizen, at <a href="mailto:f.l.m.veldhuizen@student.utwente.nl">f.l.m.veldhuizen@student.utwente.nl</a>) or my supervisor (Dennis Reidsma, at <a href="mailto:d.reidsma@utwente.nl">d.reidsma@utwente.nl</a>). Finally, you could also reach the Ethics Committee at <a href="mailto:ethics-comm-ewi@utwente.nl"> ethics-comm-ewi@utwente.nl</a>.</p>
+			<p><b>🇳🇱: Als je Nederlands bent en je ook de test wilt maken maar moeite hebt met Engels lezen, kan je deze site bezoeken in Google Chrome en met <a target="_blank" href="https://support.google.com/chrome/answer/173424?co=GENIE.Platform%3DDesktop&hl=nl">deze stappen</a> de pagina gemakkelijk vertalen!</b></p>
+		</div>
+		<div class="col-lg-6 col-md-6 margin-top-75">
+			<form id="introductionform" class="margin-top-90">
+				<div class="col-lg-4 col-md-4">
+					Gender:<br>
+					<input type="radio" name="gender" value="1" checked> Male<br>
+				  <input type="radio" name="gender" value="2"> Female<br>
+				  <input type="radio" name="gender" value="3"> Other <br>
+				</div>
+
+				<div class="col-lg-8 col-md-8">
+					Age:<br>
+			  	<input required name="age" min="16" max="120" type="number"><br>
+				</div>
+				<div class="col-lg-12 col-md-12">
+					<input class="margin-top-25" type="checkbox" required style="width:auto;height:auto">
+					<p class="checkboxtext"> I have read and understood the study information dated <script> document.write(new Date().toLocaleDateString()); </script>. I have been able to ask questions (in person or via mail) about the study and my questions have been answered to my satisfaction. </p><br>
+					<input class="margin-top-25" type="checkbox" required style="width:auto;height:auto">
+					<p class="checkboxtext"> I consent voluntarily to be a participant in this study and understand that I can refuse to answer questions and I can withdraw from the study at any time, without having to give a reason. </p><br>
+					<input class="margin-top-25" type="checkbox" required style="width:auto;height:auto">
+					<p class="checkboxtext"> I accept that the information that I submit by participating in this user test will be used for research purposes, including publication of these anonymous results in scientific and popular writings and/or presentations. </p><br>
+					<!-- <input class="margin-top-25" type="checkbox" required style="width:auto;height:auto">
+					<p class="checkboxtext"> Click <a href="review-mashup"> here </a> to accept terms and start the user test </p> -->
+					<div class="mx-auto margin-top-50">
+						<button type="submit" class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('introduction','review-platform.html');"> Start Test </button>
+					</div>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+
+<!-- Back To Top Button -->
+<div id="backtotop"><a href="#"></a></div>
+
+
+</div>
+<!-- Wrapper / End -->
+
+
+<!-- Scripts
+================================================== -->
+<script type="text/javascript" src="scripts/jquery-2.2.0.min.js"></script>
+<script type="text/javascript" src="scripts/mmenu.min.js"></script>
+<script type="text/javascript" src="scripts/chosen.min.js"></script>
+<script type="text/javascript" src="scripts/slick.min.js"></script>
+<script type="text/javascript" src="scripts/rangeslider.min.js"></script>
+<script type="text/javascript" src="scripts/magnific-popup.min.js"></script>
+<script type="text/javascript" src="scripts/waypoints.min.js"></script>
+<script type="text/javascript" src="scripts/counterup.min.js"></script>
+<script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
+<script type="text/javascript" src="scripts/tooltips.min.js"></script>
+<script type="text/javascript" src="scripts/custom.js"></script>
+<script type="text/javascript" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/14082/FileSaver.js"></script>
+<script type="text/javascript" src="datahandler.js"></script>
+<script type="text/javascript" src="scripts/usertest.js"></script>
+
+</body>
+</html>

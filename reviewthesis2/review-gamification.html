@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<head>
+
+<!-- Basic Page Needs
+================================================== -->
+<title>User test - Gamification</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+<!-- CSS
+================================================== -->
+
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style-pico.css">
+<link rel="stylesheet" href="css/rangeslider-form.css">
+<style>
+	input {
+		display:inline-block;
+	}
+	a {
+		color: #46aeeb;
+	}
+	.checkboxtext {
+		display:inline;
+		font-size: 14px;
+	}
+	.pagenumber{
+		position: fixed;
+    bottom: 20px;
+    left: 35px;
+    font-size: 20px;
+	}
+	form .statement {
+		display:block;
+		font-size: 14px;
+		font-weight: bold;
+		padding: 15px 0 30px 12px;
+	}
+	form .likert {
+		list-style:none;
+		width:100%;
+		margin:0;
+		padding:0 0 35px;
+		display:block;
+		border-bottom:2px solid #efefef;
+	}
+	form .likert:last-of-type {border-bottom:0;}
+	form .likert:before {
+		content: '';
+		position:relative;
+		top:11px;
+		left:16%;
+		display:block;
+		background-color:#efefef;
+		height:4px;
+		width:65%;
+	}
+	form .likert li {
+		display:inline-block;
+		width:32%;
+		text-align:center;
+		vertical-align: top;
+	}
+	form .likert li input[type=radio] {
+		display:block;
+		position:relative;
+		top:0;
+		left:50%;
+		margin-left:-6px;
+
+	}
+	form .likert li label {width:100%;}
+</style>
+
+<link rel="stylesheet" href="css/colors/main.css" id="colors">
+
+</head>
+
+<body onload="setPage();">
+
+<!-- Wrapper -->
+<div id="wrapper">
+
+<!-- Content
+================================================== -->
+<div class="container">
+	<div class="row sticky-wrapper">
+		<form id="gamificationform">
+			<div class="col-lg-12 col-md-12 margin-top-25">
+				<h1>4. Gamification</h1>
+				<p class="margin-top-25"> Gamification is when elements of playing a game (E.g. rewards, experience, competition) get applied to other areas of activity. It is often used to make simple tasks more interesting and rewarding, and can also be used as a marketing technique to engage customers with a product or service. In my first experiment I noticed that multiple people do not like gamification at all. While both theory and literature support the effectiveness of gamification, I wanted to see what you think about gamification, and if it is effective at all. </p>
+				<p> On this page, I am proposing a few versions of gamification that can be used on online platforms. Would the techniques help to make a platform more fun, or help you engage with a platform? Let me know what you think.</p>
+				<label class="statement">1. (Reward) - Exceptional platform users get rewarded with platform benefits and a visible badge (think about Airbnb's superhost badge).</label>
+				<textarea rows="4" spellcheck="true" placeholder="Would this trigger you to engage with the platform? Explain why!" name="gamificationrewardtext" required></textarea>
+				<label class="statement">2. (Challenge) - The writer of the best review of a product will get the next edition of the product for free.</label>
+				<textarea rows="4" spellcheck="true" placeholder="Would a challenge like this trigger you to write a review? Explain why!" name="gamificationchallengetext" required></textarea>
+				<label class="statement">3. (Meaningful) - Everytime a product receives a well written review, a tree will be planted by the platform (to save the planet)!</label>
+				<textarea rows="4" spellcheck="true" placeholder="Would you help out by writing a review? Explain why!" name="gamificationmeaningfultext" required></textarea>
+				<label class="statement">4. (Interactivity) - The platform has a lot of personal customization options. You can rate other reviews and product features, and customize your public profile.</label>
+				<textarea rows="4" spellcheck="true" placeholder="Would this trigger you to engage more with the platform? Explain why!" name="gamificationinteractivitytext" required></textarea>
+				<div class="mx-auto margin-top-50 margin-bottom-50">
+				<button class="center-block btn btn-primary submit button submit-with-zoom-anim" style="display:block;margin-right:auto;width:180px;" onclick="return setPageData('review-gamification.html','review-debrief.html');"> Next page </button>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+
+
+<!-- Back To Top Button -->
+<div id="backtotop"><a href="#"></a></div>
+<div class="pagenumber"><b>(4/4)</b></div>
+
+</div>
+<!-- Wrapper / End -->
+
+
+<!-- Scripts
+================================================== -->
+<script type="text/javascript" src="scripts/jquery-2.2.0.min.js"></script>
+<script type="text/javascript" src="scripts/mmenu.min.js"></script>
+<script type="text/javascript" src="scripts/chosen.min.js"></script>
+<script type="text/javascript" src="scripts/slick.min.js"></script>
+<script type="text/javascript" src="scripts/rangeslider.min.js"></script>
+<script type="text/javascript" src="scripts/magnific-popup.min.js"></script>
+<script type="text/javascript" src="scripts/waypoints.min.js"></script>
+<script type="text/javascript" src="scripts/counterup.min.js"></script>
+<script type="text/javascript" src="scripts/jquery-ui.min.js"></script>
+<script type="text/javascript" src="scripts/tooltips.min.js"></script>
+<script type="text/javascript" src="scripts/custom.js"></script>
+<script type="text/javascript" src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/14082/FileSaver.js"></script>
+<script type="text/javascript" src="datahandler.js"></script>
+<script type="text/javascript" src="scripts/usertest.js"></script>
+
+</body>
+</html>

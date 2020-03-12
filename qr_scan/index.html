@@ -1,0 +1,36 @@
+<head>
+  <title>QR Test</title>
+  <script src="node_modules/jsqr/dist/jsQR.js"></script>
+</head>
+
+<script>
+  async function getMedia(constraints) {
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      return stream;
+      /* use the stream */
+    } catch(err) {
+      /* handle the error */
+    }
+  }
+
+  getMedia({video:true}).then((mediaStream) => {
+    let video = document.querySelector('video');
+    video.srcObject = mediaStream;
+    console.log(mediaStream);
+    video.onloadedmetadata = function(e) {
+      video.play();
+    };
+  })
+  .catch(function(err) { console.log(err.name + ": " + err.message); }); // always check for errors at the end.
+
+  // const code = jsQR(imageData, width, height, options);
+  // if (code) {
+  //   console.log("Found QR code", code);
+  // }
+</script>
+
+<body>
+    <video id="video" autoplay></video>
+</body>
