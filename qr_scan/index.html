@@ -69,6 +69,9 @@ navigator.mediaDevices.getUserMedia({ video: true })
   }
   video.onloadedmetadata = function(e) {
     console.log(video);
+    video.setAttribute('autoplay', '');
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
     video.play();
   };
 })
