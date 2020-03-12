@@ -18,7 +18,7 @@
     navigator.mediaDevices.getUserMedia = function(constraints) {
 
       // First get ahold of the legacy getUserMedia, if present
-      var getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.getUserMedia;
+      let getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.getUserMedia;
 
       // Some browsers just don't implement it - return a rejected promise with an error
       // to keep a consistent interface
@@ -33,28 +33,30 @@
     }
   }
 
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: (front? "user" : "environment") } })
-  .then(function(stream) {
-    var video = document.getElementById('video');
-    // Older browsers may not have srcObject
-    if ("srcObject" in video) {
-      video.srcObject = stream;
-    } else {
-      // Avoid using this in new browsers, as it is going away.
-      video.src = window.URL.createObjectURL(stream);
-    }
-    video.onloadedmetadata = function(e) {
-      console.log(video);
-      video.setAttribute('autoplay', '');
-      video.setAttribute('muted', '');
-      video.setAttribute('playsinline', '');
-      video.play();
-    };
-  })
-  .catch(function(err) {
-    console.log(err.name + ": " + err.message);
-  });
+  let runCam = function(){
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: (front? "user" : "environment") } })
+    .then(function(stream) {
+      var video = document.querySelector('video');
+      // Older browsers may not have srcObject
+      if ("srcObject" in video) {
+        video.srcObject = stream;
+      } else {
+        // Avoid using this in new browsers, as it is going away.
+        video.src = window.URL.createObjectURL(stream);
+      }
+      video.onloadedmetadata = function(e) {
+        video.setAttribute('autoplay', '');
+        video.setAttribute('muted', '');
+        video.setAttribute('playsinline', '');
+        video.play();
+      };
+    })
+    .catch(function(err) {
+      console.log(err.name + ": " + err.message);
+    });
+  }
 
+  runCam();
 
   // const code = jsQR(imageData, width, height, options);
   // if (code) {
@@ -62,7 +64,10 @@
   // }
 
   window.onload = function(){
-    document.getElementById('flip-button').onclick = function() { front = !front; };
+    document.getElementById('flip-button').onclick = function() {
+      front = !front;
+      runCam();
+    };
   };
 </script>
 
