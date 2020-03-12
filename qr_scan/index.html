@@ -4,6 +4,7 @@
 </head>
 
 <script>
+  let canvasElement, canvas, video;
   let front = false;
 
   // Older browsers might not implement mediaDevices at all, so we set an empty object first
@@ -33,10 +34,18 @@
     }
   }
 
+  function drawLine(begin, end, color) {
+      canvas.beginPath();
+      canvas.moveTo(begin.x, begin.y);
+      canvas.lineTo(end.x, end.y);
+      canvas.lineWidth = 4;
+      canvas.strokeStyle = color;
+      canvas.stroke();
+    }
+
   let runCam = function(){
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: (front? "user" : "environment") } })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: (front? "user" : "environment"), width: 1280, height: 720 } })
     .then(function(stream) {
-      var video = document.querySelector('video');
       // Older browsers may not have srcObject
       if ("srcObject" in video) {
         video.srcObject = stream;
@@ -45,10 +54,9 @@
         video.src = window.URL.createObjectURL(stream);
       }
       video.onloadedmetadata = function(e) {
-        video.setAttribute('autoplay', '');
-        video.setAttribute('muted', '');
-        video.setAttribute('playsinline', '');
+        video.setAttribute('playsinline', true);
         video.play();
+        requestAnimationFrame(tick);
       };
     })
     .catch(function(err) {
@@ -56,14 +64,28 @@
     });
   }
 
-  runCam();
-
-  // const code = jsQR(imageData, width, height, options);
-  // if (code) {
-  //   console.log("Found QR code", code);
-  // }
+  function tick() {
+    canvasElement.height = video.videoHeight;
+    canvasElement.width = video.videoWidth;
+    canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+    let imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+    let code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "dontInvert",
+    });
+    if(code){
+      drawLine(code.location.topLeftCorner, code.location.topRightCorner, "#FF3B58");
+      drawLine(code.location.topRightCorner, code.location.bottomRightCorner, "#FF3B58");
+      drawLine(code.location.bottomRightCorner, code.location.bottomLeftCorner, "#FF3B58");
+      drawLine(code.location.bottomLeftCorner, code.location.topLeftCorner, "#FF3B58");
+    }
+    requestAnimationFrame(tick);
+  }
 
   window.onload = function(){
+    video = document.querySelector('video');
+    canvasElement = document.getElementById("canvas");
+    canvas = canvasElement.getContext("2d");
+    runCam();
     document.getElementById('flip-button').onclick = function() {
       front = !front;
       runCam();
@@ -72,6 +94,7 @@
 </script>
 
 <body>
+    <canvas id="canvas"></canvas>
     <video id="video" autoplay></video> <br>
     <button id="flip-button"> Flip view </button>
 </body>
