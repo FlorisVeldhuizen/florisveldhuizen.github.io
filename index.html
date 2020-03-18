@@ -1,4 +1,8 @@
-<style>
+<head>
+  <title>Github Pages - Floris Veldhuizen</title>
+</head>
+
+<style type="text/css">
   body{
     background-color:#eee;
     position:relative;
@@ -32,11 +36,18 @@
     text-align: left;
     position: relative;
   }
-
+  #secretsloth{
+    position:absolute;
+    transition: all 4s ease;
+    right:20px;
+    top:0px;
+    cursor:pointer;
+  }
 </style>
+
 <body>
   <div class="container">
-    <h1> &#x1F9A5; Random projects </h1>
+    <h1> Random projects</h1>
     <ol>
       <li><a href="fractals"> Mandelbrot Fractal </a> <span class="right"> (Drag mouse and scroll to interact)</span></li>
       <li><a href="portfolio"> Lines </a> <span class="right">(Use arrow keys) </span></li>
@@ -47,4 +58,25 @@
       <li><a href="qr_scan"> QR code test </a> <span class="right">(Try holding a QR code in front of your webcam) </span></li>
     </ol>
   </div>
+  <h2 id="secretsloth"> &#x1F9A5;</h2>
 </body>
+
+<script type="text/javascript">
+  let sloth, patience;
+  const stoptouching = function(e){
+    sloth.style.top = Math.floor(Math.random() * window.innerHeight);
+    sloth.style.right = Math.floor(Math.random() * window.innerWidth);
+    if(patience < 3){
+      alert("Ouch, stop pressing me!");
+    } else {
+      sloth.style.fontSize = patience * 20 + "px";
+      alert("I am going to get you!");
+    }
+    patience++;
+  }
+  window.onload = function(){
+    patience = 1;
+    sloth = document.getElementById('secretsloth');
+    sloth.addEventListener("click",stoptouching);
+  }
+</script>
