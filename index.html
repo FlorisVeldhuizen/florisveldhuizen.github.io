@@ -6,6 +6,7 @@
   body{
     background-color:#eee;
     position:relative;
+    overflow: hidden;
   }
   .container{
     position:absolute;
@@ -42,6 +43,18 @@
     right:20px;
     top:0px;
     cursor:pointer;
+    text-shadow: 0 0 0 red;
+  }
+  .anger {
+    animation: angry 0.8s 2;
+  }
+  @keyframes angry {
+    0% {
+      color: transparent;
+    }
+    100% {
+      color: #b4d455;
+    }
   }
 </style>
 
@@ -62,20 +75,25 @@
 </body>
 
 <script type="text/javascript">
-  let sloth, patience;
+  let sloth, patience, growth;
   const stoptouching = function(e){
-    sloth.style.top = Math.floor(Math.random() * window.innerHeight);
-    sloth.style.right = Math.floor(Math.random() * window.innerWidth);
+    sloth.style.top = Math.floor(Math.random() * window.innerHeight)-(patience*growth);
+    sloth.style.right = Math.floor(Math.random() * window.innerWidth)-(patience*growth);
     if(patience < 3){
       alert("Ouch, stop pressing me!");
     } else {
-      sloth.style.fontSize = patience * 20 + "px";
+      sloth.classList.remove("anger");
+      void sloth.offsetWidth; //weird CSS trick to restart keyframe animation
+      sloth.classList.add("anger");
+      sloth.style.fontSize = patience * growth + "px";
       alert("I am going to get you!");
+      // sloth.classList.remove("anger");
     }
     patience++;
   }
   window.onload = function(){
     patience = 1;
+    growth = 20;
     sloth = document.getElementById('secretsloth');
     sloth.addEventListener("click",stoptouching);
   }
