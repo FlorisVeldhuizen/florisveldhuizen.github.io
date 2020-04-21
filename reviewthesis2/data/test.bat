@@ -1,1 +1,0 @@
-type  user*.txt > merge.txt
