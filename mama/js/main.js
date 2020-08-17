@@ -1,22 +1,29 @@
 /*
-Cadeautje voor mama
+Cadeautje voor mama en papa
 Met dank aan: https://www.openprocessing.org/sketch/532445 (sketch van Justin Chambers)
 */
 
 let sunSize, sunHeight, halfCanvas, reflectionHalfWidth, reflectionColor, highlightColor, waterLowColor, waterHighColor;
 
+
+let resolution = 1.3;
+
 let gradientSteps = 20; //the detail of color
 let noiseScale = .07; //increments the noise, higher values are more erratic
 let waveMovementSpeed = 1.75; //how noisy is the water
-let waterStrokeWeight = 10; //how thicc is the water
-let waterStride = 15; //the lower, the more detailed
+let waterStrokeWeight = 10; //how thicc is the water, default:10
+let waterStride = 15; //the lower, the more detailed, default:15
+
+
 
 function preload(){
   img = loadImage('./img/gazing.png');
 }
 
 function setup(){
-  const canvasElement = createCanvas(windowWidth, windowHeight);
+  const canvasElement = createCanvas(windowWidth/resolution, windowHeight/resolution);
+  canvasElement.style('height',height*resolution+'px');
+  canvasElement.style('width',width*resolution+'px');
   imageMode(CENTER);
   strokeCap(SQUARE);
   noSmooth();
@@ -60,6 +67,7 @@ function draw(){
     lineToggle = lineToggle == 0 ? -waterStride/3 : 0;
   }
   image(img, width/2, height/2, width, height);
+  text("FPS: " + frameRate().toFixed(2), 10, height - 10);
 }
 
 function drawSun(){
@@ -99,6 +107,10 @@ function drawSun(){
   }
 
   strokeWeight(waterStrokeWeight);
+}
+
+function fireworks() {
+  
 }
 
 let oldMouseY = 0;
