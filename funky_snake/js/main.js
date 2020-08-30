@@ -12,6 +12,8 @@ let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY;
 // TOUCH CONTROLS
 let startTouchX, startTouchY;
 let touchControl = false;
+let touchSet = false;
+const arcSize = 120;
 
 // GLOBAL VARIABLES
 const _RIGHT = 0;
@@ -42,15 +44,16 @@ function setup() {
 }
 
 function draw() {
+  if (touchControl) calcTouch();
   if (iterationCounter > _frameRate) {
     background(0,0,0,100);
     calcNewPos();
     drawGrid();
     drawPlayer();
     drawSnacc();
+    if (touchControl) drawTouch();
     iterationCounter = 0;
   }
-  if (touchControl) handleTouch();
   if (death) reset();
   iterationCounter++;
   drawScore();
@@ -155,55 +158,63 @@ const drawPlayer = () => {
   });
 }
 
-const handleTouch = () => {
-  // store mouse start pos Y and X globally on touchStart
-  // these values will be the pos where the touch controls will be 
-  // then divide the controls in 4 parts (up, down, left right)
-  // the middle part of the control (circle) will move towards where you move your thumb
-
-  const arcSize = 100;
+const calcTouch = () => {
   const distSquared = (x1, y1, x2, y2) => {
     let dx = x2 - x1;
     let dy = y2 - y1;
     return dx * dx + dy * dy;
   }
-  
-  fill(100);
-  ellipse(startTouchX, startTouchY, arcSize, arcSize);
+  const dirCheck = (oppositeDir, dir) => {
+    if (direction !== oppositeDir) {
+      if (!directionLocked) direction = dir;
+    } 
+    else touchSet = false;
+  }
   let radianDistance = Math.atan2(mouseY-startTouchY, mouseX-startTouchX);
   if (radianDistance < 0) radianDistance = radianDistance + TWO_PI;
-  
+
+  if(distSquared(startTouchX, startTouchY, mouseX, mouseY) > 100) {
+    touchSet = true;
+    if (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI) {
+      dirCheck(_LEFT,_RIGHT);
+    }
+    else if (radianDistance > QUARTER_PI && radianDistance < HALF_PI + QUARTER_PI) {
+      dirCheck(_UP,_DOWN);
+    }
+    else if (radianDistance > HALF_PI + QUARTER_PI && radianDistance < PI + QUARTER_PI) {
+      dirCheck(_RIGHT,_LEFT);
+    }
+    else if (radianDistance > PI + QUARTER_PI && radianDistance < TWO_PI - QUARTER_PI) {
+      dirCheck(_DOWN,_UP);
+    }
+    directionLocked = touchSet;
+  } else {
+    touchSet = false;
+  }
+}
+
+const drawTouch = () => {
   const bottomArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, QUARTER_PI, HALF_PI + QUARTER_PI);
   const leftArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, HALF_PI + QUARTER_PI, PI + QUARTER_PI);
   const topArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, PI + QUARTER_PI, TWO_PI - QUARTER_PI);
   const rightArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, TWO_PI - QUARTER_PI, QUARTER_PI);
 
-  if(distSquared(startTouchX, startTouchY, mouseX, mouseY) > arcSize) {
+  fill(100);
+  ellipse(startTouchX, startTouchY, arcSize, arcSize);
+  if(touchSet) {
     fill(200);
-    if (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI) {
-      rightArc();
-      if (direction !== _LEFT && !directionLocked) direction = _RIGHT;
-    }
-    else if (radianDistance > QUARTER_PI && radianDistance < HALF_PI + QUARTER_PI) {
-      bottomArc();
-      if (direction !== _UP && !directionLocked)   direction = _DOWN;
-    }
-    else if (radianDistance > HALF_PI + QUARTER_PI && radianDistance < PI + QUARTER_PI) {
-      leftArc();
-      if (direction !== _RIGHT && !directionLocked)direction = _LEFT;
-    }
-    else if (radianDistance > PI + QUARTER_PI && radianDistance < TWO_PI - QUARTER_PI) {
-      topArc();
-      if (direction !== _DOWN && !directionLocked) direction = _UP;
-    }
-    directionLocked = true;
+    if      (direction === _UP) topArc();
+    else if (direction === _DOWN) bottomArc();
+    else if (direction === _LEFT) leftArc();
+    else if (direction === _RIGHT) rightArc();
   }
+
   // TO-DO: DRAW JOYSTICK THAT IS constrained BY BOUNDARIES OF CONTROL
   fill(50);
-  ellipse(mouseX, mouseY, arcSize/2, arcSize/2)
+  ellipse(mouseX, mouseY, arcSize/2, arcSize/2);
 }
 
-function mousePressed() {
+function mousePressed () {
   startTouchX = mouseX;
   startTouchY = mouseY;
   touchControl = true;
@@ -212,6 +223,20 @@ function mousePressed() {
 }
 
 function mouseReleased() {
+  touchControl = false;
+  // prevent default
+  return false;
+}
+
+function touchStarted () {
+  startTouchX = mouseX;
+  startTouchY = mouseY;
+  touchControl = true;
+  // prevent default
+  return false;
+}
+
+function touchEnded() {
   touchControl = false;
   // prevent default
   return false;
