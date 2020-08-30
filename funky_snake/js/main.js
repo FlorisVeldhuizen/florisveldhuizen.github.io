@@ -9,6 +9,10 @@ const snakeSize = 5;
 // PRECALCULATED VALUES
 let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY; 
 
+// TOUCH CONTROLS
+let startTouchX, startTouchY;
+let touchControl = false;
+
 // GLOBAL VARIABLES
 const _RIGHT = 0;
 const _DOWN  = 1;
@@ -25,6 +29,7 @@ let iterationCounter = 0;
 let snaccPos = [0,0];
 let _frameRate = 60 / gameSpeed;
 let highScore = 0;
+
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -45,6 +50,7 @@ function draw() {
     drawSnacc();
     iterationCounter = 0;
   }
+  if (touchControl) handleTouch();
   if (death) reset();
   iterationCounter++;
   drawScore();
@@ -149,6 +155,69 @@ const drawPlayer = () => {
   });
 }
 
+const handleTouch = () => {
+  // store mouse start pos Y and X globally on touchStart
+  // these values will be the pos where the touch controls will be 
+  // then divide the controls in 4 parts (up, down, left right)
+  // the middle part of the control (circle) will move towards where you move your thumb
+
+  const arcSize = 100;
+  const distSquared = (x1, y1, x2, y2) => {
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    return dx * dx + dy * dy;
+  }
+  
+  fill(100);
+  ellipse(startTouchX, startTouchY, arcSize, arcSize);
+  let radianDistance = Math.atan2(mouseY-startTouchY, mouseX-startTouchX);
+  if (radianDistance < 0) radianDistance = radianDistance + TWO_PI;
+  
+  // BOTTOM ARC
+  const bottomArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, QUARTER_PI, HALF_PI + QUARTER_PI);
+  // LEFT ARC
+  const leftArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, HALF_PI + QUARTER_PI, PI + QUARTER_PI);
+  // TOP ARC
+  const topArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, PI + QUARTER_PI, TWO_PI - QUARTER_PI);
+  // RIGHT ARC
+  const rightArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, TWO_PI - QUARTER_PI, QUARTER_PI);
+
+  if(distSquared(startTouchX, startTouchY, mouseX, mouseY) > arcSize * 5) {
+    fill(200);
+    if (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI) {
+      rightArc();
+      if (direction !== _LEFT && !directionLocked) direction = _RIGHT;
+    }
+    else if (radianDistance > QUARTER_PI && radianDistance < HALF_PI + QUARTER_PI) {
+      bottomArc();
+      if (direction !== _UP && !directionLocked)   direction = _DOWN;
+    }
+    else if (radianDistance > HALF_PI + QUARTER_PI && radianDistance < PI + QUARTER_PI) {
+      leftArc();
+      if (direction !== _RIGHT && !directionLocked)direction = _LEFT;
+    }
+    else if (radianDistance > PI + QUARTER_PI && radianDistance < TWO_PI - QUARTER_PI) {
+      topArc();
+      if (direction !== _DOWN && !directionLocked) direction = _UP;
+    }
+    directionLocked = true;
+  }
+}
+
+function mousePressed() {
+  startTouchX = mouseX;
+  startTouchY = mouseY;
+  touchControl = true;
+  // prevent default
+  return false;
+}
+
+function mouseReleased() {
+  touchControl = false;
+  // prevent default
+  return false;
+}
+
 function keyPressed() {
   if (!directionLocked) { //prevents a player to abuse pressing multiple directions to turn directly
     if      (keyCode === UP_ARROW)    { if (direction !== _DOWN) direction = _UP;   } 
@@ -157,8 +226,6 @@ function keyPressed() {
     else if (keyCode === RIGHT_ARROW) { if (direction !== _LEFT) direction = _RIGHT;}
     directionLocked = true;
   }
-  // Continue the game after death
-  if (keyCode === ENTER) { frameRate(gameSpeed); }
 }
 
 function windowResized() {
