@@ -51,9 +51,9 @@ function draw() {
     drawGrid();
     drawPlayer();
     drawSnacc();
-    if (touchControl) drawTouch();
     iterationCounter = 0;
   }
+  if (touchControl) drawTouch();
   if (death) reset();
   iterationCounter++;
   drawScore();
