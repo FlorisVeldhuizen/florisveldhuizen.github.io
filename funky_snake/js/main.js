@@ -173,16 +173,12 @@ const handleTouch = () => {
   let radianDistance = Math.atan2(mouseY-startTouchY, mouseX-startTouchX);
   if (radianDistance < 0) radianDistance = radianDistance + TWO_PI;
   
-  // BOTTOM ARC
   const bottomArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, QUARTER_PI, HALF_PI + QUARTER_PI);
-  // LEFT ARC
   const leftArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, HALF_PI + QUARTER_PI, PI + QUARTER_PI);
-  // TOP ARC
   const topArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, PI + QUARTER_PI, TWO_PI - QUARTER_PI);
-  // RIGHT ARC
   const rightArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, TWO_PI - QUARTER_PI, QUARTER_PI);
 
-  if(distSquared(startTouchX, startTouchY, mouseX, mouseY) > arcSize * 5) {
+  if(distSquared(startTouchX, startTouchY, mouseX, mouseY) > arcSize) {
     fill(200);
     if (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI) {
       rightArc();
@@ -202,6 +198,9 @@ const handleTouch = () => {
     }
     directionLocked = true;
   }
+  // TO-DO: DRAW JOYSTICK THAT IS constrained BY BOUNDARIES OF CONTROL
+  fill(50);
+  ellipse(mouseX, mouseY, arcSize/2, arcSize/2)
 }
 
 function mousePressed() {
