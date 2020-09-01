@@ -11,9 +11,9 @@ let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY;
 
 // TOUCH CONTROLS
 let startTouchX, startTouchY;
-let touchControl = false;
-let touchSet = false;
-const arcSize = 120;
+let touchControl = false;     // If true, the touch controls are displayed on screen
+let touchSet = false;         // If true, the touch controls highlight the current direction
+const arcSize = 120;          // Diameter of the touch controls
 
 // GLOBAL VARIABLES
 const _RIGHT = 0;
@@ -242,14 +242,25 @@ function touchEnded() {
   return false;
 }
 
-function keyPressed() {
-  if (!directionLocked) { //prevents a player to abuse pressing multiple directions to turn directly
-    if      (keyCode === UP_ARROW)    { if (direction !== _DOWN) direction = _UP;   } 
-    else if (keyCode === DOWN_ARROW)  { if (direction !== _UP)   direction = _DOWN; }
-    else if (keyCode === LEFT_ARROW)  { if (direction !== _RIGHT)direction = _LEFT; }
-    else if (keyCode === RIGHT_ARROW) { if (direction !== _LEFT) direction = _RIGHT;}
+const handleKeys = (keyType, up, down, left, right) => {
+  const setDirection = dir => {
+    direction = dir;
     directionLocked = true;
   }
+  if (!directionLocked) { //prevents a player to abuse pressing multiple directions to turn directly
+    if      (keyType === up)    { if (direction !== _DOWN) setDirection(_UP);   } 
+    else if (keyType === down)  { if (direction !== _UP)   setDirection(_DOWN); }
+    else if (keyType === left)  { if (direction !== _RIGHT)setDirection(_LEFT); }
+    else if (keyType === right) { if (direction !== _LEFT) setDirection(_RIGHT);}
+  }
+}
+
+function keyTyped() {
+  handleKeys(key, "w", "s", "a", "d");
+}
+
+function keyPressed() {
+  handleKeys(keyCode, UP_ARROW, DOWN_ARROW, LEFT_ARROW, RIGHT_ARROW);
 }
 
 function windowResized() {
