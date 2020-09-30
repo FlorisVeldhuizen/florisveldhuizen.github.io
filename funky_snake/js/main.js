@@ -1,12 +1,16 @@
+/* 
+Made by: Floris Veldhuizen
+Queuing of moves was adapted from: https://github.com/patorjk/JavaScript-Snake/blob/master/js/snake.js 
+*/
+
 // PARAMS
 const fieldWidth = 400;
 const fieldHeight = 400;
 const backgroundColor = 255;
 const gridResolutionX = 14;   // How many squares fit in a row  (default: 14)
-const gameSpeed = 12;         // Amount of frames per second    (default: 12)
+const gameSpeed = 13;         // Amount of frames per second    (default: 12)
 const snakeSize = 5;
 
-// TO-DO: use maxLength to determine when the game is over
 // PRECALCULATED VALUES
 let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY, maxLength, lastDirection; 
 
@@ -32,7 +36,7 @@ let bodyLength = snakeSize - 1;
 let death = false;
 let iterationCounter = 0;
 let snaccPos = [0,0];
-let _frameRate = Math.floor(60 / gameSpeed);
+let _frameRate = Math.floor(60 / gameSpeed); // Assuming 60 fps
 let highScore = 0;
 
 function setup() {
@@ -101,6 +105,8 @@ const spawnSnacc = () => {
   let overlap = false;
 
   // TO-DO check for bodyparts, then spawn snacc somewhere where there is no bodypart
+  // TO-DO: use maxLength to determine when the game is over
+
   bodyParts.forEach(part => {
     if (part[0] === xPos && part[1] === yPos) {
       overlap = true;
@@ -117,7 +123,7 @@ const drawSnacc = () => {
 }
 
 const calcNewPos = () => {
-  // Check for queued moves
+  // Set lastDirection and check for queued moves
   lastDirection = currentDirection;
   if (preMove !== NIL) {
     currentDirection = preMove;
@@ -149,10 +155,10 @@ const calcNewPos = () => {
   });
 
   if (curLocation[0] === snaccPos[0] && curLocation[1] === snaccPos[1]) {
-    bodyLength++
+    bodyLength++;
     spawnSnacc();
   }
-  
+
   // Set all bodyparts
   bodyParts.push([...curLocation]);
 }
