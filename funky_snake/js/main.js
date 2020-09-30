@@ -6,8 +6,9 @@ const gridResolutionX = 14;   // How many squares fit in a row  (default: 14)
 const gameSpeed = 13;         // Amount of frames per second    (default: 12)
 const snakeSize = 5;
 
+// TO-DO: use maxLength to determine when the game is over
 // PRECALCULATED VALUES
-let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY; 
+let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY, maxLength; 
 
 // TOUCH CONTROLS
 let startTouchX, startTouchY;
@@ -21,7 +22,8 @@ const _DOWN  = 1;
 const _LEFT  = 2;
 const _UP    = 3;
 
-let direction = _RIGHT; 
+let currentDirection = _RIGHT;
+let lastDirection = null;
 let curLocation = [0,0];
 let bodyParts = [];
 let bodyLength = snakeSize - 1;
@@ -29,9 +31,8 @@ let directionLocked = false;
 let death = false;
 let iterationCounter = 0;
 let snaccPos = [0,0];
-let _frameRate = 60 / gameSpeed;
+let _frameRate = Math.floor(60 / gameSpeed);
 let highScore = 0;
-
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -40,6 +41,7 @@ function setup() {
   fieldOffsetY = (windowHeight/2)-(fieldHeight/2);
   squareSize = fieldWidth / gridResolutionX;
   gridResolutionY = Math.floor(fieldHeight / squareSize);
+  maxLength = gridResolutionX * gridResolutionY;
   spawnSnacc();
 }
 
@@ -66,8 +68,6 @@ const reset = () => {
   bodyLength = snakeSize - 1;
   bodyParts = [];
   death = false;
-  shaky = true;
-  _frameRate = 60 / gameSpeed;
 }
 
 const drawGrid = () => {
@@ -116,10 +116,10 @@ const drawSnacc = () => {
 
 const calcNewPos = () => {
   // Calculate new position of body based on direction
-  if      (direction === _UP)    { curLocation[1]--; }
-  else if (direction === _DOWN)  { curLocation[1]++; }
-  else if (direction === _LEFT)  { curLocation[0]--; }
-  else if (direction === _RIGHT) { curLocation[0]++; }
+  if      (currentDirection === _UP)    { curLocation[1]--; }
+  else if (currentDirection === _DOWN)  { curLocation[1]++; }
+  else if (currentDirection === _LEFT)  { curLocation[0]--; }
+  else if (currentDirection === _RIGHT) { curLocation[0]++; }
 
   // Boundary check
   if      (curLocation[1] < 0 ) { curLocation[1] = gridResolutionY - 1; }
@@ -148,6 +148,7 @@ const calcNewPos = () => {
 
   // Allow new keyboard input
   directionLocked = false;
+  lastDirection = currentDirection;
 }
 
 const drawPlayer = () => {
@@ -164,30 +165,20 @@ const calcTouch = () => {
     let dy = y2 - y1;
     return dx * dx + dy * dy;
   }
-  const dirCheck = (oppositeDir, dir) => {
-    if (direction !== oppositeDir) {
-      if (!directionLocked) direction = dir;
-    } 
-    else touchSet = false;
+  const dirCheck = dir => {
+    if (dir + lastDirection !== 2 && dir !== lastDirection) {
+      currentDirection = dir;
+      directionLocked = true;
+      touchSet = true;
+    }
   }
   let radianDistance = Math.atan2(mouseY-startTouchY, mouseX-startTouchX);
   if (radianDistance < 0) radianDistance = radianDistance + TWO_PI;
-
   if(distSquared(startTouchX, startTouchY, mouseX, mouseY) > 100) {
-    touchSet = true;
-    if (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI) {
-      dirCheck(_LEFT,_RIGHT);
-    }
-    else if (radianDistance > QUARTER_PI && radianDistance < HALF_PI + QUARTER_PI) {
-      dirCheck(_UP,_DOWN);
-    }
-    else if (radianDistance > HALF_PI + QUARTER_PI && radianDistance < PI + QUARTER_PI) {
-      dirCheck(_RIGHT,_LEFT);
-    }
-    else if (radianDistance > PI + QUARTER_PI && radianDistance < TWO_PI - QUARTER_PI) {
-      dirCheck(_DOWN,_UP);
-    }
-    directionLocked = touchSet;
+    if      (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI)       { dirCheck(_RIGHT)}
+    else if (radianDistance > QUARTER_PI && radianDistance < HALF_PI + QUARTER_PI)      { dirCheck(_DOWN) }
+    else if (radianDistance > HALF_PI + QUARTER_PI && radianDistance < PI + QUARTER_PI) { dirCheck(_LEFT) }
+    else if (radianDistance > PI + QUARTER_PI && radianDistance < TWO_PI - QUARTER_PI)  { dirCheck(_UP)   }
   } else {
     touchSet = false;
   }
@@ -195,18 +186,18 @@ const calcTouch = () => {
 
 const drawTouch = () => {
   const bottomArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, QUARTER_PI, HALF_PI + QUARTER_PI);
-  const leftArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, HALF_PI + QUARTER_PI, PI + QUARTER_PI);
-  const topArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, PI + QUARTER_PI, TWO_PI - QUARTER_PI);
-  const rightArc = () => arc(startTouchX, startTouchY, arcSize, arcSize, TWO_PI - QUARTER_PI, QUARTER_PI);
+  const leftArc   = () => arc(startTouchX, startTouchY, arcSize, arcSize, HALF_PI + QUARTER_PI, PI + QUARTER_PI);
+  const topArc    = () => arc(startTouchX, startTouchY, arcSize, arcSize, PI + QUARTER_PI, TWO_PI - QUARTER_PI);
+  const rightArc  = () => arc(startTouchX, startTouchY, arcSize, arcSize, TWO_PI - QUARTER_PI, QUARTER_PI);
 
   fill(100);
   ellipse(startTouchX, startTouchY, arcSize, arcSize);
   if(touchSet) {
     fill(200);
-    if      (direction === _UP) topArc();
-    else if (direction === _DOWN) bottomArc();
-    else if (direction === _LEFT) leftArc();
-    else if (direction === _RIGHT) rightArc();
+    if (currentDirection === _UP)    topArc();
+    if (currentDirection === _DOWN)  bottomArc();
+    if (currentDirection === _LEFT)  leftArc();
+    if (currentDirection === _RIGHT) rightArc();
   }
 
   // TO-DO: DRAW JOYSTICK THAT IS constrained BY BOUNDARIES OF CONTROL
@@ -218,13 +209,11 @@ function mousePressed () {
   startTouchX = mouseX;
   startTouchY = mouseY;
   touchControl = true;
-  // prevent default
   return false;
 }
 
 function mouseReleased() {
   touchControl = false;
-  // prevent default
   return false;
 }
 
@@ -232,26 +221,33 @@ function touchStarted () {
   startTouchX = mouseX;
   startTouchY = mouseY;
   touchControl = true;
-  // prevent default
   return false;
 }
 
 function touchEnded() {
   touchControl = false;
-  // prevent default
   return false;
 }
 
+// TO-DO: QUEUE KEYS, see https://github.com/patorjk/JavaScript-Snake/blob/master/js/snake.js :250
+// Last move: kinda like direction --> hier ook lastDir en curDir gebruiken, kan ook "abs(lastdir + curdir) !== 2" gebruiken dan
+// currentdirection, directionfound, premove, isfirstmove
+// currentdirection gets set by handing arrow keys (so its like direction)
+// on move: lastmove becomes currentdirection
+// if there was a premove, currentdirection becomes premove and then resets it
+
 const handleKeys = (keyType, up, down, left, right) => {
   const setDirection = dir => {
-    direction = dir;
-    directionLocked = true;
+    if (dir + lastDirection !== 2 && dir !== lastDirection) {
+      currentDirection = dir;
+      directionLocked = true;
+    }
   }
   if (!directionLocked) { //prevents a player to abuse pressing multiple directions to turn directly
-    if      (keyType === up)    { if (direction !== _DOWN) setDirection(_UP);   } 
-    else if (keyType === down)  { if (direction !== _UP)   setDirection(_DOWN); }
-    else if (keyType === left)  { if (direction !== _RIGHT)setDirection(_LEFT); }
-    else if (keyType === right) { if (direction !== _LEFT) setDirection(_RIGHT);}
+    if      (keyType === up)    { setDirection(_UP)   } 
+    else if (keyType === down)  { setDirection(_DOWN) }
+    else if (keyType === left)  { setDirection(_LEFT) }
+    else if (keyType === right) { setDirection(_RIGHT)}
   }
 }
 
