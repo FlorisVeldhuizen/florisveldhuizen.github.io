@@ -3,12 +3,12 @@ const fieldWidth = 400;
 const fieldHeight = 400;
 const backgroundColor = 255;
 const gridResolutionX = 14;   // How many squares fit in a row  (default: 14)
-const gameSpeed = 13;         // Amount of frames per second    (default: 12)
+const gameSpeed = 12;         // Amount of frames per second    (default: 12)
 const snakeSize = 5;
 
 // TO-DO: use maxLength to determine when the game is over
 // PRECALCULATED VALUES
-let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY, maxLength; 
+let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY, maxLength, lastDirection; 
 
 // TOUCH CONTROLS
 let startTouchX, startTouchY;
@@ -17,17 +17,18 @@ let touchSet = false;         // If true, the touch controls highlight the curre
 const arcSize = 120;          // Diameter of the touch controls
 
 // GLOBAL VARIABLES
-const _RIGHT = 0;
-const _DOWN  = 1;
-const _LEFT  = 2;
-const _UP    = 3;
+const NIL     = -1;
+const _RIGHT  = 0;
+const _DOWN   = 1;
+const _LEFT   = 2;
+const _UP     = 3;
 
+let isFirstMove = true;
+let preMove = NIL;
 let currentDirection = _RIGHT;
-let lastDirection = null;
 let curLocation = [0,0];
 let bodyParts = [];
 let bodyLength = snakeSize - 1;
-let directionLocked = false;
 let death = false;
 let iterationCounter = 0;
 let snaccPos = [0,0];
@@ -99,6 +100,7 @@ const spawnSnacc = () => {
   const yPos = Math.floor(Math.random() * gridResolutionY);
   let overlap = false;
 
+  // TO-DO check for bodyparts, then spawn snacc somewhere where there is no bodypart
   bodyParts.forEach(part => {
     if (part[0] === xPos && part[1] === yPos) {
       overlap = true;
@@ -115,17 +117,25 @@ const drawSnacc = () => {
 }
 
 const calcNewPos = () => {
+  // Check for queued moves
+  lastDirection = currentDirection;
+  if (preMove !== NIL) {
+    currentDirection = preMove;
+    preMove = NIL;
+  }
+  isFirstMove = true;
+
   // Calculate new position of body based on direction
-  if      (currentDirection === _UP)    { curLocation[1]--; }
-  else if (currentDirection === _DOWN)  { curLocation[1]++; }
-  else if (currentDirection === _LEFT)  { curLocation[0]--; }
-  else if (currentDirection === _RIGHT) { curLocation[0]++; }
+  if      (lastDirection === _UP)    { curLocation[1]-- }
+  else if (lastDirection === _DOWN)  { curLocation[1]++ }
+  else if (lastDirection === _LEFT)  { curLocation[0]-- }
+  else if (lastDirection === _RIGHT) { curLocation[0]++ }
 
   // Boundary check
-  if      (curLocation[1] < 0 ) { curLocation[1] = gridResolutionY - 1; }
-  else if (curLocation[1] > gridResolutionY - 1 ) { curLocation[1] = 0; }
-  else if (curLocation[0] < 0 ) { curLocation[0] = gridResolutionX - 1; }
-  else if (curLocation[0] > gridResolutionX - 1 ) { curLocation[0] = 0; }
+  if      (curLocation[1] < 0 ) { curLocation[1] = gridResolutionY - 1 }
+  else if (curLocation[1] > gridResolutionY - 1 ) { curLocation[1] = 0 }
+  else if (curLocation[0] < 0 ) { curLocation[0] = gridResolutionX - 1 }
+  else if (curLocation[0] > gridResolutionX - 1 ) { curLocation[0] = 0 }
 
   // Shift the snake body
   if (bodyParts.length > bodyLength) { bodyParts.shift(); }
@@ -145,10 +155,6 @@ const calcNewPos = () => {
   
   // Set all bodyparts
   bodyParts.push([...curLocation]);
-
-  // Allow new keyboard input
-  directionLocked = false;
-  lastDirection = currentDirection;
 }
 
 const drawPlayer = () => {
@@ -159,26 +165,28 @@ const drawPlayer = () => {
   });
 }
 
+const setDirection = dir => {
+  if (currentDirection !== lastDirection) { preMove = dir }
+  if (Math.abs(dir - lastDirection) !== 2 && isFirstMove) {
+    currentDirection = dir;
+    isFirstMove = false;
+  }
+}
+
 const calcTouch = () => {
   const distSquared = (x1, y1, x2, y2) => {
     let dx = x2 - x1;
     let dy = y2 - y1;
     return dx * dx + dy * dy;
   }
-  const dirCheck = dir => {
-    if (dir + lastDirection !== 2 && dir !== lastDirection) {
-      currentDirection = dir;
-      directionLocked = true;
-      touchSet = true;
-    }
-  }
   let radianDistance = Math.atan2(mouseY-startTouchY, mouseX-startTouchX);
   if (radianDistance < 0) radianDistance = radianDistance + TWO_PI;
   if(distSquared(startTouchX, startTouchY, mouseX, mouseY) > 100) {
-    if      (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI)       { dirCheck(_RIGHT)}
-    else if (radianDistance > QUARTER_PI && radianDistance < HALF_PI + QUARTER_PI)      { dirCheck(_DOWN) }
-    else if (radianDistance > HALF_PI + QUARTER_PI && radianDistance < PI + QUARTER_PI) { dirCheck(_LEFT) }
-    else if (radianDistance > PI + QUARTER_PI && radianDistance < TWO_PI - QUARTER_PI)  { dirCheck(_UP)   }
+    touchSet = true;
+    if      (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI)       { setDirection(_RIGHT)}
+    else if (radianDistance > QUARTER_PI && radianDistance < HALF_PI + QUARTER_PI)      { setDirection(_DOWN) }
+    else if (radianDistance > HALF_PI + QUARTER_PI && radianDistance < PI + QUARTER_PI) { setDirection(_LEFT) }
+    else if (radianDistance > PI + QUARTER_PI && radianDistance < TWO_PI - QUARTER_PI)  { setDirection(_UP)   }
   } else {
     touchSet = false;
   }
@@ -229,26 +237,11 @@ function touchEnded() {
   return false;
 }
 
-// TO-DO: QUEUE KEYS, see https://github.com/patorjk/JavaScript-Snake/blob/master/js/snake.js :250
-// Last move: kinda like direction --> hier ook lastDir en curDir gebruiken, kan ook "abs(lastdir + curdir) !== 2" gebruiken dan
-// currentdirection, directionfound, premove, isfirstmove
-// currentdirection gets set by handing arrow keys (so its like direction)
-// on move: lastmove becomes currentdirection
-// if there was a premove, currentdirection becomes premove and then resets it
-
 const handleKeys = (keyType, up, down, left, right) => {
-  const setDirection = dir => {
-    if (dir + lastDirection !== 2 && dir !== lastDirection) {
-      currentDirection = dir;
-      directionLocked = true;
-    }
-  }
-  if (!directionLocked) { //prevents a player to abuse pressing multiple directions to turn directly
-    if      (keyType === up)    { setDirection(_UP)   } 
-    else if (keyType === down)  { setDirection(_DOWN) }
-    else if (keyType === left)  { setDirection(_LEFT) }
-    else if (keyType === right) { setDirection(_RIGHT)}
-  }
+  if (keyType === right) { setDirection(_RIGHT)}
+  if (keyType === down)  { setDirection(_DOWN) }
+  if (keyType === left)  { setDirection(_LEFT) }
+  if (keyType === up)    { setDirection(_UP)   } 
 }
 
 function keyTyped() {
