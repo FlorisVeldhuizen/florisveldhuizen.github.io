@@ -7,18 +7,9 @@ Queuing of moves was adapted from: https://github.com/patorjk/JavaScript-Snake/b
 const fieldWidth = 400;
 const fieldHeight = 400;
 const backgroundColor = 255;
-const gridResolutionX = 14;   // How many squares fit in a row  (default: 14)
+const gridResX = 14;   // How many squares fit in a row  (default: 14)
 const gameSpeed = 13;         // Amount of frames per second    (default: 12)
 const snakeSize = 5;
-
-// PRECALCULATED VALUES
-let fieldOffsetX, fieldOffsetY, squareSize, gridResolutionY, maxLength, lastDirection; 
-
-// TOUCH CONTROLS
-let startTouchX, startTouchY;
-let touchControl = false;     // If true, the touch controls are displayed on screen
-let touchSet = false;         // If true, the touch controls highlight the current direction
-const arcSize = 120;          // Diameter of the touch controls
 
 // GLOBAL VARIABLES
 const NIL     = -1;
@@ -27,10 +18,19 @@ const _DOWN   = 1;
 const _LEFT   = 2;
 const _UP     = 3;
 
+// PRECALCULATED VALUES
+let fieldOffsetX, fieldOffsetY, squareSize, gridResY, maxLength, lastDir; 
+
+// TOUCH CONTROLS
+let startTouchX, startTouchY;
+let touchControl = false;     // If true, the touch controls are displayed on screen
+let touchDir = NIL;
+const arcSize = 120;          // Diameter of the touch controls
+
 let isFirstMove = true;
 let preMove = NIL;
-let currentDirection = _RIGHT;
-let curLocation = [0,0];
+let curDir = _RIGHT;
+let curLoc = [0,0];
 let bodyParts = [];
 let bodyLength = snakeSize - 1;
 let death = false;
@@ -44,9 +44,9 @@ function setup() {
   background(0,0,0,100);
   fieldOffsetX = (windowWidth/2)-(fieldWidth/2);
   fieldOffsetY = (windowHeight/2)-(fieldHeight/2);
-  squareSize = fieldWidth / gridResolutionX;
-  gridResolutionY = Math.floor(fieldHeight / squareSize);
-  maxLength = gridResolutionX * gridResolutionY;
+  squareSize = fieldWidth / gridResX;
+  gridResY = Math.floor(fieldHeight / squareSize);
+  maxLength = gridResX * gridResY;
   spawnSnacc();
 }
 
@@ -78,8 +78,8 @@ const reset = () => {
 const drawGrid = () => {
   stroke(255)
   fill(0);
-  for (let i = 0; i < gridResolutionX; i++) { // x-axis
-    for (let j = 0; j < gridResolutionY; j++) { // y-axis
+  for (let i = 0; i < gridResX; i++) { // x-axis
+    for (let j = 0; j < gridResY; j++) { // y-axis
       rect(i * squareSize + fieldOffsetX, j * squareSize + fieldOffsetY, squareSize, squareSize);
     }
   }
@@ -100,8 +100,8 @@ const drawScore = () => {
 }
 
 const spawnSnacc = () => {
-  const xPos = Math.floor(Math.random() * gridResolutionX);
-  const yPos = Math.floor(Math.random() * gridResolutionY);
+  const xPos = Math.floor(Math.random() * gridResX);
+  const yPos = Math.floor(Math.random() * gridResY);
   let overlap = false;
 
   // TO-DO check for bodyparts, then spawn snacc somewhere where there is no bodypart
@@ -123,44 +123,44 @@ const drawSnacc = () => {
 }
 
 const calcNewPos = () => {
-  // Set lastDirection and check for queued moves
-  lastDirection = currentDirection;
+  // Set lastDir and check for queued moves
+  lastDir = curDir;
   if (preMove !== NIL) {
-    currentDirection = preMove;
+    curDir = preMove;
     preMove = NIL;
   }
   isFirstMove = true;
 
   // Calculate new position of body based on direction
-  if      (lastDirection === _UP)    { curLocation[1]-- }
-  else if (lastDirection === _DOWN)  { curLocation[1]++ }
-  else if (lastDirection === _LEFT)  { curLocation[0]-- }
-  else if (lastDirection === _RIGHT) { curLocation[0]++ }
+  if      (lastDir === _UP)    { curLoc[1]-- }
+  else if (lastDir === _DOWN)  { curLoc[1]++ }
+  else if (lastDir === _LEFT)  { curLoc[0]-- }
+  else if (lastDir === _RIGHT) { curLoc[0]++ }
 
   // Boundary check
-  if      (curLocation[1] < 0 ) { curLocation[1] = gridResolutionY - 1 }
-  else if (curLocation[1] > gridResolutionY - 1 ) { curLocation[1] = 0 }
-  else if (curLocation[0] < 0 ) { curLocation[0] = gridResolutionX - 1 }
-  else if (curLocation[0] > gridResolutionX - 1 ) { curLocation[0] = 0 }
+  if      (curLoc[1] < 0 ) { curLoc[1] = gridResY - 1 }
+  else if (curLoc[1] > gridResY - 1 ) { curLoc[1] = 0 }
+  else if (curLoc[0] < 0 ) { curLoc[0] = gridResX - 1 }
+  else if (curLoc[0] > gridResX - 1 ) { curLoc[0] = 0 }
 
   // Shift the snake body
   if (bodyParts.length > bodyLength) { bodyParts.shift(); }
 
   // Death 💀 and Snacc 🍬 check 
   bodyParts.forEach(part => {
-    if (curLocation[0] === part[0] && curLocation[1] === part[1]) {
+    if (curLoc[0] === part[0] && curLoc[1] === part[1]) {
       death = true;
       console.error(`U DEAD ${String.fromCodePoint(0x1F480)}`);
     }
   });
 
-  if (curLocation[0] === snaccPos[0] && curLocation[1] === snaccPos[1]) {
+  if (curLoc[0] === snaccPos[0] && curLoc[1] === snaccPos[1]) {
     bodyLength++;
     spawnSnacc();
   }
 
   // Set all bodyparts
-  bodyParts.push([...curLocation]);
+  bodyParts.push([...curLoc]);
 }
 
 const drawPlayer = () => {
@@ -172,11 +172,12 @@ const drawPlayer = () => {
 }
 
 const setDirection = dir => {
-  if (currentDirection !== lastDirection) { preMove = dir }
-  if (Math.abs(dir - lastDirection) !== 2 && isFirstMove) {
-    currentDirection = dir;
+  if (curDir !== lastDir) { preMove = dir }
+  if (Math.abs(dir - lastDir) !== 2 && isFirstMove) {
+    curDir = dir;
     isFirstMove = false;
   }
+  touchDir = dir;
 }
 
 const calcTouch = () => {
@@ -188,13 +189,12 @@ const calcTouch = () => {
   let radianDistance = Math.atan2(mouseY-startTouchY, mouseX-startTouchX);
   if (radianDistance < 0) radianDistance = radianDistance + TWO_PI;
   if(distSquared(startTouchX, startTouchY, mouseX, mouseY) > 100) {
-    touchSet = true;
     if      (radianDistance > TWO_PI - QUARTER_PI || radianDistance < QUARTER_PI)       { setDirection(_RIGHT)}
     else if (radianDistance > QUARTER_PI && radianDistance < HALF_PI + QUARTER_PI)      { setDirection(_DOWN) }
     else if (radianDistance > HALF_PI + QUARTER_PI && radianDistance < PI + QUARTER_PI) { setDirection(_LEFT) }
     else if (radianDistance > PI + QUARTER_PI && radianDistance < TWO_PI - QUARTER_PI)  { setDirection(_UP)   }
   } else {
-    touchSet = false;
+    touchDir = NIL;
   }
 }
 
@@ -206,40 +206,26 @@ const drawTouch = () => {
 
   fill(100);
   ellipse(startTouchX, startTouchY, arcSize, arcSize);
-  if(touchSet) {
-    fill(200);
-    if (currentDirection === _UP)    topArc();
-    if (currentDirection === _DOWN)  bottomArc();
-    if (currentDirection === _LEFT)  leftArc();
-    if (currentDirection === _RIGHT) rightArc();
-  }
+  fill(200);
+  if (touchDir === _UP)    topArc();
+  if (touchDir === _DOWN)  bottomArc();
+  if (touchDir === _LEFT)  leftArc();
+  if (touchDir === _RIGHT) rightArc();
 
   // TO-DO: DRAW JOYSTICK THAT IS constrained BY BOUNDARIES OF CONTROL
   fill(50);
   ellipse(mouseX, mouseY, arcSize/2, arcSize/2);
 }
 
-function mousePressed () {
-  startTouchX = mouseX;
-  startTouchY = mouseY;
-  touchControl = true;
-  return false;
-}
-
-function mouseReleased() {
+const handleTouchEnd = () => {
   touchControl = false;
   return false;
 }
 
-function touchStarted () {
+const handleTouchBegin = () => {
   startTouchX = mouseX;
   startTouchY = mouseY;
   touchControl = true;
-  return false;
-}
-
-function touchEnded() {
-  touchControl = false;
   return false;
 }
 
@@ -248,6 +234,22 @@ const handleKeys = (keyType, up, down, left, right) => {
   if (keyType === down)  { setDirection(_DOWN) }
   if (keyType === left)  { setDirection(_LEFT) }
   if (keyType === up)    { setDirection(_UP)   } 
+}
+
+function mousePressed() {
+  return handleTouchBegin();
+}
+
+function touchStarted() {
+  return handleTouchBegin();
+}
+
+function mouseReleased() {
+  return handleTouchEnd();
+}
+
+function touchEnded() {
+  return handleTouchEnd();
 }
 
 function keyTyped() {
@@ -263,5 +265,5 @@ function windowResized() {
   background(0,0,0,100);
   fieldOffsetX = (windowWidth/2)-(fieldWidth/2);
   fieldOffsetY = (windowHeight/2)-(fieldHeight/2);
-  squareSize = fieldWidth / gridResolutionX;
+  squareSize = fieldWidth / gridResX;
 }
