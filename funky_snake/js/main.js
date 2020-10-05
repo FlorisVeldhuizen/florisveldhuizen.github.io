@@ -123,7 +123,7 @@ const spawnSnacc = () => {
 
     const keys = Object.keys(gridObject);
     const availableX = parseInt(keys[Math.floor(Math.random() * keys.length)]);
-    const availableY = availableGrid[availableX][Math.floor(Math.random() * availableGrid[availableX].length)];
+    const availableY = gridObject[availableX][Math.floor(Math.random() * gridObject[availableX].length)];
 
     return [availableX, availableY];
   }
