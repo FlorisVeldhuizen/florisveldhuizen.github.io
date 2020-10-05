@@ -7,7 +7,7 @@ Queuing of moves was adapted from: https://github.com/patorjk/JavaScript-Snake/b
 const fieldWidth = 400;
 const fieldHeight = 400;
 const backgroundColor = 255;
-const gridResX = 14;   // How many squares fit in a row  (default: 14)
+const gridResX = 14;          // How many squares fit in a row  (default: 14)
 const gameSpeed = 13;         // Amount of frames per second    (default: 12)
 const snakeSize = 5;
 
@@ -100,21 +100,35 @@ const drawScore = () => {
 }
 
 const spawnSnacc = () => {
-  const xPos = Math.floor(Math.random() * gridResX);
-  const yPos = Math.floor(Math.random() * gridResY);
-  let overlap = false;
+  // const xPos = Math.floor(Math.random() * gridResX);
+  // const yPos = Math.floor(Math.random() * gridResY);
+  // const overlap = bodyParts.some(part => (part[0] === xPos && part[1] === yPos));
+  // if (overlap) return spawnSnacc();
+  // console.log("random:", xPos,yPos);
 
-  // TO-DO check for bodyparts, then spawn snacc somewhere where there is no bodypart
+  // TO-DO choose between using a random value and checking all available grid spots (what is quicker)
   // TO-DO: use maxLength to determine when the game is over
 
-  bodyParts.forEach(part => {
-    if (part[0] === xPos && part[1] === yPos) {
-      overlap = true;
-    }
-  });
+  const returnAvailablePos = () => {
+    const gridObject = {};
 
-  if (overlap) return spawnSnacc();
-  else return snaccPos = [xPos,yPos];
+    [...Array(gridResX)].forEach((_,i) => gridObject[i] = [...Array(gridResY).keys()]);
+    for (const [key, value] of Object.entries(gridObject)) {
+      const keyInt = parseInt(key);
+      gridObject[key] = value.filter(elem =>
+        !bodyParts.some(part => part[0] === keyInt && part[1] === elem)
+      )
+      if (gridObject[key].length < 1) delete gridObject[key];
+    }
+
+    const keys = Object.keys(gridObject);
+    const availableX = parseInt(keys[Math.floor(Math.random() * keys.length)]);
+    const availableY = availableGrid[availableX][Math.floor(Math.random() * availableGrid[availableX].length)];
+
+    return [availableX, availableY];
+  }
+
+  return snaccPos = returnAvailablePos();
 }
 
 const drawSnacc = () => {
@@ -138,15 +152,15 @@ const calcNewPos = () => {
   else if (lastDir === _RIGHT) { curLoc[0]++ }
 
   // Boundary check
-  if      (curLoc[1] < 0 ) { curLoc[1] = gridResY - 1 }
-  else if (curLoc[1] > gridResY - 1 ) { curLoc[1] = 0 }
-  else if (curLoc[0] < 0 ) { curLoc[0] = gridResX - 1 }
-  else if (curLoc[0] > gridResX - 1 ) { curLoc[0] = 0 }
+  if      (curLoc[1] < 0) { curLoc[1] = gridResY - 1 }
+  else if (curLoc[1] > gridResY - 1) { curLoc[1] = 0 }
+  else if (curLoc[0] < 0) { curLoc[0] = gridResX - 1 }
+  else if (curLoc[0] > gridResX - 1) { curLoc[0] = 0 }
 
   // Shift the snake body
   if (bodyParts.length > bodyLength) { bodyParts.shift(); }
 
-  // Death 💀 and Snacc 🍬 check 
+  // Death 💀 check
   bodyParts.forEach(part => {
     if (curLoc[0] === part[0] && curLoc[1] === part[1]) {
       death = true;
@@ -154,13 +168,14 @@ const calcNewPos = () => {
     }
   });
 
+  // Set all bodyparts
+  bodyParts.push([...curLoc]);
+
+  // Snacc 🍬 check 
   if (curLoc[0] === snaccPos[0] && curLoc[1] === snaccPos[1]) {
     bodyLength++;
     spawnSnacc();
   }
-
-  // Set all bodyparts
-  bodyParts.push([...curLoc]);
 }
 
 const drawPlayer = () => {
