@@ -100,18 +100,17 @@ const drawScore = () => {
 }
 
 const spawnSnacc = () => {
-  // const xPos = Math.floor(Math.random() * gridResX);
-  // const yPos = Math.floor(Math.random() * gridResY);
-  // const overlap = bodyParts.some(part => (part[0] === xPos && part[1] === yPos));
-  // if (overlap) return spawnSnacc();
-  // console.log("random:", xPos,yPos);
-
-  // TO-DO choose between using a random value and checking all available grid spots (what is quicker)
   // TO-DO: use maxLength to determine when the game is over
+  const returnRandomPos = () => {
+    const xPos = Math.floor(Math.random() * gridResX);
+    const yPos = Math.floor(Math.random() * gridResY);
+    const overlap = bodyParts.some(part => (part[0] === xPos && part[1] === yPos));
+    if (overlap) return returnRandomPos();
+    return [xPos, yPos];
+  }
 
   const returnAvailablePos = () => {
     const gridObject = {};
-
     [...Array(gridResX)].forEach((_,i) => gridObject[i] = [...Array(gridResY).keys()]);
     for (const [key, value] of Object.entries(gridObject)) {
       const keyInt = parseInt(key);
@@ -120,15 +119,13 @@ const spawnSnacc = () => {
       )
       if (gridObject[key].length < 1) delete gridObject[key];
     }
-
-    const keys = Object.keys(gridObject);
-    const availableX = parseInt(keys[Math.floor(Math.random() * keys.length)]);
+    const availableKeys = Object.keys(gridObject);
+    const availableX = parseInt(availableKeys[Math.floor(Math.random() * availableKeys.length)]);
     const availableY = gridObject[availableX][Math.floor(Math.random() * gridObject[availableX].length)];
-
     return [availableX, availableY];
   }
 
-  return snaccPos = returnAvailablePos();
+  return snaccPos = bodyLength < maxLength / 2 ? returnRandomPos() : returnAvailablePos();
 }
 
 const drawSnacc = () => {
