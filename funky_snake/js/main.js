@@ -81,7 +81,6 @@ const drawGrid = () => {
   for (let i = 0; i < gridResX; i++) { // x-axis
     for (let j = 0; j < gridResY; j++) { // y-axis
       rect(i * squareSize + fieldOffsetX, j * squareSize + fieldOffsetY, squareSize, squareSize);
-      squareSize = 30 + Math.random() * 2;
     }
   }
 }
