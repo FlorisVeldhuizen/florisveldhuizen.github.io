@@ -113,26 +113,22 @@
     sloth.style.top = Math.floor(Math.random() * window.innerHeight)-(patience*growth);
     sloth.style.right = Math.floor(Math.random() * window.innerWidth)-(patience*growth);
   }
-  const stoptouching = function(e){
-    movethatsloth();
-    if(patience < 2){
-      alert(responses[patience]);
-    } else if (patience < 4){
-      sloth.classList.remove("anger");
-      void sloth.offsetWidth; //weird CSS trick to restart keyframe animation
-      sloth.classList.add("anger");
-      sloth.style.fontSize = patience * growth + "px";
-    } else if (false) {
-      ///
+  const stoptouching = (e) => {
+      movethatsloth();
+      if(patience > 1) {
+        sloth.classList.remove("anger");
+        void sloth.offsetWidth; //weird CSS trick to restart keyframe animation
+        sloth.classList.add("anger");
+        sloth.style.fontSize = patience * growth + "px";
+      }
+      if(patience > responses.length-1) {
+        // sloth.classList.add("shaking");
+        alert(responses[responses.length-1]);
+      } else {
+        alert(responses[patience]);
+      }
+      patience++;
     }
-    if(patience > responses.length-1) {
-      sloth.classList.add("shaking");
-      alert(responses[responses.length-1]);
-    } else {
-      alert(responses[patience]);
-    }
-    patience++;
-  }
   window.onload = function(){
     patience = 0;
     growth = 20;
