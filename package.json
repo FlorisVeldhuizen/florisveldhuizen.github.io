@@ -10,6 +10,8 @@
   "scripts": {
     "start": "parcel ./src/index.html",
     "build": "parcel build ./src/index.html --public-url ./",
+    "predeploy": "rm -rf dist && parcel build ./*.html --public-url https://florisveldhuizen.github.io/",
+    "deploy": "gh-pages -d dist",
     "lint": "eslint"
   },
   "devDependencies": {
@@ -23,6 +25,7 @@
     "prettier": "2.4.0"
   },
   "dependencies": {
+    "gh-pages": "^3.2.3",
     "jquery": "^3.6.0",
     "jsqr": "^1.4.0",
     "p5": "^1.4.0",
