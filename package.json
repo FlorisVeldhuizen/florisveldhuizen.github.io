@@ -1,0 +1,32 @@
+{
+  "name": "florisveldhuizen.github.io",
+  "version": "1.0.0",
+  "description": "Github Pages - Floris Veldhuizen",
+  "source": "src/index.html",
+  "repository": "https://github.com/FlorisVeldhuizen/florisveldhuizen.github.io.git",
+  "author": "Floris Veldhuizen <flm.veldhuizen@gmail.com>",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "start": "parcel ./src/index.html",
+    "build": "parcel build ./src/index.html --public-url ./",
+    "lint": "eslint"
+  },
+  "devDependencies": {
+    "@parcel/transformer-image": "2.0.0-rc.0",
+    "eslint": "^7.2.0",
+    "eslint-config-airbnb-base": "14.2.1",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-prettier": "^4.0.0",
+    "parcel": "^2.0.0-rc.0",
+    "prettier": "2.4.0"
+  },
+  "dependencies": {
+    "jquery": "^3.6.0",
+    "jsqr": "^1.4.0",
+    "p5": "^1.4.0",
+    "paper": "^0.12.15",
+    "pathfinding": "^0.4.18"
+  }
+}
