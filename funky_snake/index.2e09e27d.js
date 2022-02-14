@@ -466,7 +466,7 @@ const sketch = (p)=>{
     const fieldWidth = 400;
     const fieldHeight = 400;
     const gridResX = 14; // How many squares fit in a row  (default: 14)
-    const gameSpeed = 13; // Amount of frames per second    (default: 12)
+    const gameSpeed = 30; // Amount of frames per second    (default: 12)
     const snakeSize = 5;
     // GLOBAL VARIABLES
     const NIL = -1;

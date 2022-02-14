@@ -592,7 +592,7 @@ const sketch = (p)=>{
 };
 const sketchInstance = new _p5Default.default(sketch);
 
-},{"p5":"3jIsn","@parcel/transformer-js/src/esmodule-helpers.js":"JacNc","../img/bg.jpeg":"gNJvQ"}],"3jIsn":[function(require,module,exports) {
+},{"p5":"3jIsn","../img/bg.jpeg":"gNJvQ","@parcel/transformer-js/src/esmodule-helpers.js":"JacNc"}],"3jIsn":[function(require,module,exports) {
 var global = arguments[3];
 /*! p5.js v1.4.0 June 29, 2021 */ !function(e) {
     if ("object" == typeof exports && "undefined" != typeof module) module.exports = e();
@@ -28052,38 +28052,6 @@ var global = arguments[3];
     ])(245);
 });
 
-},{}],"JacNc":[function(require,module,exports) {
-exports.interopDefault = function(a) {
-    return a && a.__esModule ? a : {
-        default: a
-    };
-};
-exports.defineInteropFlag = function(a) {
-    Object.defineProperty(a, '__esModule', {
-        value: true
-    });
-};
-exports.exportAll = function(source, dest) {
-    Object.keys(source).forEach(function(key) {
-        if (key === 'default' || key === '__esModule') return;
-        // Skip duplicate re-exports when they have the same value.
-        if (key in dest && dest[key] === source[key]) return;
-        Object.defineProperty(dest, key, {
-            enumerable: true,
-            get: function() {
-                return source[key];
-            }
-        });
-    });
-    return dest;
-};
-exports.export = function(dest, destName, get) {
-    Object.defineProperty(dest, destName, {
-        enumerable: true,
-        get: get
-    });
-};
-
 },{}],"gNJvQ":[function(require,module,exports) {
 module.exports = require('./helpers/bundle-url').getBundleURL('1R10o') + "../bg.9d1f5af5.jpeg";
 
@@ -28121,6 +28089,38 @@ function getOrigin(url) {
 exports.getBundleURL = getBundleURLCached;
 exports.getBaseURL = getBaseURL;
 exports.getOrigin = getOrigin;
+
+},{}],"JacNc":[function(require,module,exports) {
+exports.interopDefault = function(a) {
+    return a && a.__esModule ? a : {
+        default: a
+    };
+};
+exports.defineInteropFlag = function(a) {
+    Object.defineProperty(a, '__esModule', {
+        value: true
+    });
+};
+exports.exportAll = function(source, dest) {
+    Object.keys(source).forEach(function(key) {
+        if (key === 'default' || key === '__esModule') return;
+        // Skip duplicate re-exports when they have the same value.
+        if (key in dest && dest[key] === source[key]) return;
+        Object.defineProperty(dest, key, {
+            enumerable: true,
+            get: function() {
+                return source[key];
+            }
+        });
+    });
+    return dest;
+};
+exports.export = function(dest, destName, get) {
+    Object.defineProperty(dest, destName, {
+        enumerable: true,
+        get: get
+    });
+};
 
 },{}]},["iBhlC","h8WAu"], "h8WAu", "parcelRequireae9f")
 
