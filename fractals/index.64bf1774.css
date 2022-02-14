@@ -1,0 +1,53 @@
+body,html{
+	background: #000;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+canvas{
+	cursor: move;
+}
+
+#control{
+	position: absolute;
+	top: 0;
+	left: 0;
+	padding: 20px 20px 20px 70px;
+	width: 100%;
+	background-color: rgba(0,0,0,.4);
+	box-sizing: border-box;
+}
+
+input[type="range"]{
+	width: 100%;
+	cursor: pointer;
+}
+
+.playpause.arrow-right, .playpause.bars:hover{
+	width: 0; 
+	height: 0; 
+	border-top: 12px solid transparent;
+	border-bottom: 12px solid transparent;
+	
+	border-left: 24px solid white;
+	display: inline-block;
+	margin-left: -50px;
+	margin-right: 10px;
+	background-image: none;
+}
+
+.playpause.bars, .playpause.arrow-right:hover{
+    width: 15px;
+    height: 24px;
+    cursor: pointer;
+    border-left: none;
+    border-bottom: none;
+    border-top: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' version='1.1' x='0px' y='0px' width='15px' height='24px' viewBox='0 0 15 24' enable-background='new 0 0 15 24' xml:space='preserve'><rect height='24' width='5' fill='white' /><rect x='10' height='24' width='5' fill='white' /></svg>");
+    background-size: contain;
+	display: inline-block;
+	margin-left: -48px;
+	margin-right: 17px;
+}
+/*# sourceMappingURL=index.64bf1774.css.map */
