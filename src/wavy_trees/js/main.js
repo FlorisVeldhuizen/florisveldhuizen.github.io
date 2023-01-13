@@ -4,6 +4,7 @@
 import p5 from "p5";
 
 let trees;
+let treeId = 0;
 
 // Perlin noise offset
 let yoff = 0;
@@ -74,7 +75,6 @@ const sketch = (p) => {
       0.1
     );
     trees = [tree, tree2];
-
   };
 
   p.draw = () => {
@@ -96,7 +96,6 @@ const sketch = (p) => {
       stepbool = !stepbool;
     }
     stepboolcounter++;
-
 
     p.noStroke();
     trees.forEach((treee) => {
@@ -241,15 +240,24 @@ const sketch = (p) => {
       this.size = size;
       this.flexibilityArray = flexibilityArray;
       this.slices = [];
+      this.treeId = treeId;
       this.setup();
     }
 
     setup() {
       for (let i = 0; i < this.flexibilityArray.length; i++) {
         this.slices.push(
-          new TreeSlice(this.x, this.y, this.size, i, this.flexibilityArray[i])
+          new TreeSlice(
+            this.x,
+            this.y,
+            this.size,
+            i,
+            this.flexibilityArray[i],
+            this.treeId
+          )
         );
       }
+      treeId += 1;
     }
 
     draw() {
@@ -261,7 +269,7 @@ const sketch = (p) => {
   }
 
   class TreeSlice {
-    constructor(x, y, radius, level, flexibility) {
+    constructor(x, y, radius, level, flexibility, _treeId) {
       this.x = x;
       this.y = y;
       this.radius = radius - level * 6;
@@ -269,6 +277,7 @@ const sketch = (p) => {
       this.flexibility = flexibility;
       this.branches = [];
       this.leaves = [];
+      this.treeId = _treeId;
       this.setup();
     }
 
@@ -302,7 +311,7 @@ const sketch = (p) => {
       xoff = this.level * 0.02;
       this.leaves.forEach((leave, index) => {
         const theta = p.map(
-          p.noise(xoff + index, yoff),
+          p.noise(xoff + index, yoff + this.treeId),
           0,
           1,
           -p.PI / 3,
