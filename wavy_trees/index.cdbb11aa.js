@@ -524,6 +524,7 @@ var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 /* eslint-disable max-classes-per-file */ var _p5 = require("p5");
 var _p5Default = parcelHelpers.interopDefault(_p5);
 let trees;
+let treeId = 0;
 // Perlin noise offset
 let yoff = 0;
 let xoff = 0;
@@ -712,10 +713,12 @@ const sketch = (p)=>{
             this.size = size;
             this.flexibilityArray = flexibilityArray;
             this.slices = [];
+            this.treeId = treeId;
             this.setup();
         }
         setup() {
-            for(let i = 0; i < this.flexibilityArray.length; i++)this.slices.push(new TreeSlice(this.x, this.y, this.size, i, this.flexibilityArray[i]));
+            for(let i = 0; i < this.flexibilityArray.length; i++)this.slices.push(new TreeSlice(this.x, this.y, this.size, i, this.flexibilityArray[i], this.treeId));
+            treeId += 1;
         }
         draw() {
             yoff += 0.0001;
@@ -725,7 +728,7 @@ const sketch = (p)=>{
         }
     }
     class TreeSlice {
-        constructor(x, y, radius, level, flexibility1){
+        constructor(x, y, radius, level, flexibility1, _treeId){
             this.x = x;
             this.y = y;
             this.radius = radius - level * 6;
@@ -733,6 +736,7 @@ const sketch = (p)=>{
             this.flexibility = flexibility1;
             this.branches = [];
             this.leaves = [];
+            this.treeId = _treeId;
             this.setup();
         }
         setup() {
@@ -750,7 +754,7 @@ const sketch = (p)=>{
         draw() {
             xoff = this.level * 0.02;
             this.leaves.forEach((leave, index)=>{
-                const theta = p.map(p.noise(xoff + index, yoff), 0, 1, -p.PI / 3, p.PI / 3);
+                const theta = p.map(p.noise(xoff + index, yoff + this.treeId), 0, 1, -p.PI / 3, p.PI / 3);
                 leave.update(theta * 60, -theta * 60);
                 leave.draw();
             });
