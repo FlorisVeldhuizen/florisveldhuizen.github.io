@@ -307,20 +307,6 @@ $(document).ready(function () {
         console.log("you're dead!");
         mainCharacter.kill();
         $('body').append('<h1><a href="index.html">Game over :( - Play again!</a></h1>');
-
-        if (Math.random() > 0.05) return
-
-        console.log("hee ouwe lekkere lellebel" + " wat zie je er weer snoezig uit vandaag");
-        console.warn("als je nou niet oplet he")
-
-        console.error("dan sla ik je voor je muil")
-        alert("het is tijd voor een pofje!")
-        const answer = prompt("do you want a pofje? tip: jazeker")
-        if (annswer === "jazeker") {
-          window.location.href = "http://www.maanraket.nl/experiments/fractals"
-        }
-        "zonne lekker pofske toch"
-        "woef, woef! woef! woef!"
       }
 
       mainCharacter.currentMoves = movesCalculator(node, getUpdatedGrid);
