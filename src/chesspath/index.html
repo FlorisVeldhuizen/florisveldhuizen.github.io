@@ -26,8 +26,28 @@
 	</head>
 	<body>
 		<h1>0</h1>
-    <script src="js/phaser-ce.js"></script>
-    <script src="js/jquery.min.js"></script>
+    <script type="module" src="js/phaser-ce.js"></script>
+    <!-- <script type="module">
+      const scriptArray = [
+        { script: "js/phaser-ce.js", type: "text/javascript" },
+        { script: "js/jquery.min.js", type: "module" },
+        { script: "js/main.js", type: "module" }
+        // "js/jquery.min.js",
+        // "js/main.js"
+      ];
+      scriptArray.forEach(({ script, type }) => {
+        let externalScript = document.createElement('script');
+        externalScript.setAttribute('src', script)
+        externalScript.setAttribute('type', type)
+        document.head.appendChild(externalScript);
+      });
+      // let externalScript = document.createElement('script');
+      // externalScript.setAttribute('src', 'js/phaser-ce.js')
+      // document.head.appendChild(externalScript);
+
+
+    </script> -->
+    <script type="module" src="js/jquery.min.js"></script>
     <script type="module" src="js/main.js"></script>
 	</body>
 </html>
