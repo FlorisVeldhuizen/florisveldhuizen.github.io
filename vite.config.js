@@ -1,22 +1,6 @@
 import path, { resolve } from "path";
 import { defineConfig } from "vite";
 
-const fileRegex = /.*chesspath.*/
-
-const noAttr = () => {
-  return {
-    name: "no-attribute",
-    transformIndexHtml(html, id) {
-      // console.log("testing:", fileRegex.test(id), id.fileName);
-      console.log(html, id.path);
-      if (fileRegex.test(id.path)) {
-        console.log("replacing chesspath")
-        return html.replace(`type="module"`, "");
-      }
-    }
-  }
-}
-
 // https://vitejs.dev/config/
 export default defineConfig({
   root: path.join(__dirname, "./src"),
@@ -31,5 +15,4 @@ export default defineConfig({
       },
     },
   },
-  plugins: [noAttr()],
 });

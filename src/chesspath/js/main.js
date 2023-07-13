@@ -1,5 +1,12 @@
 import PF from "pathfinding";
-// import { Phaser } from "./phaser.max.js";
+import $ from "jquery";
+
+import chazz from "../assets/princhess.png";
+import bishopOdd from "../assets/bishop-odd.png";
+import bishop from "../assets/bishop.png";
+import knight from "../assets/knight.png";
+import rook from "../assets/rook.png";
+import ground from "../assets/ground.png";
 
 var findPath, matrix;
 var tileSize = 48;
@@ -158,12 +165,12 @@ $(document).ready(function () {
 
   //global game functions
   var preload = function () {
-    game.load.image('ground', 'assets/ground.png');
-    game.load.image('enemy-rook', 'assets/rook.png');
-    game.load.image('enemy-knight', 'assets/knight.png');
-    game.load.image('enemy-bishop', 'assets/bishop.png');
-    game.load.image('enemy-bishop-odd', 'assets/bishop-odd.png');
-    game.load.spritesheet('main-character', 'assets/princhess.png', 24, 35);
+    game.load.image('ground', ground);
+    game.load.image('enemy-rook', rook);
+    game.load.image('enemy-knight', knight);
+    game.load.image('enemy-bishop', bishop);
+    game.load.image('enemy-bishop-odd', bishopOdd);
+    game.load.spritesheet('main-character', chazz, 24, 35);
   }
 
   var create = function () {
