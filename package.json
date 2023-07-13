@@ -7,29 +7,29 @@
   "author": "Floris Veldhuizen <flm.veldhuizen@gmail.com>",
   "license": "MIT",
   "private": false,
+  "type": "module",
   "scripts": {
-    "start": "parcel ./src/index.html",
-    "build": "parcel build ./src/index.html --public-url ./",
-    "predeploy": "rm -rf dist && parcel build ./*.html --public-url https://florisveldhuizen.github.io/",
     "deploy": "gh-pages -d dist",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
-    "@parcel/transformer-image": "2.3.1",
     "eslint": "^7.2.0",
     "eslint-config-airbnb-base": "14.2.1",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-import": "^2.25.4",
     "eslint-plugin-prettier": "^4.0.0",
-    "parcel": "^2.3.1",
     "prettier": "2.5.1"
   },
   "dependencies": {
-    "gh-pages": "^3.2.3",
+    "gh-pages": "^5.0.0",
     "jquery": "^3.6.0",
     "jsqr": "^1.4.0",
     "p5": "^1.4.1",
     "paper": "^0.12.15",
-    "pathfinding": "^0.4.18"
+    "pathfinding": "^0.4.18",
+    "vite": "^4.4.2"
   }
 }
