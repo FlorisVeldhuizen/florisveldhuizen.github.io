@@ -1,150 +1,158 @@
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Github Pages - Floris Veldhuizen</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦥</text></svg>">
-</head>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Github Pages - Floris Veldhuizen</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦥</text></svg>" />
+  </head>
 
-<style>
-  html, body {
-    height: 100%;
-  }
+  <style type="text/css">
+    html, body {
+      height: 100%;
+    }
 
-  body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    font-family: "Times New Roman", Times, serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-color:#eee;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .container{
-    box-sizing: border-box;
-    padding: 40px;
-    margin: 0 auto;
-    min-width: 600px;
-    line-height: 1.8;
-  }
-  h1{
-    background: #000;
-    color: #eee;
-    padding-left: 20px;
-  }
-  .left{
-    float:left;
-  }
-  .right{
-    float:right;
-  }
-  ol {
-    padding-left: 20px;
-    list-style-position: outside;
-  }
-  li {
-    text-align: left;
-    position: relative;
-  }
-  #secretsloth{
-    position:absolute;
-    transition: all 4s ease;
-    right:20px;
-    top:0px;
-    cursor:pointer;
-    text-shadow: 0 0 0 red;
-  }
-  .anger {
-    animation: angry 0.8s 2;
-  }
-  .shaking {
-    animation: shake 2s infinite;
-  }
-  @media only screen and (max-width: 800px) {
-    .container {
-      flex: 1 1 auto;
-      min-height: auto;
-      min-width: 320px;
-      line-height: 1.4;
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      background-color:#eee;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .right {
-      float: none;
-      display: block;
+    .container{
+      box-sizing: border-box;
+      padding: 40px;
+      margin: 0 auto;
+      min-width: 600px;
+      line-height: 1.8;
     }
-  }
-  @keyframes angry {
-    0% {
-      color: transparent;
+    .footer {
+      position: absolute;
+      bottom: 0;
     }
-    100% {
-      color: #bada55;
+    h1{
+      background: #000;
+      color: #eee;
+      padding-left: 20px;
     }
-  }
-  @keyframes shake {
-    0% {
-      transform: rotate(45deg);
+    .left{
+      float:left;
     }
-    50% {
-      transform: rotate(-45deg);
+    .right{
+      float:right;
     }
-    100% {
-      transform: rotate(45deg);
+    ol {
+      padding-left: 20px;
+      list-style-position: outside;
     }
-  }
+    li {
+      text-align: left;
+      position: relative;
+    }
+    #secretsloth{
+      position:absolute;
+      transition: all 4s ease;
+      right:20px;
+      top:0px;
+      cursor:pointer;
+      text-shadow: 0 0 0 red;
+    }
+    .anger {
+      animation: angry 0.8s 2;
+    }
+    .shaking {
+      animation: shake 2s infinite;
+    }
+    @media only screen and (max-width: 800px) {
+      .container {
+        flex: 1 1 auto;
+        min-height: auto;
+        min-width: 320px;
+        line-height: 1.4;
+      }
+      .right {
+        float: none;
+        display: block;
+      }
+    }
+    @keyframes angry {
+      0% {
+        color: transparent;
+      }
+      100% {
+        color: #bada55;
+      }
+    }
+    @keyframes shake {
+      0% {
+        transform: rotate(45deg);
+      }
+      50% {
+        transform: rotate(-45deg);
+      }
+      100% {
+        transform: rotate(45deg);
+      }
+    }
+  </style>
 
-</style>
+  <body>
+    <div class="container">
+      <h1>Random projects</h1>
+      <ol>
+        <li><a href="fractals/index.html"> Mandelbrot Fractal </a> <span class="right"> (Drag mouse and scroll to interact)</span></li>
+        <li><a href="portfolio/index.html"> Lines </a> <span class="right">(Use arrow keys) </span></li>
+        <li><a href="walking_p5/index.html"> Footsteps </a> <span class="right">(Use arrow keys or mouseclicks) </span></li>
+        <li><a href="chesspath/index.html"> Prince Chazz </a> <span class="right">(Chess with a twist) </span></li>
+        <li><a href="card_js/index.html"> Card JS </a></li>
+        <li><a href="rain_p5/index.html"> Rain </a> <span class="right">(Move around your mouse) </span> </li>
+        <li><a href="qr_scan/index.html"> QR code test </a> <span class="right">(Try holding a QR code in front of your webcam) </span></li>
+        <li><a href="p5_frames/index.html"> Funky frames </a> <span class="right">Move the mouse, and press r, c, p and m </span></li>
+        <li><a href="funky_snake/index.html"> Funky Snake</a> <span class="right">(Use arrow keys) </span></li>
+        <li><a href="wavy_trees/index.html"> Wavy Trees (for Noor ❤️) </a> <span class="right">(Use arrow keys or mouseclicks) </span></li>
+      </ol>
+    </div>
+    <h2 id="secretsloth"> &#x1F9A5;</h2>
+    <p class="footer">Bundled with Vite</p>
+  </body>
 
-<body>
-  <div class="container">
-    <h1> Random projects</h1>
-    <ol>
-      <li><a href="/fractals/index.html"> Mandelbrot Fractal </a> <span class="right"> (Drag mouse and scroll to interact)</span></li>
-      <li><a href="/portfolio/index.html"> Lines </a> <span class="right">(Use arrow keys) </span></li>
-      <li><a href="/walking_p5/index.html"> Footsteps </a> <span class="right">(Use arrow keys or mouseclicks) </span></li>
-      <li><a href="/chesspath/index.html"> Prince Chazz </a> <span class="right">(Chess with a twist) </span></li>
-      <li><a href="/card_js/index.html"> Card JS </a></li>
-      <li><a href="/rain_p5/index.html"> Rain </a> <span class="right">(Move around your mouse) </span> </li>
-      <li><a href="/qr_scan/index.html"> QR code test </a> <span class="right">(Try holding a QR code in front of your webcam) </span></li>
-      <li><a href="/p5_frames/index.html"> Funky frames </a> <span class="right">Move the mouse, and press r, c, p and m </span></li>
-      <li><a href="/funky_snake/index.html"> Funky Snake</a> <span class="right">(Use arrow keys) </span></li>
-      <li><a href="/wavy_trees/index.html"> Wavy Trees (for Noor ❤️) </a> <span class="right">(Use arrow keys or mouseclicks) </span></li>
-    </ol>
-  </div>
-  <h2 id="secretsloth"> &#x1F9A5;</h2>
-</body>
-
-<script type="text/javascript">let sloth, patience, growth;
-const responses = [
-    "Ouch, stop pressing me!",
-    "Hey, I warned you, quit it...",
-    "Alright, now I am getting angry!",
-    "I am going to get you!"
-];
-const movethatsloth = ()=>{
-    sloth.style.top = Math.floor(Math.random() * window.innerHeight) - patience * growth;
-    sloth.style.right = Math.floor(Math.random() * window.innerWidth) - patience * growth;
-};
-const stoptouching = (e)=>{
-    movethatsloth();
-    if (patience > 1) {
-        sloth.classList.remove("anger");
-        sloth.offsetWidth; //weird CSS trick to restart keyframe animation
-        sloth.classList.add("anger");
-        sloth.style.fontSize = patience * growth + "px";
+  <script type="text/javascript">
+    let sloth, patience, growth;
+    const responses = [
+      "Ouch, stop pressing me!",
+      "Hey, I warned you, quit it...",
+      "Alright, now I am getting angry!",
+      "I am going to get you!"
+    ]
+    const movethatsloth = () => {
+      sloth.style.top = Math.floor(Math.random() * window.innerHeight)-(patience*growth);
+      sloth.style.right = Math.floor(Math.random() * window.innerWidth)-(patience*growth);
     }
-    if (patience > responses.length - 1) // sloth.classList.add("shaking");
-    alert(responses[responses.length - 1]);
-    else alert(responses[patience]);
-    patience++;
-};
-window.onload = function() {
-    patience = 0;
-    growth = 20;
-    sloth = document.getElementById('secretsloth');
-    sloth.addEventListener("click", stoptouching);
-};
-
-</script>
+    const stoptouching = (e) => {
+        movethatsloth();
+        if(patience > 1) {
+          sloth.classList.remove("anger");
+          void sloth.offsetWidth; //weird CSS trick to restart keyframe animation
+          sloth.classList.add("anger");
+          sloth.style.fontSize = patience * growth + "px";
+        }
+        if(patience > responses.length-1) {
+          // sloth.classList.add("shaking");
+          alert(responses[responses.length-1]);
+        } else {
+          alert(responses[patience]);
+        }
+        patience++;
+      }
+    window.onload = function(){
+      patience = 0;
+      growth = 20;
+      sloth = document.getElementById('secretsloth');
+      sloth.addEventListener("click",stoptouching);
+    }
+  </script>
+</html>
