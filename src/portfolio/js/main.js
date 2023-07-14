@@ -1,124 +1,126 @@
 import paper from "paper";
 
 window.onload = () => {
-  let charspeed = 1;
+  const charspeed = 1;
   const maxspeed = 6;
   const drag = 0.9;
   const canvas = document.getElementById("canvas");
   paper.setup(canvas);
 
-    let charpos = new paper.Point(0,0);
-    let movevector = new paper.Point(0,0);
-    let speedvector = new paper.Point(0, 0);
+  const charpos = new paper.Point(0, 0);
+  const movevector = new paper.Point(0, 0);
+  const speedvector = new paper.Point(0, 0);
 
-    const pathArray = [];
-    const maxArraylength = 20;
+  const pathArray = [];
+  const maxArraylength = 20;
 
-    // controller vars
-    let upPressed = 0;
-    let downPressed = 0;
-    let leftPressed = 0;
-    let rightPressed = 0;
+  let path;
 
-    const keyup = (e) => {
-      e = e || window.event;
-      checkKey(e,0);
+  // controller vars
+  let upPressed = 0;
+  let downPressed = 0;
+  let leftPressed = 0;
+  let rightPressed = 0;
+
+  const setMovevector = () => {
+    movevector.length = 0;
+    movevector.y += -1 * upPressed;
+    movevector.y += 1 * downPressed;
+    movevector.x += -1 * leftPressed;
+    movevector.x += 1 * rightPressed;
+  };
+
+  const checkKey = (e, keydown) => {
+    if (e.keyCode === 38 || e.keyCode === 87) {
+      upPressed = keydown;
+      // up arrow + w
     }
-
-    const keydown = (e) => {
-      e = e || window.event;
-      checkKey(e,1);
+    if (e.keyCode === 40 || e.keyCode === 83) {
+      downPressed = keydown;
+      // down arrow + s
     }
-
-    const setMovevector = () => {
-      movevector.length = 0;
-      movevector.y += -1 * upPressed;
-      movevector.y += 1 * downPressed;
-      movevector.x += -1 * leftPressed;
-      movevector.x += 1 * rightPressed;
+    if (e.keyCode === 37 || e.keyCode === 65) {
+      leftPressed = keydown;
+      // left arrow + a
     }
-
-    const checkKey = (e,keydown) => {
-        if (e.keyCode == '38') {
-            upPressed = keydown;
-            // up arrow
-        }
-        if (e.keyCode == '40') {
-            downPressed = keydown;
-            // down arrow
-        }
-        if (e.keyCode == '37') {
-            leftPressed = keydown;
-          // left arrow
-        }
-        if (e.keyCode == '39') {
-            rightPressed = keydown;
-          // right arrow
-        }
-        setMovevector();
+    if (e.keyCode === 39 || e.keyCode === 68) {
+      rightPressed = keydown;
+      // right arrow + d
     }
+    setMovevector();
+  };
 
-    const speedqualizervector = () => {
-      _movevector = new paper.Point(movevector.x, movevector.y);
-      _movevector.normalize();
-      _movevector.x = _movevector.x * charspeed;
-      _movevector.y = _movevector.y * charspeed;
-      speedvector.x += _movevector.x;
-      speedvector.y += _movevector.y;
+  const keyUp = (e) => {
+    const event = e || window.event;
+    checkKey(event, 0);
+  };
 
-      //checks if the player moves faster than the maximum speed
-      if( speedvector.length > maxspeed){
-        speedvector.length = maxspeed;
-      }
-      // if the player is not moving, the character should stop
-      if(!speedvector.isZero()){
-        if(movevector.x==0) speedvector.x *= drag;
-        if(movevector.y==0) speedvector.y *= drag;
-      }
-      speedvector.x *= drag;
-      speedvector.y *= drag;
+  const keyDown = (e) => {
+    const event = e || window.event;
+    checkKey(event, 1);
+  };
+
+  const speedqualizervector = () => {
+    const tempVector = new paper.Point(movevector.x, movevector.y);
+    tempVector.normalize();
+    tempVector.x *= charspeed;
+    tempVector.y *= charspeed;
+    speedvector.x += tempVector.x;
+    speedvector.y += tempVector.y;
+
+    // checks if the player moves faster than the maximum speed
+    if (speedvector.length > maxspeed) {
+      speedvector.length = maxspeed;
     }
-
-    const pathHandler = (curPath) => {
-      _curPath = curPath.clone();
-      _curPath.scale(1.1);
-      _curPath.strokeColor = 'blue';
-      pathArray.push(_curPath);
-      pathArray.forEach(function(item){
-          item.scale(1.1);
-      });
-      if (pathArray.length > maxArraylength){
-          pathArray.shift().remove();
-      }
+    // if the player is not moving, the character should stop
+    if (!speedvector.isZero()) {
+      if (movevector.x === 0) speedvector.x *= drag;
+      if (movevector.y === 0) speedvector.y *= drag;
     }
+    speedvector.x *= drag;
+    speedvector.y *= drag;
+  };
 
-    const drawPlayer = () => {
-      path.add(charpos);
-      path.strokeColor = 'black';
+  const pathHandler = (curPath) => {
+    const tempPath = curPath.clone();
+    tempPath.scale(1.1);
+    tempPath.strokeColor = "blue";
+    pathArray.push(tempPath);
+    pathArray.forEach(function (item) {
+      item.scale(1.1);
+    });
+    if (pathArray.length > maxArraylength) {
+      pathArray.shift().remove();
     }
+  };
 
-    const init = () => {
-      document.onkeydown = keydown;
-      document.onkeyup = keyup;
-      path = new paper.Path();
-      path.add(charpos);
-      path.strokeColor = 'black';
+  const drawPlayer = () => {
+    path.add(charpos);
+    path.strokeColor = "black";
+  };
+
+  const init = () => {
+    document.onkeydown = keyDown;
+    document.onkeyup = keyUp;
+    path = new paper.Path();
+    path.add(charpos);
+    path.strokeColor = "black";
+  };
+
+  const optimization = () => {
+    if (path.segments.length % maxArraylength === 0) {
+      path.simplify(0.1);
     }
+  };
 
-    const optimization = () => {
-      if(path.segments.length%maxArraylength==0){
-        path.simplify(0.1);
-      }
-    }
+  paper.view.onFrame = () => {
+    speedqualizervector();
+    charpos.x += speedvector.x;
+    charpos.y += speedvector.y;
+    drawPlayer();
+    pathHandler(path);
+    optimization();
+  };
 
-    paper.view.onFrame = (event) => {
-      speedqualizervector();
-      charpos.x += speedvector.x;
-      charpos.y += speedvector.y;
-      drawPlayer();
-      pathHandler(path);
-      optimization();
-    }
-
-    init();
-}
+  init();
+};
