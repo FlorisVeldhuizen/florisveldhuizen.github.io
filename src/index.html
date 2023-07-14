@@ -16,9 +16,7 @@
       margin: 0;
       padding: 0;
       height: 100%;
-      font-family: "Times New Roman", Times, serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+      font-family: Arial, Helvetica, sans-serif;
       background-color:#eee;
       overflow: hidden;
       display: flex;
@@ -31,6 +29,10 @@
       margin: 0 auto;
       min-width: 600px;
       line-height: 1.8;
+    }
+    .footer {
+      position: absolute;
+      bottom: 0;
     }
     h1{
       background: #000;
@@ -100,7 +102,7 @@
 
   <body>
     <div class="container">
-      <h1> Random projects</h1>
+      <h1>Random projects</h1>
       <ol>
         <li><a href="fractals/index.html"> Mandelbrot Fractal </a> <span class="right"> (Drag mouse and scroll to interact)</span></li>
         <li><a href="portfolio/index.html"> Lines </a> <span class="right">(Use arrow keys) </span></li>
@@ -115,6 +117,7 @@
       </ol>
     </div>
     <h2 id="secretsloth"> &#x1F9A5;</h2>
+    <p class="footer">Bundled with Vite</p>
   </body>
 
   <script type="text/javascript">
