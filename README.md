@@ -6,7 +6,7 @@ After you installed yarn, run this command to install dependencies:
 
 `yarn`
 
-To run locally (at [localhost:1234](http://localhost:1234)) use:
+To run locally (at [localhost:1234](http://localhostt:5173)) use:
 
 `yarn dev`
 
