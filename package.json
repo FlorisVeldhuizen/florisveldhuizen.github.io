@@ -9,7 +9,6 @@
   "private": false,
   "type": "module",
   "scripts": {
-    "deploy": "gh-pages -d dist",
     "lint": "eslint",
     "dev": "vite",
     "build": "vite build",
@@ -24,7 +23,6 @@
     "prettier": "2.5.1"
   },
   "dependencies": {
-    "gh-pages": "^5.0.0",
     "jquery": "^3.6.0",
     "jsqr": "^1.4.0",
     "p5": "^1.4.1",

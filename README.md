@@ -8,8 +8,14 @@ After you installed yarn, run this command to install dependencies:
 
 To run locally (at [localhost:1234](http://localhost:1234)) use:
 
-`yarn start`
+`yarn dev`
 
-When your local server is running, you can deploy changes to Github by opening a new terminal window and using:
+To build a new version, use:
 
-`yarn deploy`
+`yarn build`
+
+To preview the new version, use:
+
+`yarn preview`
+
+To deploy a new version, push the new version to the `deploy-actions` branch
