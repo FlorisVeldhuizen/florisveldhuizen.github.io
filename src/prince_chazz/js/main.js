@@ -2,18 +2,18 @@ import Phaser from "phaser";
 import PF from "pathfinding";
 import seedrandom from "seedrandom";
 
-import chazz from "../assets/princhess.png";
-import bishopOdd from "../assets/bishop-odd.png";
-import bishop from "../assets/bishop.png";
-import knight from "../assets/knight.png";
-import rook from "../assets/rook.png";
-import groundTest from "../assets/ground.png";
+import chazz from "../assets/princhess.png?url";
+import bishopOdd from "../assets/bishop-odd.png?url";
+import bishop from "../assets/bishop.png?url";
+import knight from "../assets/knight.png?url";
+import rook from "../assets/rook.png?url";
+import groundTest from "../assets/ground.png?url";
 
-import captureSound from "../sounds/capture.mp3";
-import moveSound from "../sounds/move.mp3";
-import checkSound from "../sounds/check.mp3";
-import startSound from "../sounds/game-start.mp3";
-import endSound from "../sounds/game-end.webm";
+import captureSound from "../sounds/capture.mp3?url";
+import moveSound from "../sounds/move.mp3?url";
+import checkSound from "../sounds/check.mp3?url";
+import startSound from "../sounds/game-start.mp3?url";
+import endSound from "../sounds/game-end.webm?url";
 
 const captureAudio = new Audio(captureSound);
 const moveAudio = new Audio(moveSound);

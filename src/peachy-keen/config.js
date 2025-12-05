@@ -4,10 +4,10 @@
  */
 
 // Import audio assets
-import ass2Sound from "./assets/ass2.m4a";
-import ass3Sound from "./assets/ass3.m4a";
-import ass5Sound from "./assets/ass5.m4a";
-import uhSound from "./assets/uh.m4a";
+import ass2Sound from "./assets/ass2.m4a?url";
+import ass3Sound from "./assets/ass3.m4a?url";
+import ass5Sound from "./assets/ass5.m4a?url";
+import uhSound from "./assets/uh.m4a?url";
 
 // ===== LIGHTING CONFIGURATION =====
 export const LIGHTING_CONFIG = {

@@ -14,7 +14,7 @@ import {
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { PEACH_CONFIG, INTERACTION_CONFIG } from "./config";
-import peachyModel from "./assets/peachy.glb";
+import peachyModel from "./assets/peachy.glb?url";
 
 // Oil effect state
 let peachMeshes = [];
