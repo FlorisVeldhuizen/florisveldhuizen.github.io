@@ -36,12 +36,11 @@ const seed =
 
 // console.log(seed);
 
-window.onload = () => {
-  /*
-   * -----------------------------
-   *      CHESS PATHFINDING
-   * -----------------------------
-   */
+/*
+ * -----------------------------
+ *      CHESS PATHFINDING
+ * -----------------------------
+ */
   const getChessNeighbors = function (node, diagonalMovement) {
     const { nodes } = this;
     let explore;
@@ -657,6 +656,5 @@ window.onload = () => {
 
   console.log(Phaser.Game);
 
-  // new Game(width, height, renderer, parent, state, transparent, antialias, physicsConfig)
-  const game = new Phaser.Game(config);
-};
+// new Game(width, height, renderer, parent, state, transparent, antialias, physicsConfig)
+const game = new Phaser.Game(config);
