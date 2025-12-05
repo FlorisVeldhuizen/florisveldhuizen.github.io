@@ -225,7 +225,7 @@ export function loadPeachModel(peachGroup, onMeshesLoaded) {
   const normalMap = generatePeachNormalMap();
 
   loader.load(
-    "./public/assets/peachy.glb",
+    "./assets/peachy.glb",
     (gltf) => {
       const model = gltf.scene;
 

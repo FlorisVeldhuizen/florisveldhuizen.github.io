@@ -104,11 +104,11 @@ export const PARTICLE_CONFIG = {
 // ===== AUDIO CONFIGURATION =====
 export const AUDIO_CONFIG = {
   slapSounds: [
-    "./public/assets/ass2.m4a",
-    "./public/assets/ass3.m4a",
-    "./public/assets/ass5.m4a",
+    "./assets/ass2.m4a",
+    "./assets/ass3.m4a",
+    "./assets/ass5.m4a",
   ],
-  explosionSound: "./public/assets/uh.m4a",
+  explosionSound: "./assets/uh.m4a",
   pitchVariationMin: 0.85,
   pitchVariationMax: 1.15,
   highShelfFrequency: 2000,
