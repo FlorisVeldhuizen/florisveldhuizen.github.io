@@ -201,8 +201,7 @@ export function setPeachMesh(meshes) {
         peachState.isWobbling = false;
         // Don't reset idleAnimationTime here - let it continue running
 
-        // Clear impact marks on respawn
-        peachState.impactMarks = [];
+        // Impact marks are already cleared when explosion starts
 
         // Set initial state for animation (far away and small)
         if (peachGroup) {
@@ -415,6 +414,10 @@ function checkHoverSmack() {
       peachState.particleExplosion
     ) {
       if (!peachState.particleExplosion.isActive()) {
+        // Clear impact marks immediately when explosion starts
+        peachState.impactMarks = [];
+        updateImpactMarkShaders([]);
+        
         peachState.particleExplosion.explode();
         playExplosionSound(1.0);
         peachState.rageLevel = 0; // Reset rage after explosion
