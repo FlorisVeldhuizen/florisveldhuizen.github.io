@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 // https://vitejs.dev/config/
 export default defineConfig({
   root: path.join(__dirname, "./src"),
+  assetsInclude: ['**/*.glb'],
   server: {
     hmr: {
       protocol: "ws",
