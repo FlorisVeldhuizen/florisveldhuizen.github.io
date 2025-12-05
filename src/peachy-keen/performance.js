@@ -39,7 +39,7 @@ export class PerformanceMonitor {
     this.scene = null;
 
     // Ring light configuration
-    this.ringLightCount = 6; // Current light count
+    this.ringLightCount = LIGHTING_CONFIG.NORMAL_MODE_LIGHTS; // Current light count (start in normal mode)
     this.ringLightMesh = null; // The physical torus mesh
     this.ringPointLights = []; // Just the point lights (not the mesh)
     this.isOiledMode = false; // Track current lighting mode
@@ -109,14 +109,14 @@ export class PerformanceMonitor {
                     </label>
                     <div class="slider-control">
                         <label class="slider-label interactive-element">
-                            <span>Light Count: <span id="light-count-value">6</span> <span id="light-mode-indicator">(Normal Mode)</span></span>
-                            <input type="range" id="light-count-slider" min="0" max="6" value="6" step="1" class="interactive-element">
+                            <span>Light Count: <span id="light-count-value">${LIGHTING_CONFIG.NORMAL_MODE_LIGHTS}</span> <span id="light-mode-indicator">(Normal Mode)</span></span>
+                            <input type="range" id="light-count-slider" min="0" max="${LIGHTING_CONFIG.NORMAL_MODE_LIGHTS}" value="${LIGHTING_CONFIG.NORMAL_MODE_LIGHTS}" step="1" class="interactive-element">
                         </label>
                     </div>
                     <div class="slider-control">
                         <label class="slider-label interactive-element">
-                            <span>Light Intensity: <span id="light-intensity-value">8.0</span></span>
-                            <input type="range" id="light-intensity-slider" min="0" max="15" value="8.0" step="0.1" class="interactive-element">
+                            <span>Light Intensity: <span id="light-intensity-value">${LIGHTING_CONFIG.RING_LIGHT_INTENSITY_NORMAL.toFixed(1)}</span></span>
+                            <input type="range" id="light-intensity-slider" min="0" max="15" value="${LIGHTING_CONFIG.RING_LIGHT_INTENSITY_NORMAL}" step="0.1" class="interactive-element">
                         </label>
                     </div>
                     <label class="toggle-label interactive-element">
@@ -435,7 +435,7 @@ export class PerformanceMonitor {
     const ringRadius = LIGHTING_CONFIG.RING_RADIUS;
     const zPosition = LIGHTING_CONFIG.RING_POSITION_Z;
 
-    // Get current intensity from mode setting (for new lights only)
+    // Use the current mode's intensity for new lights
     const intensity = this.isOiledMode
       ? this.oiledModeIntensity
       : this.normalModeIntensity;
@@ -483,13 +483,18 @@ export class PerformanceMonitor {
         const y = Math.sin(angle) * ringRadius;
         this.ringPointLights[i].position.set(x, y, zPosition);
 
-        // Set visibility based on newCount
-        this.ringPointLights[i].visible = i < newCount;
+        // Set visibility based on newCount AND the ringLights feature toggle
+        this.ringPointLights[i].visible = i < newCount && this.features.ringLights;
 
         // Only set intensity for newly created lights, don't override existing
         if (i >= currentCount && i < newCount) {
           this.ringPointLights[i].intensity = intensity;
         }
+      }
+
+      // Also update the ring mesh visibility to match the feature toggle
+      if (this.ringLightMesh) {
+        this.ringLightMesh.visible = this.features.ringLights;
       }
 
       this.ringLightCount = newCount;
@@ -515,28 +520,20 @@ export class PerformanceMonitor {
    * @param {boolean} isOiled - Whether oiled mode is active
    */
   setLightingMode(isOiled) {
-    // Save the current mode's light count and intensity before switching
-    const currentVisibleCount = this.ringPointLights.filter(
-      (light) => light.visible
-    ).length;
-    // Get current intensity from first visible light
-    const firstVisibleLight = this.ringPointLights.find(
-      (light) => light.visible
-    );
-    const currentIntensity = firstVisibleLight
-      ? firstVisibleLight.intensity
-      : this.isOiledMode
-      ? this.oiledModeIntensity
-      : this.normalModeIntensity;
-
+    // Save the current mode's light count before switching
+    // Use ringLightCount instead of counting visible lights, since visibility
+    // can be affected by the ringLights feature toggle
+    const currentCount = this.ringLightCount;
+    
+    // Save the light count for the current mode
+    // Note: We don't save intensity here because each mode maintains its own
+    // intensity setting independently
     if (this.isOiledMode) {
-      // Currently in oiled mode, save oiled settings
-      this.oiledModeLightCount = currentVisibleCount;
-      this.oiledModeIntensity = currentIntensity;
+      // Currently in oiled mode, save oiled light count
+      this.oiledModeLightCount = currentCount;
     } else {
-      // Currently in normal mode, save normal settings
-      this.normalModeLightCount = currentVisibleCount;
-      this.normalModeIntensity = currentIntensity;
+      // Currently in normal mode, save normal light count
+      this.normalModeLightCount = currentCount;
     }
 
     this.isOiledMode = isOiled;
@@ -570,7 +567,7 @@ export class PerformanceMonitor {
       indicator.textContent = isOiled ? "(Oiled Mode)" : "(Normal Mode)";
     }
 
-    // Update intensity slider UI
+    // Update intensity slider UI (use mode-specific intensity)
     if (intensitySlider) {
       intensitySlider.value = targetIntensity;
     }
@@ -581,7 +578,7 @@ export class PerformanceMonitor {
     // Apply the target settings to the scene
     // Use promise chaining to ensure proper order
     this.adjustLightCount(targetCount).then(() => {
-      // After count is adjusted, set the intensity
+      // After count is adjusted, set the intensity (using mode-specific intensity)
       this.adjustLightIntensity(targetIntensity);
       console.log(
         `🎚️ Switched to ${
@@ -611,7 +608,7 @@ export class PerformanceMonitor {
       }
     });
 
-    // Save to the current mode's intensity
+    // Save to the current mode's intensity (each mode maintains its own)
     if (this.isOiledMode) {
       this.oiledModeIntensity = newIntensity;
     } else {
