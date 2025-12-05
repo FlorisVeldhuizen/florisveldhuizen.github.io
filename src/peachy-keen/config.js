@@ -3,6 +3,12 @@
  * Single source of truth for all shared constants across the application
  */
 
+// Import audio assets
+import ass2Sound from "./assets/ass2.m4a";
+import ass3Sound from "./assets/ass3.m4a";
+import ass5Sound from "./assets/ass5.m4a";
+import uhSound from "./assets/uh.m4a";
+
 // ===== LIGHTING CONFIGURATION =====
 export const LIGHTING_CONFIG = {
   // Number of lights per mode
@@ -104,11 +110,11 @@ export const PARTICLE_CONFIG = {
 // ===== AUDIO CONFIGURATION =====
 export const AUDIO_CONFIG = {
   slapSounds: [
-    "./assets/ass2.m4a",
-    "./assets/ass3.m4a",
-    "./assets/ass5.m4a",
+    ass2Sound,
+    ass3Sound,
+    ass5Sound,
   ],
-  explosionSound: "./assets/uh.m4a",
+  explosionSound: uhSound,
   pitchVariationMin: 0.85,
   pitchVariationMax: 1.15,
   highShelfFrequency: 2000,

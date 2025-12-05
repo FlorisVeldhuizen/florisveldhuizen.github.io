@@ -14,6 +14,7 @@ import {
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { PEACH_CONFIG, INTERACTION_CONFIG } from "./config";
+import peachyModel from "./assets/peachy.glb";
 
 // Oil effect state
 let peachMeshes = [];
@@ -225,7 +226,7 @@ export function loadPeachModel(peachGroup, onMeshesLoaded) {
   const normalMap = generatePeachNormalMap();
 
   loader.load(
-    "./assets/peachy.glb",
+    peachyModel,
     (gltf) => {
       const model = gltf.scene;
 
