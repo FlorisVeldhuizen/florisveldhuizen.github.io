@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peachy Keen 🍑</title>
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍑</text></svg>">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="instructions">
+        🍑 Swipe over the peach to smack it! 🍑
+    </div>
+    
+    <div id="rage-meter-container">
+        <div id="rage-meter-fill"></div>
+        <div id="rage-meter-label">🍑 PEACH-O-METER 🍑</div>
+    </div>
+    
+    <div id="hand-cursor">🤚</div>
+    
+    <button id="oil-button">💧 Oil Up</button>
+    
+    <!-- Sound Enable Overlay -->
+    <div id="sound-overlay">
+        <!-- Loading items (shown during asset loading) -->
+        <div id="loading-items">
+            <div class="peach-emoji">🍑</div>
+            <div class="title">Peachy Keen</div>
+            <div class="status">
+                <span id="loading-status">Loading...</span>
+            </div>
+            <div class="progress-bar">
+                <div id="loading-progress"></div>
+            </div>
+        </div>
+        
+        <!-- Click to start (shown after loading) -->
+        <div id="sound-overlay-content" style="display: none;">
+            <p>Click anywhere to start</p>
+        </div>
+    </div>
+    
+    <script type="module" src="main.js"></script>
+</body>
+</html>
+
