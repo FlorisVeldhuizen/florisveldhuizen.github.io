@@ -127,8 +127,9 @@ const handleHover = () => {
     !slothMessage.classList.contains("show")
   ) {
     isHovering = true;
-    const randomMessage =
-      hoverMessages[Math.min(patience - 1, hoverMessages.length - 1)];
+    const maxIndex = Math.min(patience - 1, hoverMessages.length - 1);
+    const randomIndex = Math.floor(Math.random() * (maxIndex + 1));
+    const randomMessage = hoverMessages[randomIndex];
     showMessage(randomMessage, 2000); // Linger for 2 seconds
   }
 };
