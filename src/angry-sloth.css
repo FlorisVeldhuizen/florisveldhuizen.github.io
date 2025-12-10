@@ -1,0 +1,59 @@
+#secretsloth{
+  position:absolute;
+  transition: all 0.8s ease;
+  right:20px;
+  top:0px;
+  cursor:pointer;
+  user-select: none;
+}
+#secretsloth:hover:not(.angry) {
+  animation: wobble 0.5s ease-in-out infinite;
+}
+.squish {
+  animation: squish 0.3s ease-out;
+}
+.rocking {
+  animation: rock 0.6s ease-in-out infinite;
+}
+.angry {
+  animation: rock 0.6s ease-in-out infinite, red-glow 1s ease-in-out infinite;
+}
+@keyframes squish {
+  0% { transform: scale(1, 1); }
+  50% { transform: scale(1.1, 0.9); }
+  100% { transform: scale(1, 1); }
+}
+@keyframes wobble {
+  0%, 100% { transform: rotate(0deg) scale(1.02); }
+  50% { transform: rotate(3deg) scale(1.05); }
+}
+@keyframes rock {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-5deg); }
+  75% { transform: rotate(5deg); }
+}
+@keyframes red-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(255, 0, 0, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.9)) drop-shadow(0 0 15px rgba(255, 0, 0, 0.6));
+  }
+}
+#sloth-message {
+  position: fixed;
+  background: white;
+  color: #333;
+  padding: 10px 15px;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 1000;
+  border: 1px solid #ddd;
+  max-width: 200px;
+  font-family: Arial, Helvetica, sans-serif;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+#sloth-message.show {
+  opacity: 1;
+}
