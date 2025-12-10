@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Github Pages - Floris Veldhuizen</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦥</text></svg>" />
+    <link rel="stylesheet" href="angry-sloth.css">
   </head>
 
   <style type="text/css">
@@ -52,20 +53,6 @@
       text-align: left;
       position: relative;
     }
-    #secretsloth{
-      position:absolute;
-      transition: all 4s ease;
-      right:20px;
-      top:0px;
-      cursor:pointer;
-      text-shadow: 0 0 0 red;
-    }
-    .anger {
-      animation: angry 0.8s 2;
-    }
-    .shaking {
-      animation: shake 2s infinite;
-    }
     @media only screen and (max-width: 800px) {
       .container {
         flex: 1 1 auto;
@@ -76,25 +63,6 @@
       .right {
         float: none;
         display: block;
-      }
-    }
-    @keyframes angry {
-      0% {
-        color: transparent;
-      }
-      100% {
-        color: #bada55;
-      }
-    }
-    @keyframes shake {
-      0% {
-        transform: rotate(45deg);
-      }
-      50% {
-        transform: rotate(-45deg);
-      }
-      100% {
-        transform: rotate(45deg);
       }
     }
   </style>
@@ -119,42 +87,8 @@
       </ol>
     </div>
     <h2 id="secretsloth"> &#x1F9A5;</h2>
+    <div id="sloth-message"></div>
     <p class="footer">Bundled with Vite</p>
+    <script src="angry-sloth.js"></script>
   </body>
-
-  <script type="text/javascript">
-    let sloth, patience, growth;
-    const responses = [
-      "Ouch, stop pressing me!",
-      "Hey, I warned you, quit it...",
-      "Alright, now I am getting angry!",
-      "I am going to get you!"
-    ]
-    const movethatsloth = () => {
-      sloth.style.top = Math.floor(Math.random() * window.innerHeight)-(patience*growth);
-      sloth.style.right = Math.floor(Math.random() * window.innerWidth)-(patience*growth);
-    }
-    const stoptouching = (e) => {
-        movethatsloth();
-        if(patience > 1) {
-          sloth.classList.remove("anger");
-          void sloth.offsetWidth; //weird CSS trick to restart keyframe animation
-          sloth.classList.add("anger");
-          sloth.style.fontSize = patience * growth + "px";
-        }
-        if(patience > responses.length-1) {
-          // sloth.classList.add("shaking");
-          alert(responses[responses.length-1]);
-        } else {
-          alert(responses[patience]);
-        }
-        patience++;
-      }
-    window.onload = function(){
-      patience = 0;
-      growth = 20;
-      sloth = document.getElementById('secretsloth');
-      sloth.addEventListener("click",stoptouching);
-    }
-  </script>
 </html>
