@@ -1,15 +1,28 @@
-let sloth, slothMessage, patience, growth, isMoving = false, isHovering = false, hideMessageTimeout = null;
+let sloth;
+let slothMessage;
+let patience;
+let growth;
+let isMoving = false;
+let isHovering = false;
+let hideMessageTimeout = null;
 const responses = [
   "Ouch, stop pressing me!",
   "Hey, I warned you, quit it...",
   "Alright, now I am getting angry!",
-  "I am going to get you!"
+  "I am going to get you!",
+  "You're really testing my patience...",
+  "Do you WANT me to be angry?!",
+  "I'm a SLOTH, not a stress ball!",
+  "That's it, I'm moving AGAIN!",
 ];
 
 const hoverMessages = [
   "...",
   "What?",
-  "Stop staring at me."
+  "Can I help you?",
+  "Stop staring at me.",
+  "This is awkward.",
+  "Personal space, please.",
 ];
 
 const movethatsloth = () => {
@@ -17,19 +30,19 @@ const movethatsloth = () => {
   if (hideMessageTimeout) {
     clearTimeout(hideMessageTimeout);
   }
-  slothMessage.classList.remove('show');
+  slothMessage.classList.remove("show");
 
   const maxTop = window.innerHeight - sloth.offsetHeight;
   const maxRight = window.innerWidth - sloth.offsetWidth;
-  sloth.style.top = Math.max(0, Math.floor(Math.random() * maxTop)) + "px";
-  sloth.style.right = Math.max(0, Math.floor(Math.random() * maxRight)) + "px";
+  sloth.style.top = `${Math.max(0, Math.floor(Math.random() * maxTop))}px`;
+  sloth.style.right = `${Math.max(0, Math.floor(Math.random() * maxRight))}px`;
 
   isMoving = true;
-  sloth.style.pointerEvents = 'none';
+  sloth.style.pointerEvents = "none";
 
   setTimeout(() => {
     isMoving = false;
-    sloth.style.pointerEvents = 'auto';
+    sloth.style.pointerEvents = "auto";
   }, 800);
 };
 
@@ -39,7 +52,7 @@ const showMessage = (text, duration = 2000) => {
     clearTimeout(hideMessageTimeout);
   }
 
-  slothMessage.classList.remove('show');
+  slothMessage.classList.remove("show");
 
   setTimeout(() => {
     slothMessage.textContent = text;
@@ -50,7 +63,7 @@ const showMessage = (text, duration = 2000) => {
     const offset = 15;
 
     // Center the message under the sloth (accounts for sloth's actual size)
-    let left = rect.left + (rect.width / 2) - (messageWidth / 2);
+    let left = rect.left + rect.width / 2 - messageWidth / 2;
     let top = rect.bottom + offset;
 
     // Keep message on screen
@@ -66,12 +79,12 @@ const showMessage = (text, duration = 2000) => {
 
     top = Math.max(20, top);
 
-    slothMessage.style.left = left + 'px';
-    slothMessage.style.top = top + 'px';
-    slothMessage.classList.add('show');
+    slothMessage.style.left = `${left}px`;
+    slothMessage.style.top = `${top}px`;
+    slothMessage.classList.add("show");
 
     hideMessageTimeout = setTimeout(() => {
-      slothMessage.classList.remove('show');
+      slothMessage.classList.remove("show");
     }, duration);
   }, 50);
 };
@@ -85,12 +98,12 @@ const stoptouching = (e) => {
   setTimeout(() => sloth.classList.remove("squish"), 300);
 
   // Grow the sloth
-  if(patience > 1) {
-    sloth.style.fontSize = Math.min(patience * growth, 150) + "px";
+  if (patience > 1) {
+    sloth.style.fontSize = `${Math.min(patience * growth, 150)}px`;
   }
 
   // Add rocking and red glow when getting angry (after 2+ clicks)
-  if(patience > 2) {
+  if (patience > 2) {
     sloth.classList.add("angry");
   }
 
@@ -103,14 +116,20 @@ const stoptouching = (e) => {
     showMessage(responses[messageIndex]);
   }, 850);
 
-  patience++;
+  patience += 1;
 };
 
 const handleHover = () => {
-  if (!isHovering && !isMoving && patience > 1 && !slothMessage.classList.contains('show')) {
+  if (
+    !isHovering &&
+    !isMoving &&
+    patience > 0 &&
+    !slothMessage.classList.contains("show")
+  ) {
     isHovering = true;
-    const randomMessage = hoverMessages[Math.min(patience - 1, hoverMessages.length - 1)];
-    showMessage(randomMessage, 3000); // Linger for 3 seconds
+    const randomMessage =
+      hoverMessages[Math.min(patience - 1, hoverMessages.length - 1)];
+    showMessage(randomMessage, 2000); // Linger for 2 seconds
   }
 };
 
@@ -118,11 +137,11 @@ const handleHoverOut = () => {
   isHovering = false;
 };
 
-window.onload = function(){
+window.onload = function initSloth() {
   patience = 0;
   growth = 20;
-  sloth = document.getElementById('secretsloth');
-  slothMessage = document.getElementById('sloth-message');
+  sloth = document.getElementById("secretsloth");
+  slothMessage = document.getElementById("sloth-message");
 
   sloth.addEventListener("click", stoptouching);
   sloth.addEventListener("mouseenter", handleHover);
