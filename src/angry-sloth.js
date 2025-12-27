@@ -1,7 +1,7 @@
 let sloth;
 let slothMessage;
 let patience;
-let growth;
+let currentScale = 1;
 let isMoving = false;
 let isHovering = false;
 let hideMessageTimeout = null;
@@ -97,9 +97,11 @@ const stoptouching = (e) => {
   sloth.classList.add("squish");
   setTimeout(() => sloth.classList.remove("squish"), 300);
 
-  // Grow the sloth
-  if (patience > 1) {
-    sloth.style.fontSize = `${Math.min(patience * growth, 150)}px`;
+  // Grow the sloth using scale instead of fontSize for better mobile performance
+  if (patience >= 1) {
+    currentScale = Math.min(1 + patience * 0.4, 3); // Grows from 1x to 3x
+    sloth.style.setProperty("--sloth-scale", currentScale);
+    sloth.style.transform = `scale(${currentScale})`;
   }
 
   // Add rocking and red glow when getting angry (after 2+ clicks)
@@ -140,9 +142,12 @@ const handleHoverOut = () => {
 
 window.onload = function initSloth() {
   patience = 0;
-  growth = 20;
+  currentScale = 1;
   sloth = document.getElementById("secretsloth");
   slothMessage = document.getElementById("sloth-message");
+
+  // Initialize CSS variable for scale
+  sloth.style.setProperty("--sloth-scale", currentScale);
 
   sloth.addEventListener("click", stoptouching);
   sloth.addEventListener("mouseenter", handleHover);
