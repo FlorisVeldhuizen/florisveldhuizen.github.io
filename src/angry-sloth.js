@@ -5,6 +5,8 @@ let currentScale = 1;
 let isMoving = false;
 let isHovering = false;
 let hideMessageTimeout = null;
+let typewriterTimeout = null;
+const maxScale = 10;
 const responses = [
   "Ouch, stop pressing me!",
   "Hey, I warned you, quit it...",
@@ -14,21 +16,73 @@ const responses = [
   "Do you WANT me to be angry?!",
   "I'm a SLOTH, not a stress ball!",
   "That's it, I'm moving AGAIN!",
+  "Seriously, what the hell is wrong with you?!",
+  "You're being a real pain in my furry ass!",
+  "I'm going to lick all your spoons and put them back!",
+  "I'm going to breathe on all your glasses and mirrors!",
+  "I'm going to hide all your left socks, forever!",
+  "I'll slightly loosen every jar in your house!",
+  "I'll unplug your phone charger RIGHT before it hits 100%!",
+  "I'll warm up both sides of your pillow, permanently!",
+  "I'll subscribe you to 47 different email lists!",
+  "I'm going to make all your bananas ripen at the same time!",
+  "I'll eat the last bite of everything in your fridge!",
+  "I'm going to swap your salt and sugar containers!",
+  "I'll make your tea always slightly too hot or too cold!",
+  "I'm going to replace your shampoo with mayonnaise!",
+  "I'll set all your alarms to 3AM, watch me!",
+  "I'm going to make your coffee taste like dirty feet!",
+  "I'll make your toilet paper roll backwards forever!",
+  "I'll make sure every USB you use takes 3 tries to plug in!",
+  "I'll program your autocorrect to always say 'moist'!",
+  "I'll make your headphones tangle EVERY. SINGLE. TIME.",
+  "I'll make all your pens run out of ink mid-sentence!",
+  "I'll desync the audio on every video you watch!",
+  "I'll ensure every traffic light turns red as you approach!",
+  "I'll make every shopping cart you use have a wonky wheel!",
+  "I'll reorganize your apps while you sleep, enjoy!",
+  "I'm going to spoil every movie plot twist before you see it!",
+  "I'll put a single popcorn kernel in every shoe you own!",
+  "I'll hide tiny Legos in your carpet, you monster!",
+  "I'm going to hide small amounts of glitter everywhere you own!",
+  "I'm going to move all your furniture 2 inches to the left!",
+  "I'm going to take a shit on your pillow while you sleep!",
+  "YOU AND THE TREE YOU HANG FROM ARE ON MY LIST!",
 ];
 
 const hoverMessages = [
   "...",
   "What?",
   "Can I help you?",
-  "Stop staring at me.",
   "This is awkward.",
+  "Do you mind?",
+  "Stop staring at me.",
   "Personal space, please.",
+  "This is my personal bubble.",
+  "Dude, seriously?",
+  "What do you want?",
+  "I can feel you staring.",
+  "I'm not a zoo animal.",
+  "Take a picture, it'll last longer.",
+  "You're creeping me out...",
+  "Stop hovering, weirdo!",
+  "Why are you like this?",
+  "I'm judging your mouse movement.",
+  "Your cursor smells like cheese.",
+  "I'm going to breathe on your screen.",
+  "I'll remember your cursor position forever.",
+  "I'm telling the other pixels about you.",
+  "Are we gonna have a problem?",
+  "I'm too slow to deal with this.",
 ];
 
 const movethatsloth = () => {
-  // Hide any existing message
+  // Hide any existing message and stop typing
   if (hideMessageTimeout) {
     clearTimeout(hideMessageTimeout);
+  }
+  if (typewriterTimeout) {
+    clearTimeout(typewriterTimeout);
   }
   slothMessage.classList.remove("show");
 
@@ -46,17 +100,55 @@ const movethatsloth = () => {
   }, 800);
 };
 
+const typeWriter = (text, element, callback) => {
+  const chars = text.split("");
+  let currentCharIndex = 0;
+
+  // Clear any existing typewriter
+  if (typewriterTimeout) {
+    clearTimeout(typewriterTimeout);
+  }
+
+  const messageElement = element;
+  messageElement.textContent = "";
+
+  const typeNextChar = () => {
+    if (currentCharIndex < chars.length) {
+      messageElement.textContent += chars[currentCharIndex];
+      currentCharIndex += 1;
+
+      // Slothy speed - slower when calm, faster as sloth gets angrier
+      let baseDelay = 50;
+      if (patience >= 15) {
+        baseDelay = 20;
+      } else if (patience >= 5) {
+        baseDelay = 30;
+      }
+
+      // Add slight randomness for natural feel
+      const delay = baseDelay + Math.random() * 15;
+
+      typewriterTimeout = setTimeout(typeNextChar, delay);
+    } else if (callback) {
+      callback();
+    }
+  };
+
+  typeNextChar();
+};
+
 const showMessage = (text, duration = 2000) => {
-  // Clear any existing timeout
+  // Clear any existing timeouts
   if (hideMessageTimeout) {
     clearTimeout(hideMessageTimeout);
+  }
+  if (typewriterTimeout) {
+    clearTimeout(typewriterTimeout);
   }
 
   slothMessage.classList.remove("show");
 
   setTimeout(() => {
-    slothMessage.textContent = text;
-
     const rect = sloth.getBoundingClientRect();
     const messageWidth = 200;
     const messageHeight = 60;
@@ -83,9 +175,13 @@ const showMessage = (text, duration = 2000) => {
     slothMessage.style.top = `${top}px`;
     slothMessage.classList.add("show");
 
-    hideMessageTimeout = setTimeout(() => {
-      slothMessage.classList.remove("show");
-    }, duration);
+    // Type out the message word by word
+    typeWriter(text, slothMessage, () => {
+      // After typing is done, wait before hiding
+      hideMessageTimeout = setTimeout(() => {
+        slothMessage.classList.remove("show");
+      }, duration);
+    });
   }, 50);
 };
 
@@ -99,7 +195,7 @@ const stoptouching = (e) => {
 
   // Grow the sloth using scale instead of fontSize for better mobile performance
   if (patience >= 1) {
-    currentScale = Math.min(1 + patience * 0.4, 3); // Grows from 1x to 3x
+    currentScale = Math.min(1 + patience * 0.4, maxScale); // Grows from 1x to 3x
     sloth.style.setProperty("--sloth-scale", currentScale);
     sloth.style.transform = `scale(${currentScale})`;
   }
