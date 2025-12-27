@@ -1,11 +1,12 @@
 #secretsloth{
   position:absolute;
-  transition: top 0.8s ease, right 0.8s ease, transform 0.8s ease;
+  transition: top 0.8s ease, right 0.8s ease, transform 0.8s ease, filter 0.5s ease;
   right:20px;
   top:0px;
   cursor:pointer;
   user-select: none;
   transform-origin: center center;
+  filter: drop-shadow(0 0 0px rgba(255, 0, 0, 0));
 }
 #secretsloth:hover:not(.angry) {
   animation: wobble 0.5s ease-in-out infinite;
@@ -50,11 +51,15 @@
   pointer-events: none;
   z-index: 1000;
   border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   max-width: 200px;
   font-family: Arial, Helvetica, sans-serif;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transform: translateY(-5px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 #sloth-message.show {
   opacity: 1;
+  transform: translateY(0);
 }
