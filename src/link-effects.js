@@ -2,6 +2,7 @@
 const initLinkEffects = () => {
   const links = document.querySelectorAll(".container a");
   const allLetters = [];
+  let activeTouch = false;
 
   // Split text into individual letters for all links
   links.forEach((link) => {
@@ -21,18 +22,15 @@ const initLinkEffects = () => {
     });
   });
 
-  // Global mouse move handler - affects all links simultaneously
-  const handleGlobalMouseMove = (e) => {
-    const mouseX = e.clientX;
-    const mouseY = e.clientY;
-
+  // Repulsion calculation function
+  const applyRepulsion = (x, y) => {
     allLetters.forEach((letter) => {
       const letterRect = letter.getBoundingClientRect();
       const letterCenterX = letterRect.left + letterRect.width / 2;
       const letterCenterY = letterRect.top + letterRect.height / 2;
 
-      const deltaX = letterCenterX - mouseX;
-      const deltaY = letterCenterY - mouseY;
+      const deltaX = letterCenterX - x;
+      const deltaY = letterCenterY - y;
       const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
       // Only apply effect within a certain radius
@@ -49,8 +47,45 @@ const initLinkEffects = () => {
     });
   };
 
-  // Attach global listener
+  // Reset all letters
+  const resetLetters = () => {
+    allLetters.forEach((letter) => {
+      letter.style.transform = "translate(0, 0)";
+    });
+  };
+
+  // Mouse move handler
+  const handleGlobalMouseMove = (e) => {
+    applyRepulsion(e.clientX, e.clientY);
+  };
+
+  // Touch handlers
+  const handleTouchStart = (e) => {
+    activeTouch = true;
+    if (e.touches.length > 0) {
+      applyRepulsion(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (activeTouch && e.touches.length > 0) {
+      e.preventDefault(); // Prevent scrolling while interacting
+      applyRepulsion(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    activeTouch = false;
+    // Smooth reset after touch ends
+    setTimeout(resetLetters, 100);
+  };
+
+  // Attach listeners
   document.addEventListener("mousemove", handleGlobalMouseMove);
+  document.addEventListener("touchstart", handleTouchStart, { passive: false });
+  document.addEventListener("touchmove", handleTouchMove, { passive: false });
+  document.addEventListener("touchend", handleTouchEnd);
+  document.addEventListener("touchcancel", handleTouchEnd);
 };
 
 // Initialize when DOM is ready
