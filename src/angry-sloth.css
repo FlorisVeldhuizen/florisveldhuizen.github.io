@@ -56,10 +56,8 @@
   max-width: 200px;
   font-family: Arial, Helvetica, sans-serif;
   opacity: 0;
-  transform: translateY(-5px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.3s ease;
 }
 #sloth-message.show {
   opacity: 1;
-  transform: translateY(0);
 }

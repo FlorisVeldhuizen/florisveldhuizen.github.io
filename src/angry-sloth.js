@@ -148,11 +148,17 @@ const showMessage = (text, duration = 2000) => {
 
   slothMessage.classList.remove("show");
 
+  // Set the text content first to get accurate dimensions
+  slothMessage.textContent = text;
+
   setTimeout(() => {
     const rect = sloth.getBoundingClientRect();
-    const messageWidth = 200;
-    const messageHeight = 60;
     const offset = 15;
+
+    // Get the actual dimensions of the message box after content is set
+    const messageRect = slothMessage.getBoundingClientRect();
+    const messageWidth = messageRect.width;
+    const messageHeight = messageRect.height;
 
     // Center the message under the sloth (accounts for sloth's actual size)
     let left = rect.left + rect.width / 2 - messageWidth / 2;
@@ -175,7 +181,8 @@ const showMessage = (text, duration = 2000) => {
     slothMessage.style.top = `${top}px`;
     slothMessage.classList.add("show");
 
-    // Type out the message word by word
+    // Clear the text and type it out
+    slothMessage.textContent = "";
     typeWriter(text, slothMessage, () => {
       // After typing is done, wait before hiding
       hideMessageTimeout = setTimeout(() => {
