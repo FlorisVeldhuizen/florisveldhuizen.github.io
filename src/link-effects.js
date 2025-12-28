@@ -1,87 +1,130 @@
-// Sophisticated link letter repulsion effect
 const initLinkEffects = () => {
+  const CONFIG = {
+    REPULSION_RADIUS: 70,
+    REPULSION_STRENGTH: 5,
+    RESIZE_DEBOUNCE: 150,
+    TOUCH_RESET_DELAY: 100,
+  };
+
   const links = document.querySelectorAll(".container a");
   const allLetters = [];
+  const letterPositions = [];
+  let animationFrameId = null;
+  let currentMouseX = 0;
+  let currentMouseY = 0;
   let activeTouch = false;
+  let resizeTimeout = null;
 
-  // Split text into individual letters for all links
-  links.forEach((link) => {
-    const text = link.textContent;
-    link.textContent = "";
+  const initializeLetters = () => {
+    for (let i = 0; i < links.length; i += 1) {
+      const link = links[i];
+      const text = link.textContent;
+      const fragment = document.createDocumentFragment();
 
-    text.split("").forEach((char) => {
-      const span = document.createElement("span");
-      span.className = "letter";
-      span.textContent = char;
-      span.style.display = char === " " ? "inline" : "inline-block";
-      link.appendChild(span);
+      text.split("").forEach((char) => {
+        const span = document.createElement("span");
+        span.className = "letter";
+        span.textContent = char;
+        span.style.display = char === " " ? "inline" : "inline-block";
+        fragment.appendChild(span);
 
-      if (char !== " ") {
-        allLetters.push(span);
-      }
-    });
-  });
+        if (char !== " ") {
+          allLetters.push(span);
+        }
+      });
 
-  // Repulsion calculation function
-  const applyRepulsion = (x, y) => {
-    allLetters.forEach((letter) => {
-      const letterRect = letter.getBoundingClientRect();
-      const letterCenterX = letterRect.left + letterRect.width / 2;
-      const letterCenterY = letterRect.top + letterRect.height / 2;
+      link.textContent = "";
+      link.appendChild(fragment);
+    }
+  };
 
-      const deltaX = letterCenterX - x;
-      const deltaY = letterCenterY - y;
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+  const cacheLetterPositions = () => {
+    letterPositions.length = 0;
 
-      // Only apply effect within a certain radius
-      const maxDistance = 70;
-      if (distance < maxDistance) {
-        const force = (maxDistance - distance) / maxDistance;
-        const pushX = (deltaX / distance) * force * 5;
-        const pushY = (deltaY / distance) * force * 5;
+    for (let i = 0; i < allLetters.length; i += 1) {
+      const rect = allLetters[i].getBoundingClientRect();
+      letterPositions.push({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+    }
+  };
+
+  const applyRepulsion = () => {
+    const { REPULSION_RADIUS, REPULSION_STRENGTH } = CONFIG;
+    const mouseX = currentMouseX;
+    const mouseY = currentMouseY;
+
+    for (let i = 0; i < allLetters.length; i += 1) {
+      const letter = allLetters[i];
+      const pos = letterPositions[i];
+
+      const deltaX = pos.x - mouseX;
+      const deltaY = pos.y - mouseY;
+      const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+      const radiusSquared = REPULSION_RADIUS * REPULSION_RADIUS;
+
+      if (distanceSquared < radiusSquared) {
+        const distance = Math.sqrt(distanceSquared);
+        const force = (REPULSION_RADIUS - distance) / REPULSION_RADIUS;
+        const pushX = (deltaX / distance) * force * REPULSION_STRENGTH;
+        const pushY = (deltaY / distance) * force * REPULSION_STRENGTH;
 
         letter.style.transform = `translate(${pushX}px, ${pushY}px)`;
       } else {
         letter.style.transform = "translate(0, 0)";
       }
-    });
+    }
+
+    animationFrameId = null;
   };
 
-  // Reset all letters
+  const scheduleUpdate = (x, y) => {
+    currentMouseX = x;
+    currentMouseY = y;
+
+    if (animationFrameId === null) {
+      animationFrameId = requestAnimationFrame(applyRepulsion);
+    }
+  };
+
   const resetLetters = () => {
-    allLetters.forEach((letter) => {
-      letter.style.transform = "translate(0, 0)";
-    });
+    for (let i = 0; i < allLetters.length; i += 1) {
+      allLetters[i].style.transform = "translate(0, 0)";
+    }
   };
 
-  // Mouse move handler
-  const handleGlobalMouseMove = (e) => {
-    applyRepulsion(e.clientX, e.clientY);
-  };
+  const handleMouseMove = (e) => scheduleUpdate(e.clientX, e.clientY);
 
-  // Touch handlers
   const handleTouchStart = (e) => {
     activeTouch = true;
     if (e.touches.length > 0) {
-      applyRepulsion(e.touches[0].clientX, e.touches[0].clientY);
+      scheduleUpdate(e.touches[0].clientX, e.touches[0].clientY);
     }
   };
 
   const handleTouchMove = (e) => {
     if (activeTouch && e.touches.length > 0) {
-      e.preventDefault(); // Prevent scrolling while interacting
-      applyRepulsion(e.touches[0].clientX, e.touches[0].clientY);
+      e.preventDefault();
+      scheduleUpdate(e.touches[0].clientX, e.touches[0].clientY);
     }
   };
 
   const handleTouchEnd = () => {
     activeTouch = false;
-    // Smooth reset after touch ends
-    setTimeout(resetLetters, 100);
+    setTimeout(resetLetters, CONFIG.TOUCH_RESET_DELAY);
   };
 
-  // Attach listeners
-  document.addEventListener("mousemove", handleGlobalMouseMove);
+  const handleResize = () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(cacheLetterPositions, CONFIG.RESIZE_DEBOUNCE);
+  };
+
+  initializeLetters();
+  cacheLetterPositions();
+
+  window.addEventListener("resize", handleResize);
+  document.addEventListener("mousemove", handleMouseMove);
   document.addEventListener("touchstart", handleTouchStart, { passive: false });
   document.addEventListener("touchmove", handleTouchMove, { passive: false });
   document.addEventListener("touchend", handleTouchEnd);
