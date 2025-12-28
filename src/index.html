@@ -53,6 +53,35 @@
       text-align: left;
       position: relative;
     }
+    a {
+      color: #0000EE;
+      text-decoration: none;
+      position: relative;
+      display: inline-block;
+      transition: color 0.3s ease;
+    }
+    a:visited {
+      color: #551A8B;
+    }
+    a::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -2px;
+      height: 1px;
+      background-color: currentColor;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    a:hover::after {
+      opacity: 1;
+    }
+    a .letter {
+      display: inline-block;
+      will-change: transform;
+      text-decoration: none;
+    }
     @media only screen and (max-width: 800px) {
       .container {
         flex: 1 1 auto;
@@ -89,6 +118,7 @@
     <h2 id="secretsloth"> &#x1F9A5;</h2>
     <div id="sloth-message"></div>
     <p class="footer">Bundled with Vite</p>
+    <script type="module" src="link-effects.js"></script>
     <script type="module" src="angry-sloth.js"></script>
   </body>
 </html>
