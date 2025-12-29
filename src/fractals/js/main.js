@@ -101,7 +101,7 @@ class FractalRenderer {
         vec2 z = vec2(0.0);
         float iterations = 0.0;
         
-        for (float i = 0.0; i < 50000.0; i++) {
+        for (float i = 0.0; i < 10000.0; i++) {
           if (i >= maxIterations) break;
           
           float zx2 = z.x * z.x;
@@ -244,7 +244,7 @@ class FractalRenderer {
       iterations += (zoomLevel - 10) * 600;
     }
 
-    return Math.min(50000, Math.max(base, Math.floor(iterations)));
+    return Math.min(10000, Math.max(base, Math.floor(iterations)));
   }
 
   static getInteractionIterations(zoomLevel, maxIterations) {
