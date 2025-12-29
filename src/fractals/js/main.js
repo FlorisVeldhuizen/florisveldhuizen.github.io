@@ -44,6 +44,9 @@ class FractalRenderer {
     this.lastMouseX = 0;
     this.lastMouseY = 0;
 
+    this.isPinching = false;
+    this.lastPinchDistance = 0;
+
     this.needsRender = true;
     this.isInteracting = false;
     this.isDraggingActive = false;
@@ -467,7 +470,18 @@ class FractalRenderer {
       "touchstart",
       (e) => {
         e.preventDefault();
-        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+
+        if (e.touches.length === 2) {
+          this.isPinching = true;
+          const dx = e.touches[1].clientX - e.touches[0].clientX;
+          const dy = e.touches[1].clientY - e.touches[0].clientY;
+          this.lastPinchDistance = Math.sqrt(dx * dx + dy * dy);
+          this.isZoomingActive = true;
+          this.startInteraction();
+        } else if (e.touches.length === 1) {
+          this.isPinching = false;
+          startDrag(e.touches[0].clientX, e.touches[0].clientY);
+        }
       },
       { passive: false },
     );
@@ -476,12 +490,61 @@ class FractalRenderer {
       "touchmove",
       (e) => {
         e.preventDefault();
-        moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+
+        if (e.touches.length === 2 && this.isPinching) {
+          const dx = e.touches[1].clientX - e.touches[0].clientX;
+          const dy = e.touches[1].clientY - e.touches[0].clientY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (this.lastPinchDistance > 0) {
+            const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            const rect = this.canvas.getBoundingClientRect();
+
+            const scale = distance / this.lastPinchDistance;
+            const zoomFactor = 1 / scale;
+
+            const mouseX = (centerX - rect.left) / rect.width;
+            const mouseY = (centerY - rect.top) / rect.height;
+            const aspect = rect.width / rect.height;
+
+            const offsetX = (mouseX - 0.5) * this.zoom * aspect;
+            const offsetY = (mouseY - 0.5) * this.zoom;
+            const beforeX = this.centerX + offsetX;
+            const beforeY = this.centerY - offsetY;
+
+            this.zoom *= zoomFactor;
+
+            this.centerX = beforeX - (mouseX - 0.5) * this.zoom * aspect;
+            this.centerY = beforeY + (mouseY - 0.5) * this.zoom;
+
+            this.maxIterations = FractalRenderer.calculateIterations(
+              this.getZoomLevel(),
+            );
+
+            this.updateUI();
+            this.requestRender();
+          }
+
+          this.lastPinchDistance = distance;
+        } else if (e.touches.length === 1 && !this.isPinching) {
+          moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+        }
       },
       { passive: false },
     );
 
-    this.canvas.addEventListener("touchend", endDrag);
+    this.canvas.addEventListener("touchend", (e) => {
+      if (e.touches.length === 0) {
+        this.isPinching = false;
+        this.lastPinchDistance = 0;
+        endDrag();
+      } else if (e.touches.length === 1 && this.isPinching) {
+        this.isPinching = false;
+        this.lastPinchDistance = 0;
+        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    });
 
     this.canvas.addEventListener(
       "wheel",
