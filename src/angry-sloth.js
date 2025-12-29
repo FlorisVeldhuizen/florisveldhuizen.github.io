@@ -148,36 +148,53 @@ const showMessage = (text, duration = 2000) => {
 
   slothMessage.classList.remove("show");
 
-  // Set the text content first to get accurate dimensions
+  // Set the text content temporarily to measure final dimensions
   slothMessage.textContent = text;
 
   setTimeout(() => {
     const rect = sloth.getBoundingClientRect();
     const offset = 15;
+    const edgePadding = 20;
 
-    // Get the actual dimensions of the message box after content is set
+    // Calculate center point of sloth for horizontal positioning
+    const slothCenterX = rect.left + rect.width / 2;
+
+    // Get the message dimensions
     const messageRect = slothMessage.getBoundingClientRect();
     const messageWidth = messageRect.width;
     const messageHeight = messageRect.height;
 
-    // Center the message under the sloth (accounts for sloth's actual size)
-    let left = rect.left + rect.width / 2 - messageWidth / 2;
+    // Position message vertically
     let top = rect.bottom + offset;
 
-    // Keep message on screen
-    if (left + messageWidth > window.innerWidth - 20) {
-      left = window.innerWidth - messageWidth - 20;
-    }
-    if (left < 20) {
-      left = 20;
-    }
-    if (top + messageHeight > window.innerHeight - 20) {
+    // Check if message would go below viewport
+    if (top + messageHeight > window.innerHeight - edgePadding) {
       top = rect.top - messageHeight - offset;
     }
 
-    top = Math.max(20, top);
+    top = Math.max(edgePadding, top);
+
+    // Position message horizontally - check if centered position would overflow
+    const centeredLeft = slothCenterX - messageWidth / 2;
+    const centeredRight = slothCenterX + messageWidth / 2;
+
+    let left;
+    let transform = "none";
+
+    if (centeredLeft < edgePadding) {
+      // Too close to left edge - pin to left
+      left = edgePadding;
+    } else if (centeredRight > window.innerWidth - edgePadding) {
+      // Too close to right edge - pin to right
+      left = window.innerWidth - messageWidth - edgePadding;
+    } else {
+      // Plenty of space - use transform centering for natural growth
+      left = slothCenterX;
+      transform = "translateX(-50%)";
+    }
 
     slothMessage.style.left = `${left}px`;
+    slothMessage.style.transform = transform;
     slothMessage.style.top = `${top}px`;
     slothMessage.classList.add("show");
 
