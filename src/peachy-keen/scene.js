@@ -78,6 +78,7 @@ export function initScene() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.6;
+  renderer.localClippingEnabled = true;
   renderer.domElement.id = "stage";
   document.body.prepend(renderer.domElement);
 

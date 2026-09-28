@@ -17,6 +17,22 @@ const CANVAS_WIDTH = 720;
 const SURFACE = 0.2;
 const FALLOFF = [0.5, 0.444, 0.311, 0.172, 0.075, 0];
 const project = new Vector3();
+const SPRITE_SIZE = 256;
+
+function drawBlobSprite() {
+  const sprite = document.createElement("canvas");
+  sprite.width = SPRITE_SIZE;
+  sprite.height = SPRITE_SIZE;
+  const ctx = sprite.getContext("2d");
+  const half = SPRITE_SIZE / 2;
+  const g = ctx.createRadialGradient(half, half, 0, half, half, half);
+  FALLOFF.forEach((v, i) => {
+    g.addColorStop(i / (FALLOFF.length - 1), `rgb(${Math.round(v * 255)},0,0)`);
+  });
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
+  return sprite;
+}
 
 const LensShader = {
   uniforms: {
@@ -76,6 +92,7 @@ export class Lens {
     this.drops = [];
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d");
+    this.sprite = drawBlobSprite();
     this.texture = new CanvasTexture(this.canvas);
 
     this.material = new ShaderMaterial({
@@ -208,17 +225,7 @@ export class Lens {
   blob(x, y, r) {
     if (r < 0.6) return;
     const reach = r * 1.8;
-    const g = this.ctx.createRadialGradient(x, y, 0, x, y, reach);
-    FALLOFF.forEach((v, i) => {
-      g.addColorStop(
-        i / (FALLOFF.length - 1),
-        `rgb(${Math.round(v * 255)},0,0)`,
-      );
-    });
-    this.ctx.fillStyle = g;
-    this.ctx.beginPath();
-    this.ctx.arc(x, y, reach, 0, Math.PI * 2);
-    this.ctx.fill();
+    this.ctx.drawImage(this.sprite, x - reach, y - reach, reach * 2, reach * 2);
   }
 
   captureFrame() {

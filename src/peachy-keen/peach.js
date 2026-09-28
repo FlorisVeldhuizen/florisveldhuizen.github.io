@@ -34,9 +34,10 @@ import { PEACH_CONFIG, FABRIC } from "./config";
 import { RING } from "./scene";
 import { RibbonBows } from "./ribbon";
 import { Waistband } from "./band";
+import { raycastNearest } from "./raycast";
 import peachyModel from "./assets/peachy.glb?url";
 
-const HIT_LIFE = 2.5;
+const HIT_LIFE = 3.0;
 const CURVE_SLOTS = 16;
 const BRIDGE_BINS = 25;
 const BRIDGE_SPAN = "0.25";
@@ -46,6 +47,7 @@ const NOIR = [0x0d0508, 0x3a1a24];
 const LINGERIE_COMMON = `
   uniform vec4 uBounds;
   uniform vec4 uLingerie;
+  uniform vec2 uTieSag;
   uniform vec4 uFabric;
   uniform float uCreaseCurve[${CURVE_SLOTS}];
   uniform vec3 uCreaseSide;
@@ -85,7 +87,7 @@ const LINGERIE_COMMON = `
 
   float waistLine(float across, float back) {
     float top = min(uLingerie.w - uLingerie.y * 0.36 - 0.05, uLingerie.w + 0.01);
-    return top;
+    return top - uTieSag.x * smoothstep(0.0, 0.35, across) - uTieSag.y * smoothstep(0.0, 0.35, -across);
   }
 
   float fabricShape(float across, float h, float back, float waist, float soft) {
@@ -221,7 +223,7 @@ const VERTEX_HEADER = `
       float ripple = (1.0 - pad) * exp(-rim * rim * 1.4) * exp(-t * uFirmness.y * 1.2) * cos(t * uFirmness.x - rim * 2.6) * 0.22;
       float dent = pad * spring + ripple;
       float wobble = exp(-dist * dist * 0.2) * exp(-t * uFirmness.y * 0.75) * sin(t * uFirmness.x * 0.5) * uFirmness.z;
-      float cheek = cheekBody * exp(-dist * dist * 0.08) * exp(-t * uFirmness.y * 0.5) * sin(t * uFirmness.x * 0.42) * uFirmness.z * 3.2;
+      float cheek = cheekBody * exp(-dist * dist * 0.08) * exp(-t * uFirmness.y * 0.38) * sin(t * uFirmness.x * 0.42) * uFirmness.z * 3.2;
       vec3 stretch = -(q - n * dot(q, n)) / r * dent * length(uHitDirs[i].xyz) * 0.3;
       hits += (uHitDirs[i].xyz * ((dent + wobble) * mix(0.15, 1.0, sameCheek) + cheek) + stretch * sameCheek) * onset;
     }
@@ -903,6 +905,7 @@ export class Peach {
       uGrabDent: { value: new Vector4(0, 0, 0, 1) },
       uBounds: { value: new Vector4(0, 0, 0, 1) },
       uLingerie: { value: new Vector4(0, 0, 0, 0.7) },
+      uTieSag: { value: new Vector2() },
       uCreaseCurve: { value: new Array(CURVE_SLOTS).fill(0) },
       uBridgeMap: { value: null },
       uFabric: {
@@ -1012,6 +1015,7 @@ export class Peach {
       /* eslint-enable no-param-reassign */
     };
     mesh.material = this.material;
+    mesh.raycast = raycastNearest;
     this.mesh = mesh;
     this.fabric = new Mesh(mesh.geometry, this.fabricMaterial());
     this.fabric.visible = false;
@@ -1021,6 +1025,7 @@ export class Peach {
       this.followSkin(material, skin),
     );
     mesh.add(this.bows.group);
+    if (this.bowStyle) this.bows.setStyle(this.bowStyle);
     this.band = new Waistband(this, (material) => this.followSurface(material));
     mesh.add(this.band.mesh);
     this.group.add(model);
@@ -1802,6 +1807,15 @@ export class Peach {
     [u.uHits, u.uPrints].forEach((slots) =>
       slots.value.forEach((v) => v.setW(-1e4)),
     );
+  }
+
+  setTieSag(plus, minus) {
+    this.uniforms.uTieSag.value.set(plus, minus);
+  }
+
+  setBowStyle(style) {
+    this.bowStyle = style;
+    this.bows?.setStyle(style);
   }
 
   setLingerie(on, pull, visible) {

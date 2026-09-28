@@ -75,13 +75,6 @@ export class UI {
       .finished.then(() => label.remove());
   }
 
-  setScrub(amount) {
-    const rounded = Math.round(amount * 20) / 20;
-    if (rounded === this.shownScrub) return;
-    this.shownScrub = rounded;
-    this.cursor.style.setProperty("--scrub", rounded);
-  }
-
   onGrab() {
     this.hintGrab.classList.add("is-learned");
   }

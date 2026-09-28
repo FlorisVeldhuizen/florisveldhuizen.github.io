@@ -10,6 +10,15 @@ import { Settings } from "./settings";
 import { Talk, Censor } from "./spicy";
 import { unlockAudio, loadSounds, setMuted } from "./audio";
 
+const BLACK_GOLD = { color: 0x0a0408, sheen: 0xd4a24c };
+const BOW_STYLES = {
+  gold: BLACK_GOLD,
+  sheer: { color: 0x0a0408, sheen: 0x6b5a63, opacity: 0.55 },
+  red: { color: 0x6e0a16, sheen: 0xe04a5c },
+  back: { ...BLACK_GOLD, placement: "back" },
+  ties: BLACK_GOLD,
+};
+
 const intro = document.getElementById("intro");
 const introTitle = document.getElementById("intro-title");
 const introStatus = document.getElementById("intro-status");
@@ -44,12 +53,18 @@ const settings = new Settings((key, value) => {
   if (key === "splatter") lens.enabled = value;
   if (key === "firmness") interaction.setFirmness(value);
   if (key === "tool") interaction.setTool(value);
+  if (key === "bottle") interaction.bottle.setStyle(value);
   if (key === "talk") talk.setLevel(value);
   if (key === "censor") censor.setMode(value);
-  if (key === "lingerie") interaction.dressUp();
+  if (key === "lingerie") interaction.dressUp(true);
+  if (key === "bowColor") {
+    peach.setBowStyle(BOW_STYLES[value] || BOW_STYLES.gold);
+    interaction.dressUp();
+  }
 });
 
 const interaction = new Interaction({
+  scene,
   peach,
   group,
   camera,
@@ -68,7 +83,7 @@ function setProgress(fraction) {
   introTitle.style.setProperty("--progress", `${Math.round(fraction * 100)}%`);
 }
 
-peach.load(setProgress).then(() => {
+peach.load(setProgress).then(async () => {
   setProgress(1);
   group.visible = true;
   const halves = interaction.prepareHalves();
@@ -76,12 +91,16 @@ peach.load(setProgress).then(() => {
     // eslint-disable-next-line no-param-reassign
     h.visible = true;
   });
-  renderer.compile(scene, camera);
+  const compiled = Promise.all([
+    renderer.compileAsync(scene, camera),
+    renderer.compileAsync(lens.overlay, lens.overlayCamera),
+  ]);
   halves.forEach((h) => {
     // eslint-disable-next-line no-param-reassign
     h.visible = false;
   });
   group.visible = false;
+  await compiled;
   juice.clear();
   loadSounds();
   introStatus.textContent = "Click anywhere to begin. Sound on.";

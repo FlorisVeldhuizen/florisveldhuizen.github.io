@@ -318,11 +318,6 @@ button:focus-visible {
   margin: -17px 0 0 -17px;
   border: 1.5px solid var(--blush);
   border-radius: 50%;
-  background-color: color-mix(
-    in srgb,
-    var(--oil) calc(var(--scrub, 0) * 30%),
-    transparent
-  );
   transition:
     width 0.18s ease,
     height 0.18s ease,
@@ -335,19 +330,11 @@ button:focus-visible {
   width: 46px;
   height: 46px;
   margin: -23px 0 0 -23px;
-  border-color: color-mix(
-    in srgb,
-    var(--oil) calc(var(--scrub, 0) * 100%),
-    var(--peach)
-  );
+  border-color: var(--peach);
 }
 
-.cursor[data-state="rub"] span {
-  width: 40px;
-  height: 40px;
-  margin: -20px 0 0 -20px;
-  border-color: var(--oil);
-  background-color: rgba(242, 196, 107, 0.3);
+.cursor[data-state="carry"] span {
+  opacity: 0;
 }
 
 @media (hover: none), (pointer: coarse) {
@@ -574,4 +561,80 @@ button:focus-visible {
   *::after {
     transition-duration: 0.01ms !important;
   }
+}
+
+.bottle {
+  position: fixed;
+  top: 50%;
+  left: var(--gutter);
+  z-index: 4;
+  width: 60px;
+  height: 120px;
+  margin-top: -60px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.bottle.is-carried {
+  pointer-events: none;
+}
+
+.bottle-body {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: none;
+  width: 64px;
+  height: 116px;
+  margin: -58px 0 0 -32px;
+  pointer-events: none;
+}
+
+.bottle.is-drawn .bottle-body {
+  display: block;
+}
+
+.bottle-body svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 8px 12px rgba(22, 4, 10, 0.45));
+}
+
+.bottle-stream {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.bottle-stream.is-visible {
+  opacity: 1;
+}
+
+.stream-oil {
+  fill: var(--oil);
+  opacity: 0.68;
+}
+
+.stream-shine {
+  fill: none;
+  stroke: #fff6dc;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+
+.oil-splash {
+  position: fixed;
+  z-index: 4;
+  width: 26px;
+  height: 9px;
+  border: 1.5px solid var(--oil);
+  border-radius: 50%;
+  pointer-events: none;
 }

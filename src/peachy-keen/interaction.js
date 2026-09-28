@@ -13,6 +13,7 @@ import {
   playSnap,
   playTear,
   playSplash,
+  playGlug,
 } from "./audio";
 import {
   PHYSICS_CONFIG,
@@ -20,9 +21,14 @@ import {
   TOOLS,
   INTERACTION_CONFIG as CFG,
 } from "./config";
+import { Bottle } from "./bottle";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const buzz = (ms) => navigator.vibrate?.(ms);
+const freshTies = () => ({
+  1: { sag: 0, velocity: 0, untied: false },
+  "-1": { sag: 0, velocity: 0, untied: false },
+});
 const SLICE_HOLD = 0.32;
 const BEAT_LENGTH = 0.32;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -34,6 +40,7 @@ function spring(x, v, k, c, h) {
 
 export class Interaction {
   constructor({
+    scene,
     peach,
     group,
     camera,
@@ -91,6 +98,18 @@ export class Interaction {
     this.lastSmackAt = -Infinity;
     this.rubPulse = 0;
     this.rubbing = 0;
+    this.massage = {
+      amount: 0,
+      target: 0,
+      active: false,
+      pulse: 0,
+      local: new Vector3(),
+      normal: new Vector3(),
+      drag: new Vector3(),
+      point: new Vector3(),
+      pull: new Vector3(),
+      dent: new Vector3(),
+    };
 
     this.pointer = {
       x: window.innerWidth / 2,
@@ -112,7 +131,8 @@ export class Interaction {
     this.tempB = new Vector3();
     this.screen = new Vector3();
 
-    this.scrub = { turns: [], angle: null, until: 0 };
+    this.carrying = false;
+    this.bottle = new Bottle(scene, camera);
     this.grab = null;
     this.recoil = null;
     this.grabPlane = new Plane();
@@ -134,13 +154,19 @@ export class Interaction {
       pull: 0,
       velocity: 0,
       visible: 1,
+      dressing: null,
+      ties: freshTies(),
+      tugBack: null,
     };
+    this.tug = null;
+    this.bowPoint = new Vector3();
     this.zoom = 0;
     this.zoomVelocity = 0;
 
     this.setFirmness("ripe");
     this.setTool("hand");
     this.bindPointer();
+    this.bottle.el.addEventListener("pointerdown", (e) => this.pickBottle(e));
     this.bindShake();
   }
 
@@ -185,14 +211,14 @@ export class Interaction {
       p.downX = e.clientX;
       p.downY = e.clientY;
       p.travel = 0;
-      p.rubbed = false;
-      this.scrub.turns.length = 0;
-      this.scrub.until = 0;
+      p.grabbed = false;
       p.downOnPeach = !!this.raycastAt(e.clientX, e.clientY);
       p.onWaistband = this.onWaistband(e.clientX, e.clientY);
+      p.onBow = this.bowAt(e.clientX, e.clientY);
     });
     const release = (e) => {
       if (
+        !this.carrying &&
         p.pressed &&
         e.type === "pointerup" &&
         e.timeStamp - p.downAt < 220 &&
@@ -286,15 +312,43 @@ export class Interaction {
     this.dressUp();
   }
 
-  dressUp() {
-    Object.assign(this.garment, {
+  dressUp(animate = false) {
+    const g = this.garment;
+    Object.assign(g, {
       worn: true,
       stripping: false,
       target: 0,
       pull: 0,
       velocity: 0,
       visible: 1,
+      dressing: null,
+      ties: freshTies(),
+      tugBack: null,
     });
+    this.tug = null;
+    this.peach.bows?.tie();
+    this.peach.setTieSag(0, 0);
+    if (!this.settings.lingerie || !animate) return;
+    g.dressing = { time: 0 };
+    g.pull = 1.5;
+    g.target = 1.5;
+  }
+
+  updateDressing(delta) {
+    const g = this.garment;
+    g.dressing.time += delta;
+    const t = Math.min(1, g.dressing.time / 0.55);
+    g.target = 1.5 - 1.64 * t * t * (3 - 2 * t);
+    if (t >= 1) this.snapOn();
+  }
+
+  snapOn() {
+    this.garment.dressing = null;
+    this.wobbleAll(0.08);
+    this.squashVelocity.x += 1.24;
+    this.squashAxis.set(0, 1);
+    playSnap(0.72);
+    buzz(22);
   }
 
   pointerSpeed(now) {
@@ -305,7 +359,7 @@ export class Interaction {
     const b = s[s.length - 1];
     if (!a || a === b || now - b.t > CFG.SAMPLE_WINDOW_MS)
       return { vx: 0, vy: 0, speed: 0 };
-    const dt = Math.max(1, b.t - a.t) / 1000;
+    const dt = Math.max(CFG.SAMPLE_MIN_MS, b.t - a.t) / 1000;
     const unit = Math.min(window.innerWidth, window.innerHeight);
     const vx = (b.x - a.x) / dt / unit;
     const vy = (b.y - a.y) / dt / unit;
@@ -444,8 +498,11 @@ export class Interaction {
       dent: new Vector3(),
       tension: 0,
       squeeze: 0,
+      knead: 0,
+      age: 0,
       ripple: 0,
     };
+    this.pointer.grabbed = true;
     this.ui.onGrab();
     playSquish(0.2);
     buzz(8);
@@ -484,23 +541,27 @@ export class Interaction {
     const length = g.pull.length();
     const speed = g.pullVelocity.length();
     g.tension = length / limit;
+    g.age += delta;
+    const still =
+      g.age > 0.25 &&
+      this.pointerSpeed(performance.now()).speed < CFG.GRAB_STILL_SPEED;
+    g.knead = still
+      ? Math.min(1, g.knead + delta / CFG.GRAB_KNEAD_SECONDS)
+      : Math.max(0, g.knead - delta * 1.5);
 
     const scale = this.peach.worldScale();
     const strain = clamp((g.tension - 0.55) / 0.45, 0, 1);
     const tremble = reducedMotion.matches
       ? 0
-      : Math.sin(this.clock * 65) * 0.02 * strain;
+      : Math.sin(this.clock * 40) * (0.006 * strain + 0.008 * g.knead);
     const localPull = this.peach
       .toLocal(this.tempB.copy(world).add(g.pull), this.tempB)
       .sub(g.local)
       .addScaledVector(g.normal, tremble / scale);
     g.localPull.copy(localPull);
     g.radius = 1.25 + length * 0.9;
-    g.dent
-      .copy(g.normal)
-      .multiplyScalar(
-        (-CFG.GRAB_DENT * g.squeeze * (1 + g.tension * 0.6)) / scale,
-      );
+    const depth = g.squeeze * (1 + g.tension * 0.6 + g.knead * 0.9);
+    g.dent.copy(g.normal).multiplyScalar((-CFG.GRAB_DENT * depth) / scale);
     this.peach.setGrab(
       g.local,
       localPull,
@@ -538,8 +599,19 @@ export class Interaction {
     const length = g.pull.length();
     this.velocity.addScaledVector(g.pull, -1.6);
     if (length > 0.08) playSquish(0.2 + length * 0.3);
+    if (g.knead > 0.2) {
+      const world = this.peach.mesh.localToWorld(g.local.clone());
+      const outward = g.normal
+        .clone()
+        .transformDirection(this.peach.mesh.matrixWorld);
+      this.peach.addJiggle(world, outward, 0.04 + g.knead * 0.1, 1);
+      this.squashVelocity.x += g.knead * 1.2;
+      this.squashAxis.set(0.5, 0.5);
+      if (length <= 0.08) playSquish(0.3 * g.knead);
+    }
     this.recoil = {
       local: g.local,
+      normal: g.normal,
       dent: g.dent.clone(),
       pull: g.localPull.clone(),
       start: g.localPull.clone(),
@@ -558,14 +630,24 @@ export class Interaction {
     const r = this.recoil;
     if (!r) return;
     r.age += delta;
-    const k = 1100 * this.firmness.stiffness;
-    const c = 13 + (1 - this.firmness.grab) * 10;
+    const tension = Math.min(1, r.length / CFG.GRAB_REACH) ** 2;
+    const settle = this.firmness.dentFrequency * 0.85;
+    const k = r.landed
+      ? settle * settle
+      : 1100 * this.firmness.stiffness * (1 + tension * 0.8);
+    const c = r.landed ? settle * 0.5 : 8;
     const h = 1 / 240;
-    for (let t = 0; t < delta; t += h) spring(r.pull, r.velocity, k, c, h);
+    for (let t = 0; t < delta; t += h) {
+      spring(r.pull, r.velocity, k, c, h);
+      if (!r.landed && r.pull.dot(r.start) <= 0) {
+        this.landRecoil(r);
+        break;
+      }
+    }
     r.dent.multiplyScalar(Math.exp(-delta * 18));
     this.peach.setGrab(r.local, r.pull, r.radius, r.dent, CFG.GRAB_DENT_RADIUS);
-    if (!r.landed && r.pull.dot(r.start) <= 0) this.landRecoil(r);
-    if (r.age > 0.7) {
+    const motion = r.pull.length() + r.velocity.length() / 40;
+    if ((r.landed && motion < r.start.length() * 0.01) || r.age > 1.5) {
       this.peach.releaseGrab();
       this.recoil = null;
     }
@@ -574,28 +656,45 @@ export class Interaction {
   landRecoil(r) {
     r.landed = true;
     const { length, worldPull: pull } = r;
+    const punch = Math.min(1, 0.75 / Math.max(length, 0.001));
+    r.velocity.setLength(
+      r.start.length() * this.firmness.dentFrequency * 0.75 * punch,
+    );
+    const tension = Math.min(1, length / CFG.GRAB_REACH) ** 2;
     const world = this.tempA
       .copy(r.local)
       .applyMatrix4(this.peach.mesh.matrixWorld);
     const at = this.toScreen(world);
-    this.wobbleAll(0.04 + length * 0.1);
     this.peach.addJiggle(
       world,
       this.tempB.copy(pull).normalize().negate(),
-      Math.min(0.6, length) * 0.6 + 0.03,
+      0.04 + Math.min(0.7, length) * 0.26 + tension * 0.16,
       1,
     );
-    this.velocity.addScaledVector(pull, -1.6);
+    this.velocity.addScaledVector(pull, -(1.2 + tension * 1.2) * punch);
     this.spin.addScaledVector(
       this.tempA.sub(this.group.position).cross(pull),
-      -1.8,
+      -1.8 * punch,
     );
-    this.squashVelocity.x += 0.6 + length * 3;
+    this.squashVelocity.x +=
+      0.25 + Math.min(0.75, length) * 1.1 + tension * 0.8;
     this.squashAxis.set(Math.abs(pull.x), Math.abs(pull.y)).normalize();
-    this.kickVelocity.addScaledVector(pull, -0.9 * length);
+    this.kickVelocity.addScaledVector(
+      pull,
+      -(0.6 + tension * 0.8) * length * punch,
+    );
     buzz(15 + Math.round(length * 30));
     if (length < 0.08) return;
-    if (length > 0.25) this.hitStop = 0.03 + length * 0.05;
+    if (this.oil > 0.25) {
+      const flung = this.droplets.spray(
+        this.peach.mesh.localToWorld(r.local.clone()),
+        r.normal.clone().transformDirection(this.peach.mesh.matrixWorld),
+        pull.clone().normalize().multiplyScalar(-2.2),
+        this.oil * (0.3 + Math.min(0.75, length) * 1.2),
+        0.25,
+      );
+      if (tension > 0.5) this.lens.splash(flung, this.oil);
+    }
     playSlap(0.4 + length * 0.6, this.heat / 100, this.oil, 1.1);
     if (this.settings.moans) playMoan(Math.min(1, length), this.heat / 100);
     this.talk.say("release", 0.6);
@@ -616,7 +715,83 @@ export class Interaction {
   }
 
   canStrip() {
-    return this.settings.lingerie && this.garment.worn;
+    return (
+      this.settings.lingerie && this.garment.worn && !this.garment.dressing
+    );
+  }
+
+  bowAt(x, y) {
+    if (this.settings.bowColor !== "ties" || !this.canStrip()) return 0;
+    const g = this.garment;
+    const side = [1, -1].find((s) => {
+      if (g.ties[s].untied) return false;
+      const at = this.toScreen(this.peach.bows.worldPosition(s, this.bowPoint));
+      return Math.hypot(at.x - x, at.y - y) < 40;
+    });
+    return side || 0;
+  }
+
+  startTug(side) {
+    this.tug = { side, amount: 0 };
+    this.garment.tugBack = null;
+    playSquish(0.2);
+  }
+
+  updateTug() {
+    const p = this.pointer;
+    const reach = Math.min(window.innerWidth, window.innerHeight) * 0.2;
+    const amount = Math.hypot(p.x - p.downX, p.y - p.downY) / reach;
+    this.idle = 0;
+    if (amount >= 1) {
+      this.untie(this.tug.side);
+      this.tug = null;
+      return;
+    }
+    this.tug.amount = amount;
+    this.peach.bows.setTug(this.tug.side, amount * 0.8);
+  }
+
+  endTug() {
+    const { side, amount } = this.tug;
+    this.tug = null;
+    this.garment.tugBack = { side, amount: amount * 0.8 };
+    if (amount > 0.2) playSnap(amount * 0.4);
+  }
+
+  untie(side) {
+    const g = this.garment;
+    g.ties[side].untied = true;
+    this.peach.bows.untie(side);
+    playSnap(0.55);
+    playSquish(0.4);
+    buzz(25);
+    this.wobbleAll(0.06);
+    if (this.settings.moans) playMoan(0.4, this.heat / 100);
+    this.talk.say("strip", 0.6);
+    this.heat = Math.min(100, this.heat + 10);
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+  }
+
+  updateTies(delta) {
+    const g = this.garment;
+    if (g.tugBack) {
+      g.tugBack.amount *= Math.exp(-delta * 20);
+      this.peach.bows.setTug(g.tugBack.side, g.tugBack.amount);
+      if (g.tugBack.amount < 0.01) {
+        this.peach.bows.setTug(g.tugBack.side, 0);
+        g.tugBack = null;
+      }
+    }
+    [1, -1].forEach((side) => {
+      const t = g.ties[side];
+      t.velocity += ((t.untied ? 1 : 0) - t.sag) * 90 * delta;
+      t.velocity *= Math.exp(-delta * 7);
+      t.sag += t.velocity * delta;
+    });
+    this.peach.setTieSag(g.ties[1].sag * 0.2, g.ties[-1].sag * 0.2);
+    this.peach.bows?.step(delta);
+    if (g.ties[1].untied && g.ties[-1].untied && g.ties[-1].sag > 0.8)
+      this.removeGarment();
   }
 
   onWaistband(x, y) {
@@ -771,7 +946,9 @@ export class Interaction {
       return;
     }
     if (g.worn) {
-      const target = g.stripping ? g.target : 0;
+      if (g.dressing) this.updateDressing(delta);
+      this.updateTies(delta);
+      const target = g.stripping || g.dressing ? g.target : 0;
       const hike = clamp(-g.pull / 0.45, 0, 1);
       g.velocity += (target - g.pull) * 420 * (1 - 0.5 * hike) * delta;
       g.velocity *= Math.exp(-delta * 14);
@@ -1013,8 +1190,8 @@ export class Interaction {
       h.normal = normal.clone();
       h.launch = normal
         .clone()
-        .multiplyScalar(h.side * (6 + Math.random() * 1.5))
-        .add(new Vector3(0, 3.5 + Math.random(), -5));
+        .multiplyScalar(h.side * (13 + Math.random() * 2.5))
+        .add(new Vector3(0, 4.2 + Math.random(), -5));
       h.velocity.set(0, 0, 0);
       h.yaw = -Math.sign(-h.side * normal.x || 1) * 1.05;
       h.roll = 0;
@@ -1036,7 +1213,7 @@ export class Interaction {
     this.snapped = true;
     this.halves.forEach((h) => {
       h.velocity.copy(h.launch);
-      h.holder.position.addScaledVector(h.normal, h.side * 0.14);
+      h.holder.position.addScaledVector(h.normal, h.side * 0.2);
     });
     this.juice.burst(this.peach.mesh, { force: 0.9, flying: 1.5, limit: 160 });
     this.sprayCut();
@@ -1045,11 +1222,13 @@ export class Interaction {
     if (!reducedMotion.matches) {
       this.slowmo = 0.35;
       this.trauma = Math.max(this.trauma, 0.8);
+      this.zoomVelocity -= 2;
     }
     buzz([40, 30, 80]);
     this.kickVelocity.addScaledVector(this.sliceNormal, 1.2);
     this.kickVelocity.y -= 0.8;
     playSlap(1, 0.6, 0.6, 0.75);
+    playSnap(1);
     playBurst();
     playSplash();
   }
@@ -1090,11 +1269,15 @@ export class Interaction {
     if (!this.snapped) {
       const k = t / SLICE_HOLD;
       const strain = k * k;
-      const tremble = Math.sin(t * 90) * (0.012 + 0.02 * strain);
+      const w = clamp((k - 0.7) / 0.3, 0, 1);
+      const windup = w * w * (3 - 2 * w);
+      const tremble =
+        Math.sin(t * 90) * (0.012 + 0.02 * strain) * (1 - windup * 0.8);
+      const gap = 0.02 + strain * 0.1 - windup * 0.09 + tremble;
       this.halves.forEach((h) => {
         h.holder.position
           .copy(this.sliceCenter)
-          .addScaledVector(h.normal, h.side * (0.02 + strain * 0.1 + tremble));
+          .addScaledVector(h.normal, h.side * gap);
         h.holder.rotation.set(0, h.yaw * 0.12 * strain, h.side * 0.05 * strain);
         h.holder.scale.set(1 - 0.04 * strain, 1 + 0.03 * strain, 1);
       });
@@ -1135,7 +1318,9 @@ export class Interaction {
             .add(this.screen.set(0, -0.5, Math.random() - 0.5)),
         );
       h.velocity.y -= 11 * delta;
-      h.velocity.multiplyScalar(Math.exp(-delta * 0.3));
+      h.velocity.multiplyScalar(
+        Math.exp(-delta * (0.3 + 4 * Math.exp(-s * 8))),
+      );
       h.holder.position.addScaledVector(h.velocity, delta);
       h.holder.rotation.set(
         -tilt * 3.2,
@@ -1144,10 +1329,11 @@ export class Interaction {
       );
       const release = Math.exp(-s * 9);
       const bounce = release * Math.cos(s * 30) * 0.1;
+      const pop = 1 + 0.04 * (s / 0.03) * Math.exp(1 - s / 0.03);
       h.holder.scale.set(
-        1 - 0.04 * release + bounce,
-        1 + 0.03 * release - bounce,
-        1 + bounce * 0.5,
+        (1 - 0.04 * release + bounce) * pop,
+        (1 + 0.03 * release - bounce) * pop,
+        (1 + bounce * 0.5) * pop,
       );
     });
     if (s < 1.6) return;
@@ -1171,24 +1357,47 @@ export class Interaction {
     setRub(0, 0);
   }
 
-  rub(hit, motion, delta) {
-    const amount = clamp(motion.speed / 1.2, 0, 1);
-    this.rubbing = amount;
+  pickBottle(e) {
+    if (this.phase !== "live") return;
+    if (this.bottle.el.hasPointerCapture(e.pointerId))
+      this.bottle.el.releasePointerCapture(e.pointerId);
+    const p = this.pointer;
+    p.x = e.clientX;
+    p.y = e.clientY;
+    p.present = true;
+    p.pressed = true;
+    p.armed = false;
+    p.downAt = e.timeStamp;
+    p.travel = 0;
+    this.carrying = true;
+    this.bottle.pick();
+    this.ui.placeCursor(p.x, p.y);
+  }
+
+  pour(hit, motion, flow, delta) {
+    const spread = clamp(motion.speed / 1.2, 0, 1);
+    this.rubbing = 0.25 + spread * 0.35;
     this.oil = Math.min(
       1,
-      this.oil + CFG.OIL_RUB_RATE * delta * (0.3 + amount),
+      this.oil + CFG.OIL_POUR_RATE * delta * (0.6 + spread),
     );
-    this.heat = Math.max(0, this.heat - 18 * delta * amount);
     this.rubPulse -= delta;
-    if (this.rubPulse <= 0 && amount > 0.05) {
-      this.rubPulse = 0.08;
-      const drag = this.tempA.set(motion.vx, -motion.vy, 0).normalize();
-      this.peach.addJiggle(hit.point, drag, 0.035 * amount, 0.6);
+    if (this.rubPulse <= 0) {
+      this.rubPulse = 0.16 + Math.random() * 0.12;
+      const down = this.tempA.set(0, -0.4, -1).normalize();
+      this.peach.addJiggle(hit.point, down, 0.025 * flow, 0.4);
+      const normal = this.tempB
+        .copy(hit.face.normal)
+        .transformDirection(this.peach.mesh.matrixWorld);
+      this.droplets.spray(hit.point, normal, down, 0);
+      this.bottle.splash(this.pointer.x, this.pointer.y);
+      playGlug(flow);
+      buzz(4);
     }
     this.idle = 0;
     this.twerk = null;
     this.ui.onRub();
-    if (this.settings.moans && amount > 0.5 && Math.random() < delta * 0.8)
+    if (this.settings.moans && Math.random() < delta * 0.4)
       playMoan(0.2 + this.oil * 0.3, this.heat / 100);
     this.talk.say("rub", delta * 0.5);
   }
@@ -1198,18 +1407,35 @@ export class Interaction {
     const motion = this.pointerSpeed(performance.now());
     this.ui.shapeCursor(motion.vx, motion.vy, p.present, delta);
     this.rubbing = 0;
-    this.ui.setScrub(this.trackScrub(motion));
 
+    if (this.carrying) {
+      if (p.pressed && this.phase === "live") {
+        const hit = this.raycastAt(p.x, p.y);
+        const peach = {
+          x: this.toScreen(this.group.position).x,
+          radius: 1.4 * this.pixelsPerUnit(this.group.position),
+          center: this.group.position,
+          worldRadius: 1.4,
+        };
+        const flow = this.bottle.carry(p.x, p.y, motion.vx, hit, peach, delta);
+        if (hit && flow > 0.4) this.pour(hit, motion, flow, delta);
+        this.ui.setCursorState("carry");
+        return;
+      }
+      this.carrying = false;
+      this.bottle.drop();
+    }
     if (this.grab) {
       const flicked =
-        motion.speed > CFG.MIN_SWIPE_SPEED &&
+        motion.speed > CFG.GRAB_FLICK_SPEED &&
         performance.now() - p.downAt < CFG.GRAB_FLICK_MS;
-      if (flicked || p.scrubbing) {
+      if (flicked) {
         this.grab = null;
+        p.grabbed = false;
         this.peach.releaseGrab();
       } else if (p.pressed && this.phase === "live") {
         this.updateGrab(delta);
-        this.ui.setCursorState("grab");
+        this.ui.setCursorState(this.grab ? "grab" : "over");
         return;
       } else {
         this.releaseGrab();
@@ -1224,18 +1450,39 @@ export class Interaction {
       this.endStrip();
     }
 
+    if (this.tug) {
+      if (p.pressed && this.phase === "live" && this.garment.worn) {
+        this.updateTug();
+        this.ui.setCursorState("grab");
+        return;
+      }
+      this.endTug();
+    }
+
     if (this.phase !== "live" || !p.present) {
       this.ui.setCursorState(null);
+      return;
+    }
+    if (
+      p.pressed &&
+      p.onBow &&
+      p.travel > 6 &&
+      !this.garment.ties[p.onBow].untied
+    ) {
+      this.startTug(p.onBow);
+      this.updateTug();
+      this.ui.setCursorState("grab");
       return;
     }
     const hit = this.raycastAt(p.x, p.y);
     p.inside = !!hit;
     if (!hit) {
       p.armed = true;
-    } else if (p.scrubbing) {
-      if (p.pressed) p.rubbed = true;
-      this.rub(hit, motion, delta);
-    } else if (p.armed && motion.speed > CFG.MIN_SWIPE_SPEED) {
+    } else if (
+      p.armed &&
+      !(p.pressed && p.grabbed) &&
+      motion.speed > CFG.MIN_SWIPE_SPEED
+    ) {
       p.armed = false;
       this.smack(
         hit,
@@ -1249,40 +1496,86 @@ export class Interaction {
       } else if (this.canGrab()) {
         this.startGrab(hit);
         this.updateGrab(delta);
-        this.ui.setCursorState("grab");
+        this.ui.setCursorState(this.grab ? "grab" : "over");
         return;
       }
     } else {
       p.armed = false;
+      if (motion.speed > CFG.MASSAGE_MIN_SPEED)
+        this.massageAt(hit, motion, delta);
     }
-    let state = null;
-    if (p.inside) state = this.rubbing > 0 ? "rub" : "over";
-    this.ui.setCursorState(state);
+    this.ui.setCursorState(p.inside ? "over" : null);
   }
 
-  trackScrub(motion) {
-    const p = this.pointer;
-    const s = this.scrub;
-    const now = performance.now();
-    if (!p.inside && !this.grab) {
-      s.turns.length = 0;
-      s.angle = null;
-    } else if (motion.speed > CFG.SCRUB_MIN_SPEED) {
-      const angle = Math.atan2(motion.vy, motion.vx);
-      if (s.angle !== null) {
-        const turn = Math.abs(
-          Math.atan2(Math.sin(angle - s.angle), Math.cos(angle - s.angle)),
-        );
-        s.turns.push({ t: now, turn });
-      }
-      s.angle = angle;
+  massageAt(hit, motion, delta) {
+    const m = this.massage;
+    const strength = clamp(motion.speed / 0.8, 0.2, 1);
+    const local = this.peach.toLocal(hit.point, m.point);
+    const follow = 1 - Math.exp(-delta * 14);
+    if (m.amount < 0.02) {
+      m.local.copy(local);
+      m.normal.copy(hit.face.normal).normalize();
+      m.drag.set(0, 0, 0);
+    } else {
+      m.local.lerp(local, follow);
+      m.normal.lerp(hit.face.normal, follow).normalize();
     }
-    while (s.turns.length && now - s.turns[0].t > CFG.SCRUB_WINDOW_MS)
-      s.turns.shift();
-    const total = s.turns.reduce((sum, e) => sum + e.turn, 0);
-    if (total > CFG.SCRUB_TURN) s.until = now + CFG.SCRUB_HOLD_MS;
-    p.scrubbing = now < s.until;
-    return p.scrubbing ? 1 : total / CFG.SCRUB_TURN;
+    const push = this.tempA.set(motion.vx, -motion.vy, 0);
+    push.multiplyScalar(
+      (CFG.MASSAGE_DRAG * this.firmness.grab) / Math.max(0.5, push.length()),
+    );
+    const target = this.peach
+      .toLocal(this.tempB.copy(hit.point).add(push), this.tempB)
+      .sub(local);
+    m.drag.lerp(target, 1 - Math.exp(-delta * 6));
+    m.target = strength;
+
+    m.pulse -= delta;
+    if (m.pulse <= 0) {
+      m.pulse = 0.09 + Math.random() * 0.05;
+      const dir = this.tempA.set(motion.vx, -motion.vy, -0.6).normalize();
+      this.peach.addJiggle(hit.point, dir, 0.03 * strength, 0.55);
+    }
+    this.rubbing = 0.2 + strength * 0.35;
+    this.idle = 0;
+    this.twerk = null;
+    if (this.settings.moans && strength > 0.6 && Math.random() < delta * 0.5)
+      playMoan(0.2 + strength * 0.2, this.heat / 100);
+    this.talk.say("rub", delta * 0.5);
+  }
+
+  updateMassage(delta) {
+    const m = this.massage;
+    if (this.grab || this.recoil) {
+      m.amount = 0;
+      m.target = 0;
+      m.active = false;
+      return;
+    }
+    const rate = m.target > m.amount ? 5 : 3;
+    m.amount += (m.target - m.amount) * (1 - Math.exp(-delta * rate));
+    m.target = 0;
+    if (m.amount < 0.005) {
+      if (m.active) this.peach.releaseGrab();
+      m.active = false;
+      return;
+    }
+    m.active = true;
+    const scale = this.peach.worldScale();
+    const press = reducedMotion.matches
+      ? 1
+      : 1 + Math.sin(this.clock * 9) * 0.15;
+    m.dent
+      .copy(m.normal)
+      .multiplyScalar((-CFG.MASSAGE_DENT * m.amount * press) / scale);
+    m.pull.copy(m.drag).multiplyScalar(m.amount);
+    this.peach.setGrab(
+      m.local,
+      m.pull,
+      CFG.MASSAGE_RADIUS,
+      m.dent,
+      CFG.MASSAGE_DENT_RADIUS,
+    );
   }
 
   canGrab() {
@@ -1290,8 +1583,8 @@ export class Interaction {
     return (
       this.toolName === "hand" &&
       p.armed &&
-      !p.rubbed &&
       p.downOnPeach &&
+      !p.onBow &&
       (!p.onWaistband || p.travel > 28)
     );
   }
@@ -1483,6 +1776,7 @@ export class Interaction {
     }
 
     this.handlePointer(delta);
+    this.updateMassage(delta);
     this.updateRecoil(delta);
     if (this.phase === "live") this.updateTwerk(delta);
     this.updateClaps(delta);
@@ -1502,6 +1796,10 @@ export class Interaction {
 
     this.juice.update(delta);
     this.ui.setMeters(this.heat / 100, this.oil);
+    this.bottle.update(delta);
+    this.bottle.setCalling(
+      this.phase === "live" && !this.carrying && this.oil < 0.05,
+    );
     this.updateOverlays();
   }
 }

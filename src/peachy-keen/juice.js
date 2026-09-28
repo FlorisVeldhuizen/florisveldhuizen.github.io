@@ -233,13 +233,13 @@ export class Droplets {
     scene.add(this.mesh);
   }
 
-  spray(point, normal, direction, amount) {
+  spray(point, normal, direction, amount, lift = 1) {
     const start = this.drops.length;
     const count = Math.round(6 + amount * 16);
     for (let i = 0; i < count && this.drops.length < DROPLET_CAPACITY; i += 1) {
       const velocity = normal
         .clone()
-        .multiplyScalar(1.5 + Math.random() * 2.5)
+        .multiplyScalar((1.5 + Math.random() * 2.5) * lift)
         .addScaledVector(direction, 1.5 + Math.random() * 2.5)
         .add(
           new Vector3(

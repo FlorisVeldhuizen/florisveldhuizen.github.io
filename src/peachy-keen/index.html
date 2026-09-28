@@ -42,7 +42,7 @@
     <footer class="hints">
       <p id="hint-swipe">Swipe across the peach to spank it.</p>
       <p id="hint-grab">Press and drag to pull it.</p>
-      <p id="hint-rub">Rub in circles to oil it up.</p>
+      <p id="hint-rub">Carry the bottle over to oil it up.</p>
     </footer>
 
     <div class="ui settings-dock">
@@ -84,6 +84,17 @@
         <details class="settings-lab">
           <summary>Experimental <span aria-hidden="true">🌶</span></summary>
           <div class="settings-row">
+            <span>Oil bottle</span>
+            <span class="segmented" role="group" aria-label="Oil bottle">
+              <button type="button" data-setting="bottle" data-value="model">
+                3D
+              </button>
+              <button type="button" data-setting="bottle" data-value="drawn">
+                Drawn
+              </button>
+            </span>
+          </div>
+          <div class="settings-row">
             <span>Tool</span>
             <span class="segmented" role="group" aria-label="Tool">
               <button type="button" data-setting="tool" data-value="hand">
@@ -120,6 +131,26 @@
               Off
             </button>
           </p>
+          <div class="settings-row">
+            <span>Bows</span>
+            <span class="segmented" role="group" aria-label="Bows">
+              <button type="button" data-setting="bowColor" data-value="gold">
+                Black &amp; gold
+              </button>
+              <button type="button" data-setting="bowColor" data-value="sheer">
+                Sheer
+              </button>
+              <button type="button" data-setting="bowColor" data-value="red">
+                Red
+              </button>
+              <button type="button" data-setting="bowColor" data-value="back">
+                Centre back
+              </button>
+              <button type="button" data-setting="bowColor" data-value="ties">
+                Side ties
+              </button>
+            </span>
+          </div>
           <div class="settings-row">
             <span>Censor</span>
             <span class="segmented" role="group" aria-label="Censor">
@@ -169,6 +200,225 @@
     <div id="censor" class="censor" aria-hidden="true" hidden></div>
     <p id="talk" class="talk" aria-live="polite"></p>
     <div id="combos" class="combos" aria-hidden="true"></div>
+    <div id="bottle" class="ui bottle" aria-hidden="true">
+      <div class="bottle-body">
+        <svg viewBox="0 0 44 80" width="44" height="80">
+          <defs>
+            <clipPath id="ab-inside">
+              <path
+                d="M18.6 11 H25.4 V20 C25.4 23.6 36 25 36 33.5 V71 Q36 77 30 77 H14 Q8 77 8 71 V33.5 C8 25 18.6 23.6 18.6 20 Z"
+              />
+            </clipPath>
+            <linearGradient
+              id="ab-shade"
+              gradientUnits="userSpaceOnUse"
+              x1="8"
+              y1="0"
+              x2="36"
+              y2="0"
+            >
+              <stop offset="0" stop-color="#2a0812" stop-opacity="0.55" />
+              <stop offset="0.09" stop-color="#2a0812" stop-opacity="0.16" />
+              <stop offset="0.2" stop-color="#ffffff" stop-opacity="0.14" />
+              <stop offset="0.34" stop-color="#ffffff" stop-opacity="0.03" />
+              <stop offset="0.62" stop-color="#2a0812" stop-opacity="0" />
+              <stop offset="0.84" stop-color="#2a0812" stop-opacity="0.2" />
+              <stop offset="0.93" stop-color="#ffb8c4" stop-opacity="0.3" />
+              <stop offset="1" stop-color="#2a0812" stop-opacity="0.6" />
+            </linearGradient>
+            <linearGradient id="ab-base" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#2a0812" stop-opacity="0" />
+              <stop offset="1" stop-color="#2a0812" stop-opacity="0.35" />
+            </linearGradient>
+            <linearGradient id="ab-oil" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f7c064" />
+              <stop offset="0.35" stop-color="#eca64c" />
+              <stop offset="1" stop-color="#c97a2e" />
+            </linearGradient>
+            <linearGradient id="ab-paper" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f7e8da" />
+              <stop offset="1" stop-color="#ecd6c3" />
+            </linearGradient>
+            <linearGradient id="ab-spec" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffffff" stop-opacity="0.85" />
+              <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.35" />
+              <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+            </linearGradient>
+            <linearGradient id="ab-cork" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#8e5c38" />
+              <stop offset="0.3" stop-color="#d9ab7c" />
+              <stop offset="0.55" stop-color="#c49063" />
+              <stop offset="1" stop-color="#7c4c2c" />
+            </linearGradient>
+            <linearGradient id="ab-lip" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#ffffff" stop-opacity="0.25" />
+              <stop offset="0.3" stop-color="#ffffff" stop-opacity="0.6" />
+              <stop offset="1" stop-color="#ffffff" stop-opacity="0.15" />
+            </linearGradient>
+          </defs>
+          <g clip-path="url(#ab-inside)">
+            <rect
+              x="0"
+              y="0"
+              width="44"
+              height="80"
+              fill="#fff4ec"
+              opacity="0.2"
+            />
+            <g class="bottle-liquid">
+              <rect
+                x="-40"
+                y="40"
+                width="124"
+                height="90"
+                fill="url(#ab-oil)"
+              />
+              <rect
+                x="-40"
+                y="40"
+                width="124"
+                height="1.2"
+                fill="#fff1c4"
+                opacity="0.85"
+              />
+            </g>
+            <rect x="0" y="47" width="44" height="15.5" fill="url(#ab-paper)" />
+            <rect
+              x="12.6"
+              y="48.3"
+              width="18.8"
+              height="12.9"
+              rx="0.4"
+              fill="none"
+              stroke="#8a2f45"
+              stroke-width="0.4"
+            />
+            <rect
+              x="13.4"
+              y="49.1"
+              width="17.2"
+              height="11.3"
+              rx="0.3"
+              fill="none"
+              stroke="#8a2f45"
+              stroke-width="0.2"
+            />
+            <text
+              x="22"
+              y="55.7"
+              text-anchor="middle"
+              font-family="Fraunces, Georgia, serif"
+              font-style="italic"
+              font-weight="600"
+              font-size="5.4"
+              fill="#8a2f45"
+            >
+              Peach
+            </text>
+            <text
+              x="22"
+              y="58.8"
+              text-anchor="middle"
+              font-family="Fraunces, Georgia, serif"
+              font-weight="500"
+              font-size="1.45"
+              letter-spacing="0.35"
+              fill="#8a2f45"
+            >
+              MASSAGE OIL
+            </text>
+            <rect x="0" y="0" width="44" height="80" fill="url(#ab-shade)" />
+            <rect x="0" y="68" width="44" height="10" fill="url(#ab-base)" />
+            <path
+              d="M11 74.6 Q22 77.4 33 74.6"
+              fill="none"
+              stroke="#fff"
+              stroke-width="0.7"
+              stroke-linecap="round"
+              opacity="0.35"
+            />
+            <rect
+              x="0"
+              y="46.6"
+              width="44"
+              height="0.5"
+              fill="#2a0812"
+              opacity="0.12"
+            />
+            <rect
+              x="0"
+              y="62.1"
+              width="44"
+              height="0.5"
+              fill="#2a0812"
+              opacity="0.18"
+            />
+          </g>
+          <rect
+            x="11.2"
+            y="33"
+            width="3"
+            height="37"
+            rx="1.5"
+            fill="url(#ab-spec)"
+          />
+          <ellipse
+            cx="13.6"
+            cy="28.6"
+            rx="2.8"
+            ry="1.1"
+            fill="#ffffff"
+            opacity="0.55"
+            transform="rotate(-22 13.6 28.6)"
+          />
+          <rect
+            x="32.6"
+            y="36"
+            width="1"
+            height="30"
+            rx="0.5"
+            fill="#ffd0da"
+            opacity="0.4"
+          />
+          <rect
+            x="19.6"
+            y="13"
+            width="1.4"
+            height="8"
+            rx="0.7"
+            fill="#ffffff"
+            opacity="0.45"
+          />
+          <rect
+            x="16.8"
+            y="8.6"
+            width="10.4"
+            height="3.6"
+            rx="1.8"
+            fill="url(#ab-lip)"
+          />
+          <g class="bottle-cork">
+            <path
+              d="M18.3 1.6 H25.7 Q26.5 1.6 26.4 2.5 L25.6 10 H18.4 L17.6 2.5 Q17.5 1.6 18.3 1.6 Z"
+              fill="url(#ab-cork)"
+            />
+            <ellipse cx="22" cy="1.9" rx="4.1" ry="0.7" fill="#e6c29a" />
+            <circle cx="20.4" cy="5.2" r="0.35" fill="#6b3f22" opacity="0.5" />
+            <circle cx="23.6" cy="7.4" r="0.3" fill="#6b3f22" opacity="0.45" />
+          </g>
+        </svg>
+      </div>
+    </div>
+    <svg
+      id="bottle-stream"
+      class="bottle-stream"
+      aria-hidden="true"
+      width="1"
+      height="1"
+    >
+      <path class="stream-oil" />
+      <path class="stream-shine" />
+    </svg>
     <div id="cursor" class="cursor" aria-hidden="true"><span></span></div>
 
     <div id="intro" class="ui intro">

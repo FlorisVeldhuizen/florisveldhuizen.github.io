@@ -57,13 +57,22 @@ function rayToHull(hull, dx, dz) {
   return best;
 }
 
+const smooth = (x) => {
+  const t = Math.min(1, Math.max(0, x / 0.35));
+  return t * t * (3 - 2 * t);
+};
+
+function tieDrop(sag, across) {
+  return sag.x * smooth(across) + sag.y * smooth(-across);
+}
+
 export function satinMaterial() {
   return new MeshPhysicalMaterial({
-    color: 0x0a0408,
+    color: 0xd9557f,
     roughness: 0.42,
     sheen: 0.9,
     sheenRoughness: 0.35,
-    sheenColor: new Color(0x4a2233),
+    sheenColor: new Color(0xffc0d6),
     envMapIntensity: 0.35,
     side: DoubleSide,
   });
@@ -198,23 +207,18 @@ export class Waistband {
     this.mesh.visible = visible;
     if (!visible || !this.peach.mesh) return;
     if (!this.radii) this.prepare();
-    const key = `${pull.toFixed(4)}:${fade.toFixed(3)}`;
+    const u = this.peach.uniforms;
+    const sag = u.uTieSag.value;
+    const key = `${pull.toFixed(4)}:${fade.toFixed(3)}:${sag.x.toFixed(4)}:${sag.y.toFixed(4)}`;
     if (key === this.key) return;
     this.key = key;
-    const b = this.peach.uniforms.uBounds.value;
-    const rest = this.peach.uniforms.uLingerie.value.w;
+    const b = u.uBounds.value;
+    const plane = u.uCrease.value;
+    const rest = u.uLingerie.value.w;
     const waist = Math.min(rest - 0.05 - pull * 0.36, rest + 0.01);
-    const f = Math.min(
-      SLICES - 1,
-      Math.max(0, ((waist - LOW) / (HIGH - LOW)) * (SLICES - 1)),
-    );
-    const k = Math.floor(f);
-    const t = f - k;
-    const next = Math.min(SLICES - 1, k + 1);
     const half =
       b.w * 0.011 * (1 - 0.3 * Math.min(1, Math.max(0, pull))) * fade;
     const reach = half * 1.35;
-    const y = b.y + (waist - 0.5) * b.w;
     const lift = b.w * 0.003;
     const p = this.positions.array;
     const nrm = this.normals.array;
@@ -224,11 +228,17 @@ export class Waistband {
     for (let n = 0; n <= AROUND; n += 1) {
       const i = n % AROUND;
       const angle = (i / AROUND) * Math.PI * 2;
-      const r = this.radii[k][i] * (1 - t) + this.radii[next][i] * t + lift;
-      const top = this.sliceRadius(i, waist + reach / b.w) + lift;
-      const bottom = this.sliceRadius(i, waist - reach / b.w) + lift;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
+      const flat = this.sliceRadius(i, waist);
+      const across =
+        (cos * flat * plane.x + sin * flat * plane.z) / b.w +
+        (b.x * plane.x + b.z * plane.z - plane.w) / b.w;
+      const w = waist - tieDrop(sag, across);
+      const y = b.y + (w - 0.5) * b.w;
+      const r = this.sliceRadius(i, w) + lift;
+      const top = this.sliceRadius(i, w + reach / b.w) + lift;
+      const bottom = this.sliceRadius(i, w - reach / b.w) + lift;
       const x = b.x + cos * r;
       const z = b.z + sin * r;
       if (previous) travelled += Math.hypot(x - previous[0], z - previous[1]);

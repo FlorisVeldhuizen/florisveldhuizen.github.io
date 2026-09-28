@@ -494,3 +494,35 @@ export function playHeartbeat(strength) {
     osc.stop(at + 0.26);
   });
 }
+
+export function playGlug(amount) {
+  if (!ctx || ctx.state !== "running") return;
+  const now = ctx.currentTime;
+  const from = 180 + Math.random() * 120;
+  const osc = ctx.createOscillator();
+  osc.frequency.setValueAtTime(from, now);
+  osc.frequency.exponentialRampToValueAtTime(from * 2.6, now + 0.07);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.06 + amount * 0.08, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+  osc.connect(gain).connect(master);
+  osc.start(now);
+  osc.stop(now + 0.1);
+}
+
+export function playCork(open) {
+  noiseHit(open ? 1800 : 900, open ? 600 : 400, 0.05, open ? 0.5 : 0.3);
+  if (!ctx || ctx.state !== "running") return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.frequency.setValueAtTime(open ? 520 : 380, now);
+  osc.frequency.exponentialRampToValueAtTime(open ? 260 : 300, now + 0.08);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.18, now + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+  osc.connect(gain).connect(master);
+  osc.start(now);
+  osc.stop(now + 0.12);
+}
