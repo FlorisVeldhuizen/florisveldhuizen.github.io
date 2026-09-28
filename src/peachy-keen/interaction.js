@@ -1,715 +1,1507 @@
-import { Vector3, Euler, Raycaster, Vector2 } from "three";
-import { playSmackSound, playExplosionSound } from "./audio.js";
-import { SoftBodyPhysics } from "./softbody.js";
-import { ParticleExplosion } from "./particles.js";
-import { toggleOilEffect, updateImpactMarkShaders } from "./peach.js";
-import { PHYSICS_CONFIG, INTERACTION_CONFIG } from "./config.js";
+import { Vector2, Vector3, Raycaster, Matrix4, Group, Plane } from "three";
+import {
+  playSlap,
+  playBurst,
+  setRub,
+  playStretch,
+  playSlice,
+  playMoan,
+  playClimax,
+  playKiss,
+  playHeartbeat,
+  playSquish,
+  playSnap,
+  playTear,
+  playSplash,
+} from "./audio";
+import {
+  PHYSICS_CONFIG,
+  FIRMNESS,
+  TOOLS,
+  INTERACTION_CONFIG as CFG,
+} from "./config";
 
-// Physics and interaction state
-export const peachState = {
-  velocity: new Vector3(0, 0, 0),
-  angularVelocity: new Vector3(0, 0, 0),
-  physicsOffset: new Vector3(0, 0, 0), // Offset from default position due to physics
-  physicsRotation: new Euler(0, 0, 0), // Rotation offset due to physics
-  defaultPosition: new Vector3(0, 0, 0),
-  defaultRotation: new Euler(0, 0, 0),
-  isWobbling: false,
-  softBodies: [], // Array of soft body physics instances for each mesh
-  rageLevel: 0, // Builds up with each hit (0-100)
-  rageDecayRate: INTERACTION_CONFIG.RAGE_DECAY_RATE,
-  explosionThreshold: INTERACTION_CONFIG.RAGE_EXPLOSION_THRESHOLD,
-  particleExplosion: null, // Reference to particle explosion system
-  isRespawning: false, // Is the peach currently respawning?
-  respawnTimer: 0, // Timer for respawn animation
-  respawnDuration: INTERACTION_CONFIG.RESPAWN_DURATION,
-  idleAnimationTime: 0, // Separate time counter for idle animation (always running)
-  impactMarks: [], // Array of impact marks { position: Vector3, age: number, maxAge: number }
-};
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const buzz = (ms) => navigator.vibrate?.(ms);
+const SLICE_HOLD = 0.32;
+const BEAT_LENGTH = 0.32;
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-// Mouse tracking state
-const mouseState = {
-  position: { x: 0, y: 0 },
-  lastPosition: { x: 0, y: 0 },
-  velocity: { x: 0, y: 0 },
-  lastSmackTime: 0,
-  smackCooldown: INTERACTION_CONFIG.SMACK_COOLDOWN_MS,
-  velocityHistory: [],
-  maxHistorySize: INTERACTION_CONFIG.VELOCITY_HISTORY_SIZE,
-  isHoveringPeach: false, // Track if cursor is currently over the peach
-};
+function spring(x, v, k, c, h) {
+  v.addScaledVector(x, -k * h).multiplyScalar(1 - c * h);
+  x.addScaledVector(v, h);
+}
 
-// Raycaster for mouse interaction
-const raycaster = new Raycaster();
-const mouse = new Vector2();
-
-let peachMesh = null;
-let peachGroup = null;
-let camera = null;
-let handCursor = null;
-let performanceMonitor = null;
-
-/**
- * Initialize the interaction system
- * @param {THREE.Group} peachGroupRef - The peach group
- * @param {THREE.Camera} cameraRef - The camera
- * @param {THREE.Scene} sceneRef - The scene
- * @param {PerformanceMonitor} perfMonitor - Optional performance monitor to notify of mode changes
- */
-export function initInteraction(
-  peachGroupRef,
-  cameraRef,
-  sceneRef,
-  perfMonitor = null
-) {
-  if (!peachGroupRef || !cameraRef) {
-    console.error("initInteraction: Missing required parameters");
-    return;
-  }
-
-  peachGroup = peachGroupRef;
-  camera = cameraRef;
-  handCursor = document.getElementById("hand-cursor");
-  performanceMonitor = perfMonitor;
-
-  if (!handCursor) {
-    console.warn("Hand cursor element not found");
-  }
-
-  // Initialize particle explosion system (will be set up once mesh is loaded)
-  if (sceneRef) {
-    peachState.sceneRef = sceneRef;
-  }
-
-  // Mouse events
-  window.addEventListener("mousemove", onMouseMove);
-
-  // Touch events for mobile devices
-  window.addEventListener("touchstart", onTouchStart, { passive: true });
-  window.addEventListener("touchmove", onTouchMove, { passive: true });
-  window.addEventListener("touchend", onTouchEnd, { passive: true });
-
-  // Oil button event
-  const oilButton = document.getElementById("oil-button");
-  if (oilButton) {
-    oilButton.addEventListener("click", () => {
-      const isOiled = toggleOilEffect();
-
-      // Update performance monitor to match mode
-      if (performanceMonitor) {
-        performanceMonitor.setLightingMode(isOiled);
-      }
-
-      if (isOiled) {
-        oilButton.textContent = "💧 Oiled Up!";
-        oilButton.classList.add("oiled");
-      } else {
-        oilButton.textContent = "💧 Oil Up";
-        oilButton.classList.remove("oiled");
-      }
+export class Interaction {
+  constructor({
+    peach,
+    group,
+    camera,
+    juice,
+    droplets,
+    lens,
+    backdrop,
+    ui,
+    settings,
+    talk,
+    censor,
+  }) {
+    Object.assign(this, {
+      peach,
+      group,
+      camera,
+      juice,
+      droplets,
+      lens,
+      backdrop,
+      ui,
+      settings,
+      talk,
+      censor,
     });
 
-    // Add interactive class for cursor handling
-    oilButton.classList.add("interactive-element");
+    this.offset = new Vector3();
+    this.velocity = new Vector3();
+    this.tilt = new Vector3();
+    this.spin = new Vector3();
+    this.squash = new Vector3();
+    this.squashVelocity = new Vector3();
+    this.squashAxis = new Vector2(1, 0);
+    this.accumulator = 0;
+    this.hitStop = 0;
+    this.slowmo = 0;
+    this.freeze = 0;
+    this.trauma = 0;
+    this.kick = new Vector3();
+    this.kickVelocity = new Vector3();
+
+    this.phase = "hidden";
+    this.phaseTime = 0;
+    this.clock = 0;
+    this.idle = 0;
+    this.twerk = null;
+
+    this.heat = 0;
+    this.heatHold = 0;
+    this.oil = 0;
+    this.smacks = 0;
+    this.bursts = 0;
+
+    this.combo = 0;
+    this.lastSmackAt = -Infinity;
+    this.rubPulse = 0;
+    this.rubbing = 0;
+
+    this.pointer = {
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+      samples: [],
+      present: false,
+      inside: false,
+      armed: true,
+      pressed: false,
+      downAt: 0,
+      downX: 0,
+      downY: 0,
+      travel: 0,
+    };
+    this.raycaster = new Raycaster();
+    this.ndc = new Vector2();
+    this.parallax = new Vector2();
+    this.tempA = new Vector3();
+    this.tempB = new Vector3();
+    this.screen = new Vector3();
+
+    this.scrub = { turns: [], angle: null, until: 0 };
+    this.grab = null;
+    this.recoil = null;
+    this.grabPlane = new Plane();
+    this.grabTarget = new Vector3();
+    this.lastTapAt = -Infinity;
+    this.claps = null;
+    this.clapNormal = new Vector3();
+    this.beatTimer = 0;
+    this.throb = 0;
+    this.beatAge = Infinity;
+    this.beatAmp = 0;
+    this.lastJoltAt = 0;
+    this.saidHot = false;
+    this.garment = {
+      peel: 0,
+      worn: true,
+      stripping: false,
+      target: 0,
+      pull: 0,
+      velocity: 0,
+      visible: 1,
+    };
+    this.zoom = 0;
+    this.zoomVelocity = 0;
+
+    this.setFirmness("ripe");
+    this.setTool("hand");
+    this.bindPointer();
+    this.bindShake();
   }
 
-  // Universal cursor handler using event delegation
-  setupCursorHandling(handCursor);
-}
-
-/**
- * Setup universal cursor handling using event delegation
- * @param {HTMLElement} handCursor - The hand cursor element
- */
-function setupCursorHandling(handCursor) {
-  if (!handCursor) return;
-
-  // Use event delegation on document body
-  document.body.addEventListener("mouseover", (e) => {
-    // Check if the target or any parent has the interactive class
-    const interactiveElement = e.target.closest(".interactive-element");
-    if (interactiveElement) {
-      handCursor.textContent = "👆";
-    }
-  });
-
-  document.body.addEventListener("mouseout", (e) => {
-    // Check if we're leaving an interactive element
-    const interactiveElement = e.target.closest(".interactive-element");
-    if (interactiveElement && !interactiveElement.contains(e.relatedTarget)) {
-      handCursor.textContent = "🤚";
-    }
-  });
-}
-
-/**
- * Set the peach mesh for raycasting and initialize soft body physics
- * @param {Array|THREE.Mesh} meshes - The peach mesh(es)
- */
-export function setPeachMesh(meshes) {
-  if (!meshes) {
-    console.error("setPeachMesh: No meshes provided");
-    return;
+  setTool(name) {
+    this.toolName = TOOLS[name] ? name : "hand";
+    this.tool = TOOLS[this.toolName];
+    this.peach.setTool(this.toolName === "lips" ? "lips" : "hand");
+    this.ui.setTool(this.toolName);
   }
 
-  peachMesh = meshes;
+  setFirmness(name) {
+    this.firmness = FIRMNESS[name] || FIRMNESS.ripe;
+    this.peach.setFirmness(this.firmness);
+  }
 
-  // Initialize soft body physics for each mesh
-  peachState.softBodies = [];
-  const meshArray = Array.isArray(meshes) ? meshes : [meshes];
+  bindPointer() {
+    const isUi = (e) => e.target instanceof Element && e.target.closest(".ui");
+    const p = this.pointer;
+    const record = (e) => {
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+      (events.length ? events : [e]).forEach((ev) => {
+        p.samples.push({ x: ev.clientX, y: ev.clientY, t: ev.timeStamp });
+      });
+      if (p.samples.length > 24) p.samples.splice(0, p.samples.length - 24);
+      p.travel += Math.hypot(e.clientX - p.x, e.clientY - p.y);
+      p.x = e.clientX;
+      p.y = e.clientY;
+      this.ui.placeCursor(p.x, p.y);
+    };
 
-  meshArray.forEach((mesh) => {
-    if (mesh.geometry && mesh.geometry.attributes.position) {
-      // Make sure geometry is not shared/indexed in a way that prevents modification
-      if (!mesh.geometry.attributes.position.array) {
-        console.warn(
-          "⚠️ Mesh geometry cannot be modified, skipping soft body physics"
+    window.addEventListener("pointermove", (e) => {
+      p.present = !isUi(e);
+      record(e);
+    });
+    window.addEventListener("pointerdown", (e) => {
+      if (isUi(e)) return;
+      p.present = true;
+      record(e);
+      p.pressed = true;
+      p.armed = true;
+      p.downAt = e.timeStamp;
+      p.downX = e.clientX;
+      p.downY = e.clientY;
+      p.travel = 0;
+      p.rubbed = false;
+      this.scrub.turns.length = 0;
+      this.scrub.until = 0;
+      p.downOnPeach = !!this.raycastAt(e.clientX, e.clientY);
+      p.onWaistband = this.onWaistband(e.clientX, e.clientY);
+    });
+    const release = (e) => {
+      if (
+        p.pressed &&
+        e.type === "pointerup" &&
+        e.timeStamp - p.downAt < 220 &&
+        p.travel < 14
+      ) {
+        this.tap();
+      }
+      p.pressed = false;
+      if (e.pointerType !== "mouse") {
+        p.present = false;
+        p.inside = false;
+        p.armed = true;
+      }
+    };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    document.documentElement.addEventListener("pointerleave", () => {
+      p.present = false;
+      p.inside = false;
+      p.armed = true;
+      p.pressed = false;
+    });
+  }
+
+  bindShake() {
+    window.addEventListener(
+      "wheel",
+      (e) => {
+        if (e.target instanceof Element && e.target.closest(".ui")) return;
+        this.jolt(0, clamp(-e.deltaY / 100, -2, 2) * 1.6);
+      },
+      { passive: true },
+    );
+    window.addEventListener("devicemotion", (e) => {
+      const a = e.acceleration;
+      if (!a || Math.hypot(a.x || 0, a.y || 0) < 7) return;
+      this.jolt(-(a.x || 0) / 7, (a.y || 0) / 7);
+    });
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  requestShake() {
+    if (typeof DeviceMotionEvent?.requestPermission === "function")
+      DeviceMotionEvent.requestPermission().catch(() => {});
+  }
+
+  jolt(x, y) {
+    if (this.phase !== "live") return;
+    const now = performance.now();
+    if (now - this.lastJoltAt < 90) return;
+    this.lastJoltAt = now;
+    const size = Math.min(3, Math.hypot(x, y));
+    this.velocity.x += x;
+    this.velocity.y += y;
+    this.spin.z += x * 0.6 + (Math.random() - 0.5) * size * 0.5;
+    this.spin.x += y * 0.35;
+    this.squashVelocity.x += size * 1.1;
+    this.squashAxis.set(Math.abs(x), Math.abs(y)).normalize();
+    this.wobbleAll(0.05 + size * 0.05);
+    this.idle = 0;
+    this.twerk = null;
+    this.talk.say("shake", 0.2);
+  }
+
+  begin() {
+    this.enter();
+  }
+
+  timeScale(realDelta) {
+    if (this.freeze > 0) {
+      this.freeze -= realDelta;
+      return 0;
+    }
+    if (this.slowmo <= 0) return 1;
+    this.slowmo -= realDelta;
+    const k = 1 - Math.max(0, this.slowmo) / 0.5;
+    return 0.12 + 0.88 * k * k * k;
+  }
+
+  enter() {
+    this.phase = "entering";
+    this.phaseTime = 0;
+    this.group.visible = true;
+    this.offset.set(0, 0, 0);
+    this.velocity.set(0, 0, 0);
+    this.tilt.set(0, 0, 0);
+    this.spin.set(0, 0, 0);
+    this.squash.set(0, 0, 0);
+    this.squashVelocity.set(0, 0, 0);
+    this.idle = 0;
+    this.dressUp();
+  }
+
+  dressUp() {
+    Object.assign(this.garment, {
+      worn: true,
+      stripping: false,
+      target: 0,
+      pull: 0,
+      velocity: 0,
+      visible: 1,
+    });
+  }
+
+  pointerSpeed(now) {
+    const s = this.pointer.samples;
+    let first = s.length - 1;
+    while (first > 0 && now - s[first - 1].t < CFG.SAMPLE_WINDOW_MS) first -= 1;
+    const a = s[first];
+    const b = s[s.length - 1];
+    if (!a || a === b || now - b.t > CFG.SAMPLE_WINDOW_MS)
+      return { vx: 0, vy: 0, speed: 0 };
+    const dt = Math.max(1, b.t - a.t) / 1000;
+    const unit = Math.min(window.innerWidth, window.innerHeight);
+    const vx = (b.x - a.x) / dt / unit;
+    const vy = (b.y - a.y) / dt / unit;
+    return { vx, vy, speed: Math.hypot(vx, vy) };
+  }
+
+  raycastAt(x, y) {
+    if (!this.peach.mesh) return null;
+    this.ndc.set(
+      (x / window.innerWidth) * 2 - 1,
+      -(y / window.innerHeight) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(this.ndc, this.camera);
+    return this.raycaster.intersectObject(this.peach.mesh, false)[0] || null;
+  }
+
+  tap() {
+    if (this.phase !== "live") return;
+    const now = performance.now();
+    if (now - this.lastTapAt < CFG.CLAP_GAP_MS) {
+      this.lastTapAt = -Infinity;
+      this.claps = { left: 3, timer: 0 };
+      this.talk.say("clap", 0.6);
+      return;
+    }
+    this.lastTapAt = now;
+    const hit = this.raycastAt(this.pointer.x, this.pointer.y);
+    if (hit) this.smack(hit, 0, 0, 0.9);
+  }
+
+  smack(hit, vx, vy, strength) {
+    const { tool } = this;
+    const now = performance.now();
+    const tapped = vx === 0 && vy === 0;
+    const swipe = tapped
+      ? this.tempA.set(0, 0, -1)
+      : this.tempA.set(vx, -vy, 0).normalize();
+    const normal = this.tempB
+      .copy(hit.face.normal)
+      .transformDirection(this.peach.mesh.matrixWorld);
+
+    const push = swipe
+      .clone()
+      .multiplyScalar(0.75)
+      .addScaledVector(normal, -0.65)
+      .normalize();
+    this.peach.addJiggle(
+      hit.point,
+      push,
+      (0.06 + strength ** 1.4 * 0.08) * tool.force,
+      tool.reach,
+    );
+
+    const knock = strength * tool.force * this.firmness.body;
+    this.velocity.addScaledVector(swipe, 1.1 * knock);
+    this.velocity.z -= 0.3 * knock;
+    const lever = hit.point.clone().sub(this.group.position);
+    this.spin.add(lever.cross(swipe).multiplyScalar(0.7 * knock));
+    this.squashVelocity.x += 0.7 * strength * tool.force * this.firmness.squash;
+    this.squashAxis.set(Math.abs(swipe.x), Math.abs(swipe.y));
+    if (tapped) this.squashAxis.set(0.5, 0.5);
+
+    if (this.settings.handprints) {
+      const tilt = tapped
+        ? (Math.random() - 0.5) * 0.6
+        : Math.atan2(swipe.y * Math.sign(swipe.x || 1), Math.abs(swipe.x)) +
+          (Math.random() - 0.5) * 0.4;
+      this.peach.addHandprint(
+        hit.point,
+        hit.face.normal,
+        tilt,
+        swipe.x < 0,
+        Math.min(0.9, 0.45 + strength * 0.3),
+        this.toolName === "lips"
+          ? 1
+          : clamp((strength - 0.5) / 0.7, 0, 1) * (0.75 + Math.random() * 0.25),
+        tool.print,
+      );
+    }
+
+    if (this.oil > 0.25) {
+      const flung = this.droplets.spray(
+        hit.point,
+        normal,
+        swipe,
+        this.oil * strength,
+      );
+      if (strength > 1) this.lens.splash(flung, this.oil);
+    }
+
+    this.combo =
+      now - this.lastSmackAt < CFG.COMBO_WINDOW_MS ? this.combo + 1 : 1;
+    this.lastSmackAt = now;
+    this.smacks += 1;
+    this.idle = 0;
+    this.twerk = null;
+    this.heat = Math.min(
+      100,
+      this.heat +
+        (CFG.HEAT_PER_SMACK + CFG.HEAT_PER_SPEED * strength) * tool.heat,
+    );
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    if (strength * tool.force > 1.3) this.hitStop = 0.045;
+    this.kickVelocity.addScaledVector(swipe, 0.5 * strength * tool.force);
+
+    if (this.toolName === "lips") {
+      playKiss();
+    } else {
+      playSlap(
+        Math.min(1, 0.4 + strength * 0.35),
+        this.heat / 100,
+        this.oil,
+        this.firmness.pitch * tool.pitch,
+      );
+    }
+    if (this.settings.moans && (strength > 1.1 || this.combo % 4 === 0))
+      playMoan(clamp(strength / 1.6, 0.2, 1), this.heat / 100);
+    this.ui.onSmack(this.smacks, this.combo, this.pointer.x, this.pointer.y);
+    if (this.combo >= 5) this.talk.say("combo", 0.5);
+    else if (this.toolName === "lips") this.talk.say("kiss", 0.4);
+    else this.talk.say("smack", 0.3);
+
+    if (this.heat >= 100) this.charge();
+  }
+
+  startGrab(hit) {
+    const normal = hit.face.normal.clone().normalize();
+    this.recoil = null;
+    this.grab = {
+      local: this.peach.toLocal(hit.point, new Vector3()),
+      normal,
+      pull: new Vector3(),
+      pullVelocity: new Vector3(),
+      localPull: new Vector3(),
+      radius: 1.25,
+      dent: new Vector3(),
+      tension: 0,
+      squeeze: 0,
+      ripple: 0,
+    };
+    this.ui.onGrab();
+    playSquish(0.2);
+    buzz(8);
+    this.talk.say("grab", 0.7);
+    if (this.settings.moans) playMoan(0.3, this.heat / 100);
+  }
+
+  updateGrab(delta) {
+    const g = this.grab;
+    const world = this.tempA
+      .copy(g.local)
+      .applyMatrix4(this.peach.mesh.matrixWorld);
+    this.grabPlane.setFromNormalAndCoplanarPoint(
+      this.camera.getWorldDirection(this.tempB),
+      world,
+    );
+    this.ndc.set(
+      (this.pointer.x / window.innerWidth) * 2 - 1,
+      -(this.pointer.y / window.innerHeight) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(this.ndc, this.camera);
+    if (!this.raycaster.ray.intersectPlane(this.grabPlane, this.grabTarget))
+      return;
+    const target = this.grabTarget.sub(world);
+    const give = this.firmness.grab;
+    const limit = CFG.GRAB_REACH * give;
+    const reach = target.length();
+    if (reach > 0)
+      target.multiplyScalar((limit * Math.tanh(reach / limit)) / reach);
+    const stiffness = (420 * this.firmness.stiffness) / give;
+    g.pullVelocity
+      .addScaledVector(this.tempB.copy(target).sub(g.pull), stiffness * delta)
+      .multiplyScalar(Math.exp(-delta * (10 + (1 - give) * 8)));
+    g.pull.addScaledVector(g.pullVelocity, delta);
+    g.squeeze += (1 - g.squeeze) * (1 - Math.exp(-delta * 14));
+    const length = g.pull.length();
+    const speed = g.pullVelocity.length();
+    g.tension = length / limit;
+
+    const scale = this.peach.worldScale();
+    const strain = clamp((g.tension - 0.55) / 0.45, 0, 1);
+    const tremble = reducedMotion.matches
+      ? 0
+      : Math.sin(this.clock * 65) * 0.02 * strain;
+    const localPull = this.peach
+      .toLocal(this.tempB.copy(world).add(g.pull), this.tempB)
+      .sub(g.local)
+      .addScaledVector(g.normal, tremble / scale);
+    g.localPull.copy(localPull);
+    g.radius = 1.25 + length * 0.9;
+    g.dent
+      .copy(g.normal)
+      .multiplyScalar(
+        (-CFG.GRAB_DENT * g.squeeze * (1 + g.tension * 0.6)) / scale,
+      );
+    this.peach.setGrab(
+      g.local,
+      localPull,
+      g.radius,
+      g.dent,
+      CFG.GRAB_DENT_RADIUS,
+    );
+    this.ui.setGrabTension(g.tension);
+
+    g.ripple -= delta;
+    if (g.ripple <= 0 && speed > 0.5) {
+      g.ripple = 0.06;
+      const around = this.tempB
+        .set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)
+        .multiplyScalar(0.5)
+        .add(world);
+      this.peach.addJiggle(
+        around,
+        g.pullVelocity.clone().normalize(),
+        Math.min(0.07, speed * 0.02),
+        1,
+      );
+    }
+    this.velocity.addScaledVector(g.pull, 9 * delta);
+    const lever = this.tempB.copy(world).sub(this.group.position);
+    this.spin.addScaledVector(lever.cross(g.pull), 9 * delta);
+    this.heat = Math.min(99, this.heat + 2 * delta * (0.2 + length));
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    this.idle = 0;
+    this.twerk = null;
+  }
+
+  releaseGrab() {
+    const g = this.grab;
+    const length = g.pull.length();
+    this.velocity.addScaledVector(g.pull, -1.6);
+    if (length > 0.08) playSquish(0.2 + length * 0.3);
+    this.recoil = {
+      local: g.local,
+      dent: g.dent.clone(),
+      pull: g.localPull.clone(),
+      start: g.localPull.clone(),
+      velocity: new Vector3(),
+      worldPull: g.pull.clone(),
+      radius: g.radius,
+      length,
+      age: 0,
+      landed: false,
+    };
+    this.grab = null;
+    this.ui.setGrabTension(0);
+  }
+
+  updateRecoil(delta) {
+    const r = this.recoil;
+    if (!r) return;
+    r.age += delta;
+    const k = 1100 * this.firmness.stiffness;
+    const c = 13 + (1 - this.firmness.grab) * 10;
+    const h = 1 / 240;
+    for (let t = 0; t < delta; t += h) spring(r.pull, r.velocity, k, c, h);
+    r.dent.multiplyScalar(Math.exp(-delta * 18));
+    this.peach.setGrab(r.local, r.pull, r.radius, r.dent, CFG.GRAB_DENT_RADIUS);
+    if (!r.landed && r.pull.dot(r.start) <= 0) this.landRecoil(r);
+    if (r.age > 0.7) {
+      this.peach.releaseGrab();
+      this.recoil = null;
+    }
+  }
+
+  landRecoil(r) {
+    r.landed = true;
+    const { length, worldPull: pull } = r;
+    const world = this.tempA
+      .copy(r.local)
+      .applyMatrix4(this.peach.mesh.matrixWorld);
+    const at = this.toScreen(world);
+    this.wobbleAll(0.04 + length * 0.1);
+    this.peach.addJiggle(
+      world,
+      this.tempB.copy(pull).normalize().negate(),
+      Math.min(0.6, length) * 0.6 + 0.03,
+      1,
+    );
+    this.velocity.addScaledVector(pull, -1.6);
+    this.spin.addScaledVector(
+      this.tempA.sub(this.group.position).cross(pull),
+      -1.8,
+    );
+    this.squashVelocity.x += 0.6 + length * 3;
+    this.squashAxis.set(Math.abs(pull.x), Math.abs(pull.y)).normalize();
+    this.kickVelocity.addScaledVector(pull, -0.9 * length);
+    buzz(15 + Math.round(length * 30));
+    if (length < 0.08) return;
+    if (length > 0.25) this.hitStop = 0.03 + length * 0.05;
+    playSlap(0.4 + length * 0.6, this.heat / 100, this.oil, 1.1);
+    if (this.settings.moans) playMoan(Math.min(1, length), this.heat / 100);
+    this.talk.say("release", 0.6);
+    this.heat = Math.min(100, this.heat + 5 * length);
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    this.ui.onSnapback(at.x, at.y, length / CFG.GRAB_REACH);
+    if (this.heat >= 100 && this.phase === "live") this.charge();
+  }
+
+  cheekPoint(side, dy) {
+    const n = this.peach.creaseNormal(this.clapNormal);
+    const g = this.group.position;
+    this.raycaster.set(
+      this.tempA.set(g.x + n.x * side * 0.75, g.y + dy, 20),
+      this.tempB.set(0, 0, -1),
+    );
+    return this.raycaster.intersectObject(this.peach.mesh, false)[0] || null;
+  }
+
+  canStrip() {
+    return this.settings.lingerie && this.garment.worn;
+  }
+
+  onWaistband(x, y) {
+    if (!this.canStrip()) return false;
+    const hit = this.raycastAt(x, y);
+    return !!hit && this.peach.heightAt(hit.point) > CFG.WAISTBAND_FROM;
+  }
+
+  isStripPull() {
+    const p = this.pointer;
+    const vertical = Math.abs(p.y - p.downY);
+    return (
+      p.onWaistband &&
+      vertical > 24 &&
+      Math.abs(p.x - p.downX) < vertical * 0.6 &&
+      p.travel < vertical * 1.4
+    );
+  }
+
+  startStrip() {
+    this.garment.stripping = true;
+    playSquish(0.2);
+    this.talk.say("strip", 0.6);
+  }
+
+  updateStrip() {
+    const p = this.pointer;
+    const g = this.garment;
+    const wanted = clamp(
+      (p.y - p.downY) / (window.innerHeight * 0.22),
+      -0.6,
+      1,
+    );
+    g.target = wanted < 0 ? -0.42 * Math.tanh(-wanted / 0.42) : wanted;
+    this.rubbing = clamp(Math.abs(g.velocity) * 0.3, 0, 0.6);
+    if (g.pull < 0) {
+      const hike = Math.min(1, -g.pull / 0.45);
+      const lifting = Math.max(0, -0.17 - g.pull) / 0.2;
+      g.liftHold = lifting > 0 ? (g.liftHold || 0) + 1 / 60 : 0;
+      const giving = Math.min(1, g.liftHold / 0.9) ** 2;
+      const t = this.clock;
+      const tugBack = Math.max(0, Math.sin(t * 2.6)) ** 2;
+      this.velocity.y +=
+        (hike * 2 + lifting * 24 * giving - lifting * tugBack * 5) * (1 / 60);
+      this.spin.z += Math.sin(t * 4.1) * 0.05 * lifting;
+      this.spin.x += Math.sin(t * 2.9 + 1.3) * 0.025 * lifting;
+      this.squashAxis.set(0, 1);
+      this.squashVelocity.x -= hike * hike * 0.3;
+      const notch = Math.floor(-g.pull / 0.06);
+      if (notch > (g.notch || 0) && g.velocity < 0) {
+        g.velocity += 0.5 + hike * 0.6;
+        [1, -1].forEach((side) => {
+          const hit = this.cheekPoint(side, 0.45);
+          if (hit)
+            this.peach.addJiggle(
+              hit.point,
+              this.tempB.set(0, 1, -0.3).normalize(),
+              0.02 + hike * 0.03,
+              1,
+            );
+        });
+        buzz(4);
+      }
+      g.notch = notch;
+      this.heat = Math.min(99, this.heat + hike * 0.3);
+      this.heatHold = CFG.HEAT_DECAY_DELAY;
+      if (hike > 0.6) this.talk.say("wedgie", 0.02);
+    } else {
+      g.notch = 0;
+    }
+    this.idle = 0;
+    this.twerk = null;
+    if (g.target >= 1) this.removeGarment();
+  }
+
+  endStrip() {
+    const g = this.garment;
+    g.stripping = false;
+    if (!g.worn) return;
+    if (g.pull < -0.04) {
+      this.snapWedgie(Math.min(1, -g.pull / 0.45));
+      return;
+    }
+    const amount = clamp(g.pull, 0, 1);
+    if (amount < 0.05) return;
+    [1, -1].forEach((side) => {
+      const hit = this.cheekPoint(side, 0.75 - amount * 0.9);
+      if (hit)
+        this.peach.addJiggle(
+          hit.point,
+          this.tempB.set(0, -0.3, -1).normalize(),
+          0.05 + amount * 0.12,
+          0.9,
         );
+    });
+    this.squashVelocity.x += amount * 1.4;
+    this.squashAxis.set(0, 1);
+    this.kickVelocity.y += amount * 0.4;
+    playSnap(amount);
+    buzz(10 + Math.round(amount * 25));
+    if (this.settings.moans && amount > 0.4) playMoan(amount, this.heat / 100);
+    this.talk.say("snap", 0.7);
+    this.heat = Math.min(100, this.heat + 10 * amount);
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    if (this.heat >= 100) this.charge();
+  }
+
+  snapWedgie(amount) {
+    [1, -1].forEach((side) => {
+      const hit = this.cheekPoint(side, 0.3);
+      if (hit)
+        this.peach.addJiggle(
+          hit.point,
+          this.tempB.set(side * 0.3, -1, -0.4).normalize(),
+          0.08 + amount * 0.14,
+          1,
+        );
+    });
+    this.wobbleAll(0.04 + amount * 0.06);
+    this.velocity.y -= 1 + amount * 1.6;
+    this.squashVelocity.x += 0.8 + amount * 1.8;
+    this.squashAxis.set(0, 1);
+    this.kickVelocity.y -= amount * 0.6;
+    playSnap(Math.min(1, 0.4 + amount * 0.8));
+    playSlap(0.4 + amount * 0.5, this.heat / 100, this.oil, 1.2);
+    buzz(20 + Math.round(amount * 30));
+    if (this.settings.moans) playMoan(0.4 + amount * 0.6, this.heat / 100);
+    this.talk.say("wedgie", 0.8);
+    this.heat = Math.min(100, this.heat + 8 + 12 * amount);
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    if (this.heat >= 100) this.charge();
+  }
+
+  removeGarment() {
+    const g = this.garment;
+    g.worn = false;
+    g.stripping = false;
+    g.peel = 0;
+    g.freed = false;
+    buzz(30);
+    playSnap(0.6);
+    if (this.settings.moans) playMoan(0.6, this.heat / 100, "long");
+    this.talk.say("stripped");
+    this.heat = Math.min(100, this.heat + 20);
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+  }
+
+  updateGarment(delta) {
+    const g = this.garment;
+    if (!this.settings.lingerie) {
+      this.peach.setLingerie(false, 0, 0);
+      return;
+    }
+    if (g.worn) {
+      const target = g.stripping ? g.target : 0;
+      const hike = clamp(-g.pull / 0.45, 0, 1);
+      g.velocity += (target - g.pull) * 420 * (1 - 0.5 * hike) * delta;
+      g.velocity *= Math.exp(-delta * 14);
+    } else if (g.visible > 0) {
+      g.peel += delta;
+      g.velocity += (1.9 - g.pull) * 70 * delta;
+      g.velocity *= Math.exp(-delta * 6);
+      if (!g.freed && g.pull > 1.05) {
+        g.freed = true;
+        this.wobbleAll(0.1);
+        this.velocity.y += 0.6;
+        this.squashVelocity.x += 1.4;
+        this.squashAxis.set(0, 1);
+        playSquish(0.7);
+      }
+      if (g.pull > 1.55) g.visible = Math.max(0, g.visible - delta * 5);
+    }
+    g.pull += g.velocity * delta;
+    this.peach.setLingerie(true, g.pull, g.visible);
+  }
+
+  updateClaps(delta) {
+    if (!this.claps || this.phase !== "live") {
+      this.claps = null;
+      return;
+    }
+    this.claps.timer -= delta;
+    if (this.claps.timer > 0) return;
+    this.claps.timer = 0.16;
+    this.claps.left -= 1;
+    if (this.claps.left <= 0) this.claps = null;
+
+    const g = this.group.position;
+    [1, -1].forEach((side) => {
+      const hit = this.cheekPoint(side, -0.3);
+      const n = this.clapNormal;
+      if (hit)
+        this.peach.addJiggle(
+          hit.point,
+          this.tempB.copy(n).multiplyScalar(-side),
+          0.17,
+          1,
+        );
+    });
+    this.squashVelocity.x += 2;
+    this.squashAxis.set(1, 0);
+    this.velocity.z += 0.8;
+    this.kickVelocity.y += 0.5;
+    const now = performance.now();
+    this.combo =
+      now - this.lastSmackAt < CFG.COMBO_WINDOW_MS ? this.combo + 1 : 1;
+    this.lastSmackAt = now;
+    this.smacks += 1;
+    this.idle = 0;
+    this.twerk = null;
+    this.heat = Math.min(100, this.heat + CFG.HEAT_PER_SMACK);
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    playSlap(1, this.heat / 100, this.oil, this.firmness.pitch * 1.1);
+    const at = this.toScreen(g);
+    this.ui.onSmack(this.smacks, this.combo, at.x, at.y);
+    if (this.heat >= 100) {
+      this.claps = null;
+      this.charge();
+    }
+  }
+
+  updateHeartbeat(delta) {
+    this.beatAge += delta;
+    const pulse = Math.sin(Math.PI * Math.min(1, this.beatAge / BEAT_LENGTH));
+    this.throb = this.beatAmp * pulse * pulse;
+    const h = this.heat / 100;
+    if (
+      h < CFG.HEARTBEAT_FROM ||
+      (this.phase !== "live" && this.phase !== "charging")
+    ) {
+      this.beatTimer = 0;
+      return;
+    }
+    this.beatTimer -= delta;
+    if (this.beatTimer > 0) return;
+    const k = (h - CFG.HEARTBEAT_FROM) / (1 - CFG.HEARTBEAT_FROM);
+    this.beatTimer = 1 / (1.1 + k * 1.8);
+    this.beatAge = 0;
+    this.beatAmp = (0.004 + k * 0.007) * (reducedMotion.matches ? 0.3 : 1);
+    playHeartbeat(0.3 + k * 0.7);
+    this.ui.onHeartbeat();
+  }
+
+  toScreen(world) {
+    this.screen.copy(world).project(this.camera);
+    return {
+      x: (this.screen.x + 1) * 0.5 * window.innerWidth,
+      y: (1 - this.screen.y) * 0.5 * window.innerHeight,
+    };
+  }
+
+  pixelsPerUnit(world) {
+    const distance = this.camera.position.distanceTo(world);
+    const halfFov = (this.camera.fov * Math.PI) / 360;
+    return window.innerHeight / (2 * distance * Math.tan(halfFov));
+  }
+
+  updateOverlays() {
+    const shown = this.group.visible && this.phase !== "burst";
+    if (this.censor.mode !== "off") {
+      if (shown && this.peach.mesh) {
+        const world = this.peach.seamPoint(this.tempA);
+        const at = this.toScreen(world);
+        const width = 1.3 * this.group.scale.x * this.pixelsPerUnit(world);
+        this.censor.place(at.x, at.y, width, -this.group.rotation.z, true);
+      } else {
+        this.censor.place(0, 0, 0, 0, false);
+      }
+    }
+    if (this.talk.showing) {
+      const anchor = this.tempB.copy(this.group.position);
+      anchor.x -= 0.75;
+      anchor.y += 1.35;
+      const at = this.toScreen(anchor);
+      this.talk.place(at.x, at.y);
+    }
+    if (this.heat > 75 && !this.saidHot) {
+      this.saidHot = true;
+      this.talk.say("hot", 0.8);
+    } else if (this.heat < 50) {
+      this.saidHot = false;
+    }
+  }
+
+  charge() {
+    this.phase = "charging";
+    this.phaseTime = 0;
+    this.chargeTime = CFG.CHARGE_TIME;
+    this.chargePulse = 0;
+    this.twerk = null;
+    setRub(0, 0);
+    this.wobbleAll(0.09);
+    this.squashVelocity.x += 2.2;
+    this.squashAxis.set(0.5, 0.5);
+    this.freeze = 0.05;
+    if (!reducedMotion.matches) {
+      this.kickVelocity.y -= 1;
+      this.trauma = Math.max(this.trauma, 0.35);
+    }
+    playSnap(1);
+    playHeartbeat(1.3);
+    buzz([25, 40, 60]);
+    this.ui.onCharge();
+    playStretch(this.chargeTime);
+    if (this.settings.moans) playClimax(this.chargeTime);
+    this.talk.say("charge");
+  }
+
+  updateCharge(delta) {
+    const k = clamp(this.phaseTime / this.chargeTime, 0, 1);
+    this.heat = 100;
+    this.chargePulse -= delta;
+    if (this.chargePulse <= 0) {
+      this.chargePulse = 0.05;
+      const pos = this.peach.mesh.geometry.attributes.position;
+      const point = this.tempA
+        .fromBufferAttribute(pos, Math.floor(Math.random() * pos.count))
+        .applyMatrix4(this.peach.mesh.matrixWorld);
+      const out = this.tempB.copy(point).sub(this.group.position).normalize();
+      this.peach.addJiggle(point, out, 0.03 + k * 0.07, 0.7);
+    }
+    if (k >= 1) this.burst();
+  }
+
+  chargeShape(g) {
+    const k = clamp(this.phaseTime / this.chargeTime, 0, 1);
+    const still = reducedMotion.matches ? 0.2 : 1;
+    const shake = Math.sin(this.clock * 70) * 0.05 * k * k * still;
+    const inhale = clamp((k - 0.6) / 0.4, 0, 1);
+    g.scale.multiplyScalar(1 - 0.08 * inhale * inhale * (3 - 2 * inhale));
+    g.rotation.z += shake * 1.6;
+    g.position.x += shake * 0.8;
+  }
+
+  burst() {
+    this.group.updateMatrixWorld(true);
+    this.startSlice();
+    this.finishBurst();
+    this.talk.say("burst");
+  }
+
+  wobbleAll(amount) {
+    const pos = this.peach.mesh.geometry.attributes.position;
+    for (let n = 0; n < 6; n += 1) {
+      const point = this.tempA
+        .fromBufferAttribute(pos, Math.floor(Math.random() * pos.count))
+        .applyMatrix4(this.peach.mesh.matrixWorld);
+      const out = this.tempB.copy(point).sub(this.group.position).normalize();
+      this.peach.addJiggle(point, out, amount, 1);
+    }
+  }
+
+  prepareHalves() {
+    const scene = this.group.parent;
+    this.halves = [1, -1].map((side, index) => {
+      const mesh = this.peach.makeHalf(side, 10 + index * 5);
+      const holder = new Group();
+      holder.add(mesh);
+      holder.visible = false;
+      scene.add(holder);
+      return {
+        holder,
+        mesh,
+        side,
+        velocity: new Vector3(),
+        spin: new Vector3(),
+      };
+    });
+    return this.halves.map((h) => h.holder);
+  }
+
+  startSlice() {
+    if (!this.halves) this.prepareHalves();
+    const center = this.group.position.clone();
+    const normal = this.peach.creaseNormal(new Vector3());
+    const toCenter = new Matrix4().makeTranslation(
+      -center.x,
+      -center.y,
+      -center.z,
+    );
+    this.peach.refreshHalves();
+    this.halfLingerie = this.garment.visible;
+    if (this.settings.lingerie && this.garment.visible > 0) {
+      this.garment.worn = false;
+      this.garment.visible = 0;
+      this.peach.setLingerie(false, 0, 0);
+    }
+    this.halves.forEach((h) => {
+      h.mesh.matrix.copy(this.peach.mesh.matrixWorld).premultiply(toCenter);
+      h.holder.position.copy(center);
+      h.holder.rotation.set(0, 0, 0);
+      h.holder.scale.setScalar(1);
+      h.holder.visible = true;
+      h.normal = normal.clone();
+      h.launch = normal
+        .clone()
+        .multiplyScalar(h.side * (6 + Math.random() * 1.5))
+        .add(new Vector3(0, 3.5 + Math.random(), -5));
+      h.velocity.set(0, 0, 0);
+      h.yaw = -Math.sign(-h.side * normal.x || 1) * 1.05;
+      h.roll = 0;
+      h.rollVelocity = h.side * (2 + Math.random());
+      h.landed = false;
+    });
+    this.halvesAge = 0;
+    this.slicing = true;
+    this.snapped = false;
+    this.strandTimer = 0;
+    this.trailTimer = 0;
+    this.sliceCenter = center;
+    this.sliceNormal = normal;
+    playSlice();
+    playTear(SLICE_HOLD);
+  }
+
+  snapHalves() {
+    this.snapped = true;
+    this.halves.forEach((h) => {
+      h.velocity.copy(h.launch);
+      h.holder.position.addScaledVector(h.normal, h.side * 0.14);
+    });
+    this.juice.burst(this.peach.mesh, { force: 0.9, flying: 1.5, limit: 160 });
+    this.sprayCut();
+    this.juice.update(1 / 30);
+    this.freeze = 0.05;
+    if (!reducedMotion.matches) {
+      this.slowmo = 0.35;
+      this.trauma = Math.max(this.trauma, 0.8);
+    }
+    buzz([40, 30, 80]);
+    this.kickVelocity.addScaledVector(this.sliceNormal, 1.2);
+    this.kickVelocity.y -= 0.8;
+    playSlap(1, 0.6, 0.6, 0.75);
+    playBurst();
+    playSplash();
+  }
+
+  sprayCut() {
+    const at = new Vector3();
+    const v = new Vector3();
+    for (let n = 0; n < 60; n += 1) {
+      const side = n % 2 ? 1 : -1;
+      const height = (Math.random() - 0.5) * 1.8;
+      at.copy(this.sliceCenter)
+        .addScaledVector(this.sliceNormal, side * 0.05)
+        .add(v.set(0, height, (Math.random() - 0.3) * 0.8));
+      const lens = n < 3;
+      v.copy(this.sliceNormal)
+        .multiplyScalar(side * (1 + Math.random() ** 2 * 2.5))
+        .add(
+          new Vector3(
+            0,
+            1.5 + Math.random() * 1.5 + height * 0.6,
+            2 + Math.random() * 2.5,
+          ),
+        );
+      if (lens) v.set(v.x * 0.2, 2.5 + Math.random() * 2, 11 - n * 1.4);
+      this.juice.emit(at, v, lens);
+    }
+  }
+
+  updateHalves(delta) {
+    if (!this.slicing) return;
+    this.halvesAge += delta;
+    const t = this.halvesAge;
+    const fade = clamp((t - 0.3) / 0.35, 0, 1);
+    this.peach.fadeHalfLingerie(
+      this.halfLingerie * (1 - fade * fade * (3 - 2 * fade)),
+    );
+    if (!this.snapped && t >= SLICE_HOLD) this.snapHalves();
+    if (!this.snapped) {
+      const k = t / SLICE_HOLD;
+      const strain = k * k;
+      const tremble = Math.sin(t * 90) * (0.012 + 0.02 * strain);
+      this.halves.forEach((h) => {
+        h.holder.position
+          .copy(this.sliceCenter)
+          .addScaledVector(h.normal, h.side * (0.02 + strain * 0.1 + tremble));
+        h.holder.rotation.set(0, h.yaw * 0.12 * strain, h.side * 0.05 * strain);
+        h.holder.scale.set(1 - 0.04 * strain, 1 + 0.03 * strain, 1);
+      });
+      this.strandTimer -= delta;
+      if (this.strandTimer <= 0) {
+        this.strandTimer = 0.02;
+        const p = this.sliceCenter
+          .clone()
+          .add(
+            new Vector3(
+              (Math.random() - 0.5) * 0.1,
+              (Math.random() - 0.5) * 2.2,
+              1,
+            ),
+          );
+        this.juice.emit(p, new Vector3((Math.random() - 0.5) * 0.6, -0.5, 0.8));
+      }
+      return;
+    }
+    const s = t - SLICE_HOLD;
+    const open = 1 - Math.exp(-s * 14);
+    const tilt = (s * s) / (s + 0.08);
+    const glow =
+      clamp(s / 0.025, 0, 1) * Math.exp(-Math.max(0, s - 0.025) * 16) * 0.7;
+    this.trailTimer -= delta;
+    const drip = s < 0.7 && this.trailTimer <= 0;
+    if (drip) this.trailTimer = 0.035;
+    this.halves.forEach((h) => {
+      h.mesh.userData.cap.emissiveIntensity = glow;
+      if (drip)
+        this.juice.emit(
+          this.tempA
+            .copy(h.holder.position)
+            .add(this.tempB.set(0, (Math.random() - 0.5) * 1.4, 0.3)),
+          this.tempB
+            .copy(h.velocity)
+            .multiplyScalar(0.35)
+            .add(this.screen.set(0, -0.5, Math.random() - 0.5)),
+        );
+      h.velocity.y -= 11 * delta;
+      h.velocity.multiplyScalar(Math.exp(-delta * 0.3));
+      h.holder.position.addScaledVector(h.velocity, delta);
+      h.holder.rotation.set(
+        -tilt * 3.2,
+        h.yaw * (0.12 + 0.88 * open),
+        h.side * (0.05 + tilt * 2.4),
+      );
+      const release = Math.exp(-s * 9);
+      const bounce = release * Math.cos(s * 30) * 0.1;
+      h.holder.scale.set(
+        1 - 0.04 * release + bounce,
+        1 + 0.03 * release - bounce,
+        1 + bounce * 0.5,
+      );
+    });
+    if (s < 1.6) return;
+    this.halves.forEach((h) => {
+      h.holder.visible = false;
+    });
+    this.slicing = false;
+  }
+
+  finishBurst() {
+    this.phase = "burst";
+    this.phaseTime = 0;
+    this.group.visible = false;
+    this.peach.clearMarks();
+    this.heat = 0;
+    this.oil = 0;
+    this.peach.setOil(0, true);
+    this.bursts += 1;
+    this.kickVelocity.set(0, 1.6, 0);
+    this.ui.onBurst(this.bursts);
+    setRub(0, 0);
+  }
+
+  rub(hit, motion, delta) {
+    const amount = clamp(motion.speed / 1.2, 0, 1);
+    this.rubbing = amount;
+    this.oil = Math.min(
+      1,
+      this.oil + CFG.OIL_RUB_RATE * delta * (0.3 + amount),
+    );
+    this.heat = Math.max(0, this.heat - 18 * delta * amount);
+    this.rubPulse -= delta;
+    if (this.rubPulse <= 0 && amount > 0.05) {
+      this.rubPulse = 0.08;
+      const drag = this.tempA.set(motion.vx, -motion.vy, 0).normalize();
+      this.peach.addJiggle(hit.point, drag, 0.035 * amount, 0.6);
+    }
+    this.idle = 0;
+    this.twerk = null;
+    this.ui.onRub();
+    if (this.settings.moans && amount > 0.5 && Math.random() < delta * 0.8)
+      playMoan(0.2 + this.oil * 0.3, this.heat / 100);
+    this.talk.say("rub", delta * 0.5);
+  }
+
+  handlePointer(delta) {
+    const p = this.pointer;
+    const motion = this.pointerSpeed(performance.now());
+    this.ui.shapeCursor(motion.vx, motion.vy, p.present, delta);
+    this.rubbing = 0;
+    this.ui.setScrub(this.trackScrub(motion));
+
+    if (this.grab) {
+      const flicked =
+        motion.speed > CFG.MIN_SWIPE_SPEED &&
+        performance.now() - p.downAt < CFG.GRAB_FLICK_MS;
+      if (flicked || p.scrubbing) {
+        this.grab = null;
+        this.peach.releaseGrab();
+      } else if (p.pressed && this.phase === "live") {
+        this.updateGrab(delta);
+        this.ui.setCursorState("grab");
+        return;
+      } else {
+        this.releaseGrab();
+      }
+    }
+    if (this.garment.stripping) {
+      if (p.pressed && this.phase === "live" && this.garment.worn) {
+        this.updateStrip();
+        this.ui.setCursorState("grab");
         return;
       }
-
-      const softBody = new SoftBodyPhysics(mesh);
-      peachState.softBodies.push(softBody);
+      this.endStrip();
     }
-  });
 
-  // Initialize particle explosion system with respawn callback
-  if (peachState.sceneRef && !peachState.particleExplosion) {
-    peachState.particleExplosion = new ParticleExplosion(
-      meshArray,
-      peachState.sceneRef,
-      () => {
-        // Callback when explosion is complete - spawn fresh peach
-        // Show meshes again
-        meshArray.forEach((mesh) => {
-          mesh.visible = true;
-        });
+    if (this.phase !== "live" || !p.present) {
+      this.ui.setCursorState(null);
+      return;
+    }
+    const hit = this.raycastAt(p.x, p.y);
+    p.inside = !!hit;
+    if (!hit) {
+      p.armed = true;
+    } else if (p.scrubbing) {
+      if (p.pressed) p.rubbed = true;
+      this.rub(hit, motion, delta);
+    } else if (p.armed && motion.speed > CFG.MIN_SWIPE_SPEED) {
+      p.armed = false;
+      this.smack(
+        hit,
+        motion.vx,
+        motion.vy,
+        clamp(motion.speed / CFG.FULL_SWIPE_SPEED, 0.3, 2),
+      );
+    } else if (p.pressed) {
+      if (this.canStrip() && this.isStripPull()) {
+        this.startStrip();
+      } else if (this.canGrab()) {
+        this.startGrab(hit);
+        this.updateGrab(delta);
+        this.ui.setCursorState("grab");
+        return;
+      }
+    } else {
+      p.armed = false;
+    }
+    let state = null;
+    if (p.inside) state = this.rubbing > 0 ? "rub" : "over";
+    this.ui.setCursorState(state);
+  }
 
-        // Start respawn animation
-        peachState.isRespawning = true;
-        peachState.respawnTimer = 0;
+  trackScrub(motion) {
+    const p = this.pointer;
+    const s = this.scrub;
+    const now = performance.now();
+    if (!p.inside && !this.grab) {
+      s.turns.length = 0;
+      s.angle = null;
+    } else if (motion.speed > CFG.SCRUB_MIN_SPEED) {
+      const angle = Math.atan2(motion.vy, motion.vx);
+      if (s.angle !== null) {
+        const turn = Math.abs(
+          Math.atan2(Math.sin(angle - s.angle), Math.cos(angle - s.angle)),
+        );
+        s.turns.push({ t: now, turn });
+      }
+      s.angle = angle;
+    }
+    while (s.turns.length && now - s.turns[0].t > CFG.SCRUB_WINDOW_MS)
+      s.turns.shift();
+    const total = s.turns.reduce((sum, e) => sum + e.turn, 0);
+    if (total > CFG.SCRUB_TURN) s.until = now + CFG.SCRUB_HOLD_MS;
+    p.scrubbing = now < s.until;
+    return p.scrubbing ? 1 : total / CFG.SCRUB_TURN;
+  }
 
-        // Reset soft body physics
-        peachState.softBodies.forEach((softBody) => {
-          softBody.resetToOriginalImmediate();
-        });
+  canGrab() {
+    const p = this.pointer;
+    return (
+      this.toolName === "hand" &&
+      p.armed &&
+      !p.rubbed &&
+      p.downOnPeach &&
+      (!p.onWaistband || p.travel > 28)
+    );
+  }
 
-        // Reset physics state
-        peachState.velocity.set(0, 0, 0);
-        peachState.angularVelocity.set(0, 0, 0);
-        peachState.physicsOffset.set(0, 0, 0);
-        peachState.physicsRotation.set(0, 0, 0);
-        peachState.isWobbling = false;
-        // Don't reset idleAnimationTime here - let it continue running
+  twerkBeat() {
+    const side = this.twerk.beats % 2 === 0 ? -1 : 1;
+    this.raycaster.set(
+      this.tempA.set(
+        this.group.position.x + side * 0.7,
+        this.group.position.y - 0.35,
+        20,
+      ),
+      this.tempB.set(0, 0, -1),
+    );
+    const hit = this.raycaster.intersectObject(this.peach.mesh, false)[0];
+    if (hit)
+      this.peach.addJiggle(
+        hit.point,
+        this.tempA.set(0, 1, 0.3).normalize(),
+        0.13,
+        0.95,
+      );
+    this.velocity.y += 1.1;
+    this.spin.z += side * 0.5;
+    this.squashVelocity.x += 1.2;
+    this.squashAxis.set(0, 1);
+    this.twerk.beats += 1;
+  }
 
-        // Impact marks are already cleared when explosion starts
-
-        // Set initial state for animation (far away and small)
-        if (peachGroup) {
-          peachGroup.position.set(0, 0, -10); // Start far back
-          peachGroup.rotation.set(0, 0, 0); // Start at 0 rotation
-          peachGroup.scale.set(0.01, 0.01, 0.01); // Start tiny
+  updateTwerk(delta) {
+    if (this.twerk) {
+      this.twerk.timer -= delta;
+      if (this.twerk.timer <= 0) {
+        this.twerk.timer += 1 / CFG.TWERK_BEAT_HZ;
+        this.twerkBeat();
+        if (this.twerk.beats >= CFG.TWERK_BEATS) {
+          this.twerk = null;
+          this.idle = -30;
         }
       }
-    );
-  }
-}
-
-// Track mouse movement for velocity calculation
-function onMouseMove(event) {
-  updatePointerPosition(event.clientX, event.clientY);
-
-  // Update hand cursor position (only for mouse, not touch)
-  if (handCursor) {
-    handCursor.style.left = event.clientX + "px";
-    handCursor.style.top = event.clientY + "px";
-  }
-
-  // Check for hover and smack
-  checkHoverSmack();
-}
-
-// Touch event handlers for mobile devices
-function onTouchStart(event) {
-  if (event.touches.length > 0) {
-    const touch = event.touches[0];
-    updatePointerPosition(touch.clientX, touch.clientY);
-
-    // Hide hand cursor on touch devices
-    if (handCursor) {
-      handCursor.style.display = "none";
-    }
-  }
-}
-
-function onTouchMove(event) {
-  if (event.touches.length > 0) {
-    const touch = event.touches[0];
-    updatePointerPosition(touch.clientX, touch.clientY);
-    checkHoverSmack();
-  }
-}
-
-function onTouchEnd(event) {
-  // Reset hover state when touch ends
-  mouseState.isHoveringPeach = false;
-}
-
-// Unified function to update pointer position (works for both mouse and touch)
-function updatePointerPosition(clientX, clientY) {
-  // Store last position
-  mouseState.lastPosition.x = mouseState.position.x;
-  mouseState.lastPosition.y = mouseState.position.y;
-
-  // Update current position
-  mouseState.position.x = clientX;
-  mouseState.position.y = clientY;
-
-  // Calculate velocity (pixels per frame)
-  mouseState.velocity.x = mouseState.position.x - mouseState.lastPosition.x;
-  mouseState.velocity.y = mouseState.position.y - mouseState.lastPosition.y;
-
-  // Store velocity in history for smoothing
-  mouseState.velocityHistory.push({
-    x: mouseState.velocity.x,
-    y: mouseState.velocity.y,
-    time: Date.now(),
-  });
-
-  // Keep only recent history
-  if (mouseState.velocityHistory.length > mouseState.maxHistorySize) {
-    mouseState.velocityHistory.shift();
-  }
-
-  // Update normalized coordinates for raycasting
-  mouse.x = (clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-}
-
-function checkHoverSmack() {
-  // Only process if the model is loaded
-  if (!peachMesh || !peachGroup || !camera) return;
-
-  // Can't slap during explosion or respawn!
-  if (peachState.isRespawning) return;
-  if (peachState.particleExplosion && peachState.particleExplosion.isActive())
-    return;
-
-  raycaster.setFromCamera(mouse, camera);
-
-  // Handle both array of meshes (GLTF) and single mesh (procedural)
-  const meshesToCheck = Array.isArray(peachMesh) ? peachMesh : [peachMesh];
-  const intersects = raycaster.intersectObjects(meshesToCheck, true);
-
-  const isCurrentlyHovering = intersects.length > 0;
-
-  // Only allow smacking when cursor ENTERS the peach (transition from not hovering to hovering)
-  if (isCurrentlyHovering) {
-    // Check if this is a fresh entry (cursor was not hovering before)
-    if (mouseState.isHoveringPeach) {
-      // Still hovering from before - don't smack
       return;
     }
-
-    // This is a new entry! Check velocity and cooldown
-    const currentTime = Date.now();
-    if (currentTime - mouseState.lastSmackTime < mouseState.smackCooldown) {
-      // Update hover state but don't smack yet
-      mouseState.isHoveringPeach = true;
-      return;
-    }
-    // Calculate average velocity from history for smoother, more accurate direction
-    let avgVelocityX = 0;
-    let avgVelocityY = 0;
-
-    if (mouseState.velocityHistory.length > 0) {
-      for (const vel of mouseState.velocityHistory) {
-        avgVelocityX += vel.x;
-        avgVelocityY += vel.y;
-      }
-      avgVelocityX /= mouseState.velocityHistory.length;
-      avgVelocityY /= mouseState.velocityHistory.length;
-    }
-
-    // Calculate velocity magnitude from averaged values
-    const velocityMagnitude = Math.sqrt(
-      avgVelocityX * avgVelocityX + avgVelocityY * avgVelocityY
-    );
-
-    // Only smack if moving fast enough (minimum threshold)
-    if (velocityMagnitude < INTERACTION_CONFIG.MIN_VELOCITY_THRESHOLD) return;
-
-    mouseState.lastSmackTime = currentTime;
-
-    // Add smack animation to cursor
-    if (handCursor) {
-      handCursor.classList.remove("smacking");
-      void handCursor.offsetWidth; // Trigger reflow
-      handCursor.classList.add("smacking");
-      setTimeout(() => handCursor.classList.remove("smacking"), 200);
-    }
-
-    // Convert 2D screen velocity to 3D world direction
-    // Normalize the velocity to get direction
-    const velocityDir = new Vector2(avgVelocityX, avgVelocityY).normalize();
-
-    // Map screen space to world space direction
-    // X: right is positive (keep as is)
-    // Y: down is positive in screen space, but up is positive in 3D (invert)
-    // Z: push towards camera for satisfying movement
-    const direction = new Vector3(
-      velocityDir.x, // Horizontal movement matches screen
-      -velocityDir.y, // Vertical inverted (screen Y is flipped)
-      0.4 // Always push a bit toward camera for nice effect
-    ).normalize();
-
-    // Scale force based on velocity (faster movement = harder hit)
-    const velocityScale = Math.min(velocityMagnitude / 20, 2.0); // Cap at 2x for controlled but responsive movement
-    const force = 1.7 * velocityScale; // Moderate base force
-    peachState.velocity.add(direction.multiplyScalar(force));
-
-    // Add angular velocity based on impact force (moderate rotation)
-    peachState.angularVelocity.set(
-      (Math.random() - 0.5) * 4 * velocityScale,
-      (Math.random() - 0.5) * 4 * velocityScale,
-      (Math.random() - 0.5) * 4 * velocityScale
-    );
-
-    peachState.isWobbling = true;
-    // Keep idle animation running in the background
-
-    // Apply soft body impulse for jiggle effect at the intersection point
-    // (Note: This doesn't check perfMonitor since we don't have access here,
-    // but the actual physics update will be skipped if disabled)
-    const intersectPoint = intersects[0].point;
-    const jiggleForce = 0.18 * velocityScale; // Force for vertex deformation
-    peachState.softBodies.forEach((softBody) => {
-      softBody.applyImpulse(intersectPoint, direction.clone(), jiggleForce);
-    });
-
-    // Add impact mark for visual feedback (red skin that fades over time)
-    addImpactMark(intersectPoint.clone(), velocityScale);
-
-    // Sound intensity based on velocity
-    const intensity = Math.min(0.4 + velocityMagnitude / 30, 1.0);
-    playSmackSound(intensity);
-
-    // Mark that we're now hovering (after a successful smack)
-    mouseState.isHoveringPeach = true;
-
-    // Increase rage level based on hit intensity
-    const rageIncrease =
-      INTERACTION_CONFIG.RAGE_BASE_INCREASE +
-      velocityScale * INTERACTION_CONFIG.RAGE_VELOCITY_MULTIPLIER;
-    peachState.rageLevel = Math.min(
-      peachState.explosionThreshold,
-      peachState.rageLevel + rageIncrease
-    );
-
-    // Update rage meter UI
-    updateRageMeter();
-
-    // Trigger explosion if rage threshold is reached
+    this.idle += delta;
     if (
-      peachState.rageLevel >= peachState.explosionThreshold &&
-      peachState.particleExplosion
+      this.idle > CFG.TWERK_IDLE_SECONDS &&
+      this.settings.tease &&
+      !reducedMotion.matches &&
+      !this.pointer.pressed
     ) {
-      if (!peachState.particleExplosion.isActive()) {
-        // Clear impact marks immediately when explosion starts
-        peachState.impactMarks = [];
-        updateImpactMarkShaders([]);
-        
-        peachState.particleExplosion.explode();
-        playExplosionSound(1.0);
-        peachState.rageLevel = 0; // Reset rage after explosion
-        updateRageMeter();
-      }
-    }
-  } else {
-    // Cursor is not hovering - reset hover state
-    mouseState.isHoveringPeach = false;
-  }
-}
-
-/**
- * Add an impact mark at a world position that fades over time
- * @param {Vector3} worldPosition - The world position of the impact
- * @param {number} intensity - The intensity of the impact (0-2)
- */
-function addImpactMark(worldPosition, intensity = 1.0) {
-  if (!peachGroup || !peachMesh) return;
-
-  // Check if impact marks are enabled via performance monitor
-  if (
-    performanceMonitor &&
-    !performanceMonitor.isFeatureEnabled("impactMarks")
-  ) {
-    return;
-  }
-
-  // Convert to local space ONCE at impact time, so it's "baked" onto the surface
-  // This way it follows the mesh through all rotations and transformations
-  const meshArray = Array.isArray(peachMesh) ? peachMesh : [peachMesh];
-  const localPositions = [];
-
-  // Store local position for each mesh (in case we have multiple meshes in GLTF)
-  meshArray.forEach((mesh) => {
-    const localPos = worldPosition.clone();
-    mesh.worldToLocal(localPos);
-    localPositions.push({
-      mesh: mesh,
-      position: localPos,
-    });
-  });
-
-  // Duration based on intensity - more realistic fade times
-  const duration =
-    INTERACTION_CONFIG.IMPACT_MARK_BASE_DURATION +
-    intensity *
-      (INTERACTION_CONFIG.IMPACT_MARK_MAX_DURATION -
-        INTERACTION_CONFIG.IMPACT_MARK_BASE_DURATION);
-
-  peachState.impactMarks.push({
-    localPositions: localPositions, // Store per-mesh local positions
-    age: 0,
-    maxAge: duration,
-    intensity: Math.min(
-      intensity * INTERACTION_CONFIG.IMPACT_MARK_INTENSITY_SCALE,
-      1.2
-    ), // Reduced intensity for subtlety
-  });
-
-  // Limit total number of impact marks for performance
-  if (peachState.impactMarks.length > INTERACTION_CONFIG.MAX_IMPACT_MARKS) {
-    peachState.impactMarks.shift(); // Remove oldest
-  }
-}
-
-/**
- * Update impact marks (age them and remove expired ones)
- * @param {number} delta - Time delta since last frame
- */
-function updateImpactMarks(delta) {
-  // Age all impact marks
-  for (let i = peachState.impactMarks.length - 1; i >= 0; i--) {
-    const mark = peachState.impactMarks[i];
-    mark.age += delta;
-
-    // Remove expired marks
-    if (mark.age >= mark.maxAge) {
-      peachState.impactMarks.splice(i, 1);
-    }
-  }
-}
-
-/**
- * Update the rage meter UI
- */
-function updateRageMeter() {
-  const rageMeter = document.getElementById("rage-meter-fill");
-  const rageContainer = document.getElementById("rage-meter-container");
-
-  if (!rageMeter || !rageContainer) return;
-
-  try {
-    rageMeter.style.width = `${peachState.rageLevel}%`;
-
-    // Change color based on rage level
-    if (peachState.rageLevel < 33) {
-      rageMeter.style.background = "linear-gradient(90deg, #4CAF50, #8BC34A)";
-    } else if (peachState.rageLevel < 66) {
-      rageMeter.style.background = "linear-gradient(90deg, #FF9800, #FFC107)";
-    } else {
-      rageMeter.style.background = "linear-gradient(90deg, #F44336, #FF5722)";
-      // Add pulsing effect when high rage
-      rageMeter.style.animation = "rage-pulse 0.5s infinite";
-    }
-
-    // Show container when rage > 0
-    if (peachState.rageLevel > 0) {
-      rageContainer.style.opacity = "1";
-    } else {
-      rageContainer.style.opacity = "0";
-    }
-  } catch (error) {
-    console.error("Error updating rage meter:", error);
-  }
-}
-
-/**
- * Update peach physics and animation
- * @param {number} delta - Time delta since last frame
- * @param {number} idleTime - Total idle animation time
- * @param {PerformanceMonitor} perfMonitor - Optional performance monitor for feature toggling
- */
-export function updatePeachPhysics(delta, idleTime, perfMonitor = null) {
-  if (!peachGroup) return;
-
-  // Validate delta to prevent physics explosions
-  if (!delta || delta <= 0 || delta > 1) return;
-
-  // Always update idle animation time (runs continuously as base layer)
-  peachState.idleAnimationTime += delta;
-
-  // Update particle explosion if active (check if particles are enabled)
-  const particlesEnabled =
-    !perfMonitor || perfMonitor.isFeatureEnabled("particles");
-  if (peachState.particleExplosion) {
-    if (particlesEnabled) {
-      peachState.particleExplosion.update(delta);
-
-      // Skip normal physics during explosion
-      if (peachState.particleExplosion.isActive()) {
-        return;
-      }
-    } else {
-      // If particles are disabled during an active explosion, force-finish it immediately
-      if (peachState.particleExplosion.isActive()) {
-        peachState.particleExplosion.forceFinishExplosion();
-      }
+      this.twerk = { beats: 0, timer: 0 };
+      this.talk.say("idle");
     }
   }
 
-  // Handle respawn animation
-  if (peachState.isRespawning) {
-    peachState.respawnTimer += delta;
+  stepPhysics(delta) {
+    if (this.hitStop > 0) {
+      this.hitStop -= delta;
+      return;
+    }
+    this.accumulator += delta;
+    const h = PHYSICS_CONFIG.SUBSTEP;
+    let steps = 0;
+    while (this.accumulator >= h && steps < 10) {
+      spring(
+        this.offset,
+        this.velocity,
+        PHYSICS_CONFIG.POSITION_STIFFNESS * this.firmness.stiffness,
+        PHYSICS_CONFIG.POSITION_DAMPING,
+        h,
+      );
+      spring(
+        this.tilt,
+        this.spin,
+        PHYSICS_CONFIG.ROTATION_STIFFNESS,
+        PHYSICS_CONFIG.ROTATION_DAMPING,
+        h,
+      );
+      spring(
+        this.squash,
+        this.squashVelocity,
+        PHYSICS_CONFIG.SQUASH_STIFFNESS * this.firmness.stiffness,
+        PHYSICS_CONFIG.SQUASH_DAMPING,
+        h,
+      );
+      this.accumulator -= h;
+      steps += 1;
+    }
+    if (steps === 10) this.accumulator = 0;
+  }
 
-    // Calculate progress (0 to 1)
-    let progress = Math.min(
-      1.0,
-      peachState.respawnTimer / peachState.respawnDuration
+  applyTransform() {
+    const t = this.clock;
+    const g = this.group;
+    const calm = reducedMotion.matches ? 0.3 : 1;
+    const tremble =
+      this.heat > 70 && !reducedMotion.matches
+        ? ((this.heat - 70) / 30) * 0.02
+        : 0;
+
+    g.position.set(
+      this.offset.x,
+      this.offset.y + Math.sin(t * 1.4) * 0.12 * calm,
+      this.offset.z,
+    );
+    g.rotation.set(
+      this.tilt.x,
+      Math.sin(t * 0.45) * 0.25 * calm + this.tilt.y,
+      this.tilt.z + Math.sin(t * 43) * tremble,
     );
 
-    // Ease out cubic for smooth deceleration
-    progress = 1 - (1 - progress) ** 3;
-
-    // Animate position (from far back to center)
-    const startZ = -10;
-    const endZ = peachState.defaultPosition.z;
-    peachGroup.position.z = startZ + (endZ - startZ) * progress;
-    peachGroup.position.x = peachState.defaultPosition.x;
-    peachGroup.position.y = peachState.defaultPosition.y;
-
-    // Animate scale (from tiny to normal size)
-    const scale = 0.01 + (1.0 - 0.01) * progress;
-    peachGroup.scale.set(scale, scale, scale);
-
-    // Spin slows down and ends at rotation 0 (matching idle animation start)
-    const remainingSpin = 1 - progress;
-    peachGroup.rotation.x = peachState.defaultRotation.x;
-    peachGroup.rotation.y = remainingSpin * Math.PI * 2;
-    peachGroup.rotation.z = peachState.defaultRotation.z;
-
-    // Check if animation is complete
-    if (progress >= 1.0) {
-      peachState.isRespawning = false;
-      peachGroup.scale.set(1, 1, 1); // Ensure exact final scale
-      // Reset idle animation so it starts from 0 (facing forward)
-      peachState.idleAnimationTime = 0;
+    let grow = 1;
+    if (this.phase === "entering") {
+      const k = clamp(this.phaseTime / CFG.RESPAWN_DURATION, 0, 1);
+      const ease = 1 - (1 - k) ** 3;
+      grow = 0.01 + 0.99 * ease;
+      g.position.z += -10 * (1 - ease);
+      g.rotation.y += (1 - ease) * Math.PI * 2;
     }
-
-    return; // Skip normal physics during respawn
+    const s = clamp(this.squash.x, -0.35, 0.35);
+    const ax = this.squashAxis.x;
+    const ay = this.squashAxis.y;
+    g.scale.set(
+      grow * (1 - s * ax + s * 0.5 * ay),
+      grow * (1 - s * ay + s * 0.5 * ax),
+      grow * (1 + s * 0.4),
+    );
+    g.scale.multiplyScalar(1 + this.throb);
+    if (this.phase === "charging") this.chargeShape(g);
   }
 
-  // Decay rage level over time
-  if (peachState.rageLevel > 0) {
-    peachState.rageLevel = Math.max(
+  updateCamera(delta) {
+    const still = reducedMotion.matches;
+    const p = this.pointer;
+    const tx = still || !p.present ? 0 : (p.x / window.innerWidth - 0.5) * 0.5;
+    const ty =
+      still || !p.present ? 0 : (p.y / window.innerHeight - 0.5) * -0.3;
+    const ease = 1 - Math.exp(-delta * 3);
+    this.parallax.x += (tx - this.parallax.x) * ease;
+    this.parallax.y += (ty - this.parallax.y) * ease;
+    spring(this.kick, this.kickVelocity, 140, 17, delta);
+    const jolt = still ? 0 : 1;
+    const close =
+      this.phase === "charging"
+        ? 1
+        : clamp((this.heat / 100 - 0.2) / 0.8, 0, 1);
+    this.zoomVelocity +=
+      ((close - this.zoom) * 9 - this.zoomVelocity * 6) * delta;
+    this.zoom += this.zoomVelocity * delta;
+    const z = clamp(this.zoom, 0, 1);
+    const reach = 1 - 0.22 * z;
+    this.trauma = Math.max(0, this.trauma - delta * 1.4);
+    const shake = this.trauma * this.trauma * jolt * reach;
+    const c = this.clock;
+    const nx = Math.sin(c * 19 + Math.sin(c * 7)) + 0.5 * Math.sin(c * 31);
+    const ny = Math.sin(c * 17 + Math.sin(c * 5)) + 0.5 * Math.sin(c * 29);
+    const kx = this.kick.x * jolt * reach;
+    const ky = this.kick.y * jolt * reach;
+    this.camera.position.set(
+      this.parallax.x * reach + kx + shake * 0.05 * nx,
+      this.parallax.y * reach + ky - z * 0.35 + shake * 0.05 * ny,
+      this.camera.userData.baseZ * reach,
+    );
+    this.camera.lookAt(
+      kx * 0.4 - shake * 0.06 * nx,
+      ky * 0.4 - 0.3 * z - shake * 0.06 * ny,
       0,
-      peachState.rageLevel - peachState.rageDecayRate * delta
     );
-    updateRageMeter();
+    const sway = still ? 0 : Math.sin(c * 0.4) * 0.04 * z;
+    const roll = shake * 0.025 * Math.sin(c * 23 + Math.sin(c * 11));
+    this.camera.rotateZ(sway + roll - kx * 0.06);
+    const charging =
+      this.phase === "charging"
+        ? clamp(this.phaseTime / this.chargeTime, 0, 1)
+        : 0;
+    this.ui.setVignette(Math.min(1, z * 0.7 + charging * 0.3));
   }
 
-  // Update impact marks (age them and remove expired ones) - only if enabled
-  const impactMarksEnabled =
-    !perfMonitor || perfMonitor.isFeatureEnabled("impactMarks");
-  if (impactMarksEnabled) {
-    updateImpactMarks(delta);
+  update(delta) {
+    this.clock += delta;
+    this.phaseTime += delta;
 
-    // Update shader uniforms with current impact marks
-    updateImpactMarkShaders(peachState.impactMarks);
-  } else {
-    // Clear impact marks if disabled
-    if (peachState.impactMarks.length > 0) {
-      peachState.impactMarks = [];
-      updateImpactMarkShaders([]); // Clear visual marks
+    if (this.phase === "entering" && this.phaseTime >= CFG.RESPAWN_DURATION) {
+      this.phase = "live";
     }
-  }
-
-  // Update soft body physics (jiggle) - only if enabled
-  const physicsEnabled =
-    !perfMonitor || perfMonitor.isFeatureEnabled("softBodyPhysics");
-  if (physicsEnabled) {
-    peachState.softBodies.forEach((softBody) => {
-      softBody.update(delta);
-    });
-  }
-
-  // If wobbling, update physics offset
-  if (peachState.isWobbling) {
-    const velocityLength = peachState.velocity.length();
-    const angularVelLength = peachState.angularVelocity.length();
-    const settleThreshold = 0.01;
-
-    // Apply velocity to physics offset
-    peachState.physicsOffset.add(
-      peachState.velocity.clone().multiplyScalar(delta)
-    );
-
-    // Apply angular velocity to physics rotation
-    peachState.physicsRotation.x += peachState.angularVelocity.x * delta;
-    peachState.physicsRotation.y += peachState.angularVelocity.y * delta;
-    peachState.physicsRotation.z += peachState.angularVelocity.z * delta;
-
-    // Apply damping
-    peachState.velocity.multiplyScalar(PHYSICS_CONFIG.DAMPING);
-    peachState.angularVelocity.multiplyScalar(PHYSICS_CONFIG.ANGULAR_DAMPING);
-
-    // Return force pulls physics offset back to zero
-    const toDefault = peachState.physicsOffset
-      .clone()
-      .multiplyScalar(-PHYSICS_CONFIG.RETURN_FORCE);
-    peachState.velocity.add(toDefault);
-
-    // Return to default rotation gradually
-    peachState.physicsRotation.x +=
-      (0 - peachState.physicsRotation.x) *
-      PHYSICS_CONFIG.ROTATION_RETURN_FACTOR;
-    peachState.physicsRotation.y +=
-      (0 - peachState.physicsRotation.y) *
-      PHYSICS_CONFIG.ROTATION_RETURN_FACTOR;
-    peachState.physicsRotation.z +=
-      (0 - peachState.physicsRotation.z) *
-      PHYSICS_CONFIG.ROTATION_RETURN_FACTOR;
-
-    // Check if peach has settled
-    if (
-      velocityLength < PHYSICS_CONFIG.VELOCITY_SETTLE_THRESHOLD &&
-      angularVelLength < PHYSICS_CONFIG.VELOCITY_SETTLE_THRESHOLD
-    ) {
-      peachState.isWobbling = false;
-      peachState.velocity.set(0, 0, 0);
-      peachState.angularVelocity.set(0, 0, 0);
-      peachState.physicsOffset.set(0, 0, 0);
-      peachState.physicsRotation.set(0, 0, 0);
+    if (this.phase === "charging") this.updateCharge(delta);
+    this.updateHalves(delta);
+    if (this.phase === "burst" && this.phaseTime >= CFG.RESPAWN_DELAY) {
+      this.enter();
     }
+
+    this.handlePointer(delta);
+    this.updateRecoil(delta);
+    if (this.phase === "live") this.updateTwerk(delta);
+    this.updateClaps(delta);
+    this.updateHeartbeat(delta);
+    this.updateGarment(delta);
+    this.stepPhysics(delta);
+    this.applyTransform();
+    this.updateCamera(delta);
+
+    this.heatHold -= delta;
+    if (this.heatHold <= 0)
+      this.heat = Math.max(0, this.heat - CFG.HEAT_DECAY * delta);
+    if (!this.rubbing)
+      this.oil = Math.max(0, this.oil - CFG.OIL_DRY_RATE * delta);
+    this.peach.setOil(this.oil);
+    setRub(this.rubbing, this.oil);
+
+    this.juice.update(delta);
+    this.ui.setMeters(this.heat / 100, this.oil);
+    this.updateOverlays();
   }
-
-  // ALWAYS apply idle animation as base layer
-  const idleY = Math.sin(peachState.idleAnimationTime * 1.5) * 0.2;
-  const idleRotY = Math.sin(peachState.idleAnimationTime * 0.5) * 0.3;
-
-  // Apply: default + idle + physics offset
-  peachGroup.position.x =
-    peachState.defaultPosition.x + peachState.physicsOffset.x;
-  peachGroup.position.y =
-    peachState.defaultPosition.y + idleY + peachState.physicsOffset.y;
-  peachGroup.position.z =
-    peachState.defaultPosition.z + peachState.physicsOffset.z;
-
-  peachGroup.rotation.x =
-    peachState.defaultRotation.x + peachState.physicsRotation.x;
-  peachGroup.rotation.y =
-    peachState.defaultRotation.y + idleRotY + peachState.physicsRotation.y;
-  peachGroup.rotation.z =
-    peachState.defaultRotation.z + peachState.physicsRotation.z;
 }

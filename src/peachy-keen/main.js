@@ -1,173 +1,119 @@
-import { Group, PlaneGeometry, Mesh, Clock } from "three";
-import {
-  createBackgroundMaterial,
-  createGradientBackgroundMaterial,
-} from "./shaders";
-import { loadPeachModel } from "./peach";
-import { setupLighting } from "./lighting";
-import {
-  initInteraction,
-  setPeachMesh,
-  updatePeachPhysics,
-} from "./interaction";
-import { initScene, setupResizeHandler } from "./scene";
-import { resumeAudioContext } from "./audio";
-import { PerformanceMonitor } from "./performance";
+import { Group, Clock } from "three";
+import { initScene, setupResizeHandler, QualityGovernor } from "./scene";
+import { createBackdrop } from "./backdrop";
+import { Peach } from "./peach";
+import { Juice, Droplets } from "./juice";
+import { Lens } from "./lens";
+import { Interaction } from "./interaction";
+import { UI } from "./ui";
+import { Settings } from "./settings";
+import { Talk, Censor } from "./spicy";
+import { unlockAudio, loadSounds, setMuted } from "./audio";
 
-// Audio is now lazy-loaded on first interaction for better performance
+const intro = document.getElementById("intro");
+const introTitle = document.getElementById("intro-title");
+const introStatus = document.getElementById("intro-status");
 
-// Loading screen management
-const soundOverlay = document.getElementById("sound-overlay");
-const loadingProgress = document.getElementById("loading-progress");
-const loadingStatus = document.getElementById("loading-status");
-const loadingItems = document.getElementById("loading-items");
-const soundOverlayContent = document.getElementById("sound-overlay-content");
-let loadingComplete = false;
-let hasStarted = false;
-
-function updateLoadingProgress(percent, status = "Loading...") {
-  if (loadingProgress) {
-    loadingProgress.style.width = `${percent}%`;
-  }
-  if (loadingStatus) {
-    loadingStatus.textContent = status;
-  }
-}
-
-function showStartButton() {
-  // Hide loading items
-  if (loadingItems) {
-    loadingItems.style.opacity = "0";
-    setTimeout(() => {
-      loadingItems.style.display = "none";
-      // Show click to start message
-      if (soundOverlayContent) {
-        soundOverlayContent.style.display = "block";
-      }
-    }, 300);
-  }
-}
-
-function hideLoadingScreen() {
-  if (soundOverlay && loadingComplete && hasStarted) {
-    soundOverlay.style.opacity = "0";
-    setTimeout(() => {
-      soundOverlay.style.display = "none";
-    }, 300);
-  }
-}
-
-// Handle click anywhere on sound overlay to start
-if (soundOverlay) {
-  soundOverlay.addEventListener("click", async (event) => {
-    if (!loadingComplete || hasStarted) return;
-
-    // Stop event from propagating to prevent triggering peach smack
-    event.stopPropagation();
-    event.preventDefault();
-
-    hasStarted = true;
-
-    // Resume audio context (required by browsers)
-    await resumeAudioContext();
-
-    // Hide loading screen
-    hideLoadingScreen();
-  });
-}
-
-// Initialize scene, camera, and renderer
-updateLoadingProgress(10, "Initializing...");
 const { scene, camera, renderer } = initScene();
-
-// Initialize performance monitor
-const perfMonitor = new PerformanceMonitor();
-perfMonitor.setRenderer(renderer);
-perfMonitor.setScene(scene);
-
-updateLoadingProgress(20, "Creating background...");
-
-// Create both background materials
-const animatedBackgroundMaterial = createBackgroundMaterial();
-const gradientBackgroundMaterial = createGradientBackgroundMaterial();
-const backgroundGeometry = new PlaneGeometry(2, 2);
-
-// Start with the animated background
-const background = new Mesh(backgroundGeometry, animatedBackgroundMaterial);
-scene.add(background);
-
-// Set reference for performance monitoring
-perfMonitor.setBackgroundMesh(background);
-perfMonitor.setBackgroundMaterials(
-  animatedBackgroundMaterial,
-  gradientBackgroundMaterial
+const quality = new QualityGovernor(renderer);
+const backdrop = createBackdrop(scene);
+setupResizeHandler(camera, renderer, () => {
+  backdrop.resize();
+  lens.resize();
+});
+backdrop.setMotion(
+  !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
 );
 
-// Create the peach group
-const peachGroup = new Group();
-scene.add(peachGroup);
+const group = new Group();
+group.visible = false;
+scene.add(group);
 
-// Setup lighting
-updateLoadingProgress(40, "Setting up lights...");
-const { ringLights } = setupLighting(scene);
+const peach = new Peach(group);
+const juice = new Juice(scene);
+const droplets = new Droplets(scene);
+const lens = new Lens(renderer, scene, camera);
+juice.onSplat = (position, velocity) => lens.splat(position, velocity);
+const ui = new UI();
+const talk = new Talk();
+const censor = new Censor();
 
-// Set ring lights reference for performance monitoring
-perfMonitor.setRingLights(ringLights);
-
-// Load the peach model
-updateLoadingProgress(50, "Loading peach model...");
-loadPeachModel(peachGroup, (meshes) => {
-  updateLoadingProgress(80, "Preparing physics...");
-  setPeachMesh(meshes);
-  updateLoadingProgress(100, "Ready!");
-
-  // Show start button once model is loaded
-  setTimeout(() => {
-    loadingComplete = true;
-    showStartButton();
-  }, 300);
+const settings = new Settings((key, value) => {
+  if (key === "sound") setMuted(!value);
+  if (key === "quality") quality.setMode(value);
+  if (key === "splatter") lens.enabled = value;
+  if (key === "firmness") interaction.setFirmness(value);
+  if (key === "tool") interaction.setTool(value);
+  if (key === "talk") talk.setLevel(value);
+  if (key === "censor") censor.setMode(value);
+  if (key === "lingerie") interaction.dressUp();
 });
 
-// Initialize interaction system
-updateLoadingProgress(60, "Setting up interactions...");
-initInteraction(peachGroup, camera, scene, perfMonitor);
-
-// Setup window resize handler
-updateLoadingProgress(70, "Finalizing...");
-setupResizeHandler(
+const interaction = new Interaction({
+  peach,
+  group,
   camera,
-  renderer,
-  animatedBackgroundMaterial,
-  gradientBackgroundMaterial
-);
+  juice,
+  droplets,
+  lens,
+  backdrop,
+  ui,
+  settings,
+  talk,
+  censor,
+});
+settings.applyAll();
 
-// Animation loop with clock for accurate timing
-const clock = new Clock();
-
-// Idle floating animation timer
-let idleTime = 0;
-
-// Animation loop
-function animate() {
-  requestAnimationFrame(animate);
-
-  // Use clock for accurate delta time (capped to avoid large jumps)
-  const delta = Math.min(clock.getDelta(), 0.1);
-  idleTime += delta;
-
-  // Update background shader (only if enabled)
-  if (perfMonitor.isFeatureEnabled("backgroundShader")) {
-    animatedBackgroundMaterial.uniforms.time.value += delta;
-  }
-
-  // Update peach physics and animation
-  // Pass performance monitor to check if physics is enabled
-  updatePeachPhysics(delta, idleTime, perfMonitor);
-
-  // Update performance monitor
-  perfMonitor.update();
-
-  renderer.render(scene, camera);
+function setProgress(fraction) {
+  introTitle.style.setProperty("--progress", `${Math.round(fraction * 100)}%`);
 }
 
-animate();
+peach.load(setProgress).then(() => {
+  setProgress(1);
+  group.visible = true;
+  const halves = interaction.prepareHalves();
+  halves.forEach((h) => {
+    // eslint-disable-next-line no-param-reassign
+    h.visible = true;
+  });
+  renderer.compile(scene, camera);
+  halves.forEach((h) => {
+    // eslint-disable-next-line no-param-reassign
+    h.visible = false;
+  });
+  group.visible = false;
+  juice.clear();
+  loadSounds();
+  introStatus.textContent = "Click anywhere to begin. Sound on.";
+  intro.classList.add("is-ready");
+
+  intro.addEventListener(
+    "click",
+    () => {
+      unlockAudio();
+      interaction.requestShake();
+      intro.classList.add("is-leaving");
+      setTimeout(() => intro.remove(), 700);
+      interaction.begin();
+    },
+    { once: true },
+  );
+});
+
+const clock = new Clock();
+renderer.setAnimationLoop(() => {
+  const realDelta = Math.min(clock.getDelta(), 1 / 20);
+  const delta = realDelta * interaction.timeScale(realDelta);
+  interaction.update(delta);
+  peach.update(delta, interaction.heat / 100);
+  backdrop.update(delta, interaction.heat / 100);
+  peach.updateRing(camera);
+  quality.update(realDelta);
+  settings.showFps(quality.fps);
+  juice.splatZ = camera.position.z - 2.5;
+  const halfHeight = 2.5 * Math.tan((camera.fov * Math.PI) / 360);
+  juice.splatHalf.set(halfHeight * camera.aspect, halfHeight);
+  droplets.update(delta);
+  lens.update(delta);
+  lens.render([juice, droplets]);
+});

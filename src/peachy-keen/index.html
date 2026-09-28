@@ -1,47 +1,181 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peachy Keen 🍑</title>
-	<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍑</text></svg>">
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="instructions">
-        🍑 Swipe over the peach to smack it! 🍑
-    </div>
-    
-    <div id="rage-meter-container">
-        <div id="rage-meter-fill"></div>
-        <div id="rage-meter-label">🍑 PEACH-O-METER 🍑</div>
-    </div>
-    
-    <div id="hand-cursor">🤚</div>
-    
-    <button id="oil-button">💧 Oil Up</button>
-    
-    <!-- Sound Enable Overlay -->
-    <div id="sound-overlay">
-        <!-- Loading items (shown during asset loading) -->
-        <div id="loading-items">
-            <div class="peach-emoji">🍑</div>
-            <div class="title">Peachy Keen</div>
-            <div class="status">
-                <span id="loading-status">Loading...</span>
-            </div>
-            <div class="progress-bar">
-                <div id="loading-progress"></div>
-            </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2a0812" />
+    <title>Peachy Keen</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍑</text></svg>"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1&display=swap"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <section class="score" aria-live="polite">
+      <p class="score-count">
+        <span id="count">0</span> <span id="count-unit">smacks</span>
+      </p>
+      <p id="bursts" hidden></p>
+      <div id="meters" class="meters">
+        <div class="meter">
+          <span class="meter-label">Heat</span>
+          <span class="meter-track"
+            ><span id="heat-fill" class="meter-fill heat"></span
+          ></span>
         </div>
-        
-        <!-- Click to start (shown after loading) -->
-        <div id="sound-overlay-content" style="display: none;">
-            <p>Click anywhere to start</p>
+        <div class="meter">
+          <span class="meter-label">Oil</span>
+          <span class="meter-track"
+            ><span id="oil-fill" class="meter-fill oil"></span
+          ></span>
         </div>
-    </div>
-    
-    <script type="module" src="main.js"></script>
-</body>
-</html>
+      </div>
+    </section>
 
+    <footer class="hints">
+      <p id="hint-swipe">Swipe across the peach to spank it.</p>
+      <p id="hint-grab">Press and drag to pull it.</p>
+      <p id="hint-rub">Rub in circles to oil it up.</p>
+    </footer>
+
+    <div class="ui settings-dock">
+      <div id="settings" class="settings" hidden>
+        <div class="settings-row">
+          <span>Firmness</span>
+          <span class="segmented" role="group" aria-label="Firmness">
+            <button type="button" data-setting="firmness" data-value="firm">
+              Firm
+            </button>
+            <button type="button" data-setting="firmness" data-value="ripe">
+              Ripe
+            </button>
+            <button type="button" data-setting="firmness" data-value="juicy">
+              Juicy
+            </button>
+          </span>
+        </div>
+        <p class="settings-row">
+          <span>Sound</span>
+          <button type="button" class="switch" data-setting="sound">On</button>
+        </p>
+        <p class="settings-row">
+          <span>Handprints</span>
+          <button type="button" class="switch" data-setting="handprints">
+            On
+          </button>
+        </p>
+        <p class="settings-row">
+          <span>Juice on the lens</span>
+          <button type="button" class="switch" data-setting="splatter">
+            On
+          </button>
+        </p>
+        <p class="settings-row">
+          <span>Tease when ignored</span>
+          <button type="button" class="switch" data-setting="tease">On</button>
+        </p>
+        <details class="settings-lab">
+          <summary>Experimental <span aria-hidden="true">🌶</span></summary>
+          <div class="settings-row">
+            <span>Tool</span>
+            <span class="segmented" role="group" aria-label="Tool">
+              <button type="button" data-setting="tool" data-value="hand">
+                Hand
+              </button>
+              <button type="button" data-setting="tool" data-value="lips">
+                Lips
+              </button>
+            </span>
+          </div>
+          <div class="settings-row">
+            <span>Pillow talk</span>
+            <span class="segmented" role="group" aria-label="Pillow talk">
+              <button type="button" data-setting="talk" data-value="off">
+                Off
+              </button>
+              <button type="button" data-setting="talk" data-value="cheeky">
+                Cheeky
+              </button>
+              <button type="button" data-setting="talk" data-value="shy">
+                Shy
+              </button>
+            </span>
+          </div>
+          <p class="settings-row">
+            <span>Moans</span>
+            <button type="button" class="switch" data-setting="moans">
+              Off
+            </button>
+          </p>
+          <p class="settings-row">
+            <span>Lingerie</span>
+            <button type="button" class="switch" data-setting="lingerie">
+              Off
+            </button>
+          </p>
+          <div class="settings-row">
+            <span>Censor</span>
+            <span class="segmented" role="group" aria-label="Censor">
+              <button type="button" data-setting="censor" data-value="off">
+                Off
+              </button>
+              <button type="button" data-setting="censor" data-value="bar">
+                Bar
+              </button>
+              <button type="button" data-setting="censor" data-value="blur">
+                Blur
+              </button>
+              <button type="button" data-setting="censor" data-value="heart">
+                Heart
+              </button>
+            </span>
+          </div>
+        </details>
+        <div class="settings-row">
+          <span>Quality</span>
+          <span class="segmented" role="group" aria-label="Quality">
+            <button type="button" data-setting="quality" data-value="auto">
+              Auto
+            </button>
+            <button type="button" data-setting="quality" data-value="sharp">
+              Sharp
+            </button>
+            <button type="button" data-setting="quality" data-value="fast">
+              Fast
+            </button>
+          </span>
+        </div>
+        <p id="fps" class="settings-fps"></p>
+      </div>
+      <button
+        id="settings-toggle"
+        type="button"
+        class="settings-toggle"
+        aria-expanded="false"
+        aria-controls="settings"
+      >
+        Settings
+      </button>
+    </div>
+
+    <div id="vignette" class="vignette" aria-hidden="true"></div>
+    <div id="censor" class="censor" aria-hidden="true" hidden></div>
+    <p id="talk" class="talk" aria-live="polite"></p>
+    <div id="combos" class="combos" aria-hidden="true"></div>
+    <div id="cursor" class="cursor" aria-hidden="true"><span></span></div>
+
+    <div id="intro" class="ui intro">
+      <h1 id="intro-title" class="intro-title">Peachy Keen</h1>
+      <p id="intro-status" class="intro-status">Loading the peach</p>
+    </div>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

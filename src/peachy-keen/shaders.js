@@ -52,11 +52,15 @@ export function createBackgroundMaterial() {
   return new ShaderMaterial({
     uniforms: {
       time: { value: 0 },
+      heat: { value: 0 },
+      shock: { value: -1 },
       resolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
     },
     vertexShader: VERTEX_SHADER,
     fragmentShader: `
             uniform float time;
+            uniform float heat;
+            uniform float shock;
             uniform vec2 resolution;
             varying vec2 vUv;
             
@@ -136,6 +140,13 @@ export function createBackgroundMaterial() {
             
             void main() {
                 vec2 uv = vUv;
+                if (shock >= 0.0) {
+                    vec2 fromCenter = (uv - 0.5) * vec2(resolution.x / resolution.y, 1.0);
+                    float radius = length(fromCenter);
+                    float front = shock * 1.1;
+                    float ring = exp(-pow((radius - front) * 11.0, 2.0)) * exp(-shock * 2.2);
+                    uv -= normalize(fromCenter + 1e-5) * ring * 0.05;
+                }
                 
                 // Calculate distance from center for radial gradient
                 vec2 center = vec2(0.5, 0.5);
@@ -170,14 +181,14 @@ export function createBackgroundMaterial() {
                 
                 // Funky color cycling - multiple hue layers (subtle)
                 // Use smooth sinusoidal cycling instead of mod for seamless transitions
-                float baseHue = sin(time * 0.022) * 0.5 + 0.5;
-                float hueWobble = sin(time * 0.6 + plasma * TWO_PI) * 0.05;
-                float hue1 = fract(baseHue + plasma * 0.25 + liquid * 0.1 + hueWobble);
-                float hue2 = fract(baseHue + plasma * 0.35 + liquid * 0.12 - hueWobble);
+                float baseHue = mix(0.84 + sin(time * 0.022) * 0.11, 0.99, heat * 0.6);
+                float hueWobble = sin(time * 0.6 + plasma * TWO_PI) * 0.035;
+                float hue1 = fract(baseHue + (plasma - 0.5) * 0.16 + liquid * 0.05 + hueWobble);
+                float hue2 = fract(baseHue + (plasma - 0.5) * 0.22 + liquid * 0.06 - hueWobble + 0.04);
                 
                 // Pulsating saturation for extra funkiness (subtle)
                 float satPulse = sin(time * 0.7) * 0.05 + 0.95;
-                float saturation1 = mix(0.6, 0.35, vignette) * satPulse;
+                float saturation1 = mix(0.66, 0.4, vignette) * satPulse + heat * 0.1;
                 float saturation2 = mix(0.55, 0.3, vignette) * satPulse;
                 saturation1 += plasma * 0.15;
                 saturation2 += n4 * 0.12;
@@ -199,8 +210,8 @@ export function createBackgroundMaterial() {
                 vec3 finalColor = mix(color1, color2, plasma * 0.7 + 0.3);
                 
                 // Add subtle complementary color splashes
-                float accentHue1 = fract(hue1 + 0.5);
-                float accentHue2 = fract(hue2 + 0.33);
+                float accentHue1 = fract(hue1 + 0.08);
+                float accentHue2 = fract(hue2 - 0.1);
                 vec3 accentColor1 = hsl2rgb(vec3(accentHue1, saturation1 * 0.85, lightness1 * 0.75));
                 vec3 accentColor2 = hsl2rgb(vec3(accentHue2, saturation2 * 0.8, lightness2 * 0.7));
                 
@@ -217,9 +228,13 @@ export function createBackgroundMaterial() {
                     mix(finalColor.b, chromaticB.b, 0.08)
                 );
                 
-                // Pulsating glow at center (subtle)
-                float glow = smoothstep(0.6, 0.0, distFromCenter) * (0.12 + sin(time * 1.0) * 0.04);
-                finalColor += glow;
+                float silkWave = sin((uv.x * 0.8 + uv.y) * 7.0 + plasma * 5.0 + time * 0.18);
+                float silk = pow(0.5 + 0.5 * silkWave, 10.0);
+                finalColor += vec3(0.16, 0.07, 0.1) * silk * (1.0 - vignette);
+
+                float beat = pow(0.5 + 0.5 * sin(time * 0.9), 3.0);
+                float glow = smoothstep(0.6, 0.0, distFromCenter) * (0.1 + beat * (0.02 + heat * 0.01));
+                finalColor += glow * vec3(1.0, 0.72, 0.78);
                 
                 // Softer vignette to let the funk shine through
                 finalColor *= (1.0 - vignette * 0.5);

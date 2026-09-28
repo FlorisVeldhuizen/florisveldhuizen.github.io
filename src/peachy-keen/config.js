@@ -1,136 +1,112 @@
-/**
- * Central Configuration File
- * Single source of truth for all shared constants across the application
- */
-
-// Import audio assets
 import ass2Sound from "./assets/ass2.m4a?url";
 import ass3Sound from "./assets/ass3.m4a?url";
 import ass5Sound from "./assets/ass5.m4a?url";
 import uhSound from "./assets/uh.m4a?url";
 
-// ===== LIGHTING CONFIGURATION =====
-export const LIGHTING_CONFIG = {
-  // Number of lights per mode
-  NORMAL_MODE_LIGHTS: 6,
-  OILED_MODE_LIGHTS: 24,
-
-  // Ring light geometry
-  RING_RADIUS: 3.5,
-  RING_TUBE_RADIUS: 0.15,
-  RING_RADIAL_SEGMENTS: 16,
-  RING_TUBULAR_SEGMENTS: 100,
-  RING_POSITION_Z: 6,
-
-  // Ring light properties
-  RING_COLOR: 0xffd9a8,
-  RING_EMISSIVE_INTENSITY: 2,
-  RING_LIGHT_DISTANCE: 100,
-  RING_LIGHT_INTENSITY_OILED: 2.5,
-  RING_LIGHT_INTENSITY_NORMAL: 6.0,
-
-  // Ambient light
-  AMBIENT_COLOR: 0xffeedd,
-  AMBIENT_INTENSITY: 0.25,
-
-  // Key light (directional)
-  KEY_LIGHT_COLOR: 0xffffff,
-  KEY_LIGHT_INTENSITY: 1.2,
-  KEY_LIGHT_POSITION: { x: 2, y: 5, z: 8 },
-
-  // Rim light (back highlight)
-  RIM_LIGHT_COLOR: 0xffe4d6,
-  RIM_LIGHT_INTENSITY: 2.0,
-  RIM_LIGHT_DISTANCE: 100,
-  RIM_LIGHT_POSITION: { x: 0, y: 1, z: -6 },
-
-  // Bottom fill light
-  BOTTOM_FILL_COLOR: 0xffd9c8,
-  BOTTOM_FILL_INTENSITY: 0.6,
-  BOTTOM_FILL_DISTANCE: 100,
-  BOTTOM_FILL_POSITION: { x: 0, y: -3, z: 4 },
-};
-
-// ===== PHYSICS CONFIGURATION =====
-export const PHYSICS_CONFIG = {
-  // Rigid body physics
-  DAMPING: 0.95,
-  RETURN_FORCE: 0.05,
-  ANGULAR_DAMPING: 0.92,
-  VELOCITY_SETTLE_THRESHOLD: 0.01,
-  ROTATION_RETURN_FACTOR: 0.05,
-
-  // Soft body physics
-  VERTEX_POSITION_TOLERANCE: 0.0001,
-  PROXIMITY_THRESHOLD: 0.3,
-  PROXIMITY_SAMPLING_STEP_DIVISOR: 100,
-  SETTLE_THRESHOLD: 0.01,
-  MAX_VELOCITY_CAP: 0.5,
-  MAX_VELOCITY_CAP_SINGLE: 0.25,
-  NORMAL_RECALC_INTERVAL: 3,
-};
-
-// ===== INTERACTION CONFIGURATION =====
-export const INTERACTION_CONFIG = {
-  SMACK_COOLDOWN_MS: 200,
-  VELOCITY_HISTORY_SIZE: 5,
-  MIN_VELOCITY_THRESHOLD: 2,
-  RAGE_DECAY_RATE: 15,
-  RAGE_EXPLOSION_THRESHOLD: 100,
-  RAGE_BASE_INCREASE: 4,
-  RAGE_VELOCITY_MULTIPLIER: 3,
-  RESPAWN_DURATION: 0.9,
-  // Impact marks
-  IMPACT_MARK_RADIUS: 0.32, // Size of impact marks
-  IMPACT_MARK_BASE_DURATION: 3.5, // Base duration in seconds
-  IMPACT_MARK_MAX_DURATION: 6.0, // Max duration for strong hits
-  IMPACT_MARK_INTENSITY_SCALE: 0.6, // Scale intensity for subtlety
-  IMPACT_MARK_STRENGTH: 0.4, // Overall visual strength
-  MAX_IMPACT_MARKS: 8, // Maximum number of simultaneous marks
-};
-
-// ===== PARTICLE CONFIGURATION =====
-export const PARTICLE_CONFIG = {
-  SPHERE_SEGMENTS: 8,
-  RADIUS: 0.05,
-  MAX_PARTICLES: 300,
-  EXPLOSION_FORCE: 8.0,
-  FALL_DURATION: 1.8,
-  FADE_START_TIME: 1.0,
-  FADE_DURATION: 0.8,
-  GRAVITY_STRENGTH: 15.0,
-  AIR_RESISTANCE: 0.99,
-  ROTATION_DAMPING: 0.98,
-  UPWARD_BIAS: 2.0,
-  EMISSIVE_BASE: 0.3,
-  EMISSIVE_PULSE_AMPLITUDE: 0.2,
-  EMISSIVE_PULSE_FREQUENCY: 10,
-};
-
-// ===== AUDIO CONFIGURATION =====
-export const AUDIO_CONFIG = {
-  slapSounds: [
-    ass2Sound,
-    ass3Sound,
-    ass5Sound,
-  ],
-  explosionSound: uhSound,
-  pitchVariationMin: 0.85,
-  pitchVariationMax: 1.15,
-  highShelfFrequency: 2000,
-  highShelfGainMin: 3,
-  highShelfGainMax: 6,
-  lowpassFrequencyMin: 8000,
-  lowpassFrequencyMax: 12000,
-  lowpassQ: 0.7,
-  silentOffset: 0.08,
-};
-
-// ===== PEACH MODEL CONFIGURATION =====
 export const PEACH_CONFIG = {
-  NORMAL_MAP_SIZE: 512,
-  NORMAL_MAP_OCTAVES: 4,
-  NORMAL_MAP_HEIGHT_SCALE: 0.3,
   TARGET_MODEL_HEIGHT: 3,
   MODEL_ROTATION_DEGREES: 300,
+  SKIN_TINT: 0xffb3ba,
+  MAX_HITS: 8,
+  MAX_PRINTS: 8,
+  PRINT_LIFE: 7,
+};
+
+export const FABRIC = {
+  rest: 0.9,
+  press: 0.85,
+  bulge: 0.9,
+  width: 1,
+};
+
+export const TOOLS = {
+  hand: { force: 1, reach: 0.8, print: 1.4, pitch: 1, heat: 1 },
+  lips: { force: 0.3, reach: 0.55, print: 0.8, pitch: 1, heat: 0.6 },
+};
+
+export const PHYSICS_CONFIG = {
+  SUBSTEP: 1 / 120,
+  POSITION_STIFFNESS: 55,
+  POSITION_DAMPING: 6.5,
+  ROTATION_STIFFNESS: 45,
+  ROTATION_DAMPING: 5.5,
+  SQUASH_STIFFNESS: 220,
+  SQUASH_DAMPING: 10,
+};
+
+export const FIRMNESS = {
+  firm: {
+    grab: 0.6,
+    jiggle: 0.7,
+    reach: 0.9,
+    dentFrequency: 30,
+    dentDecay: 7,
+    wobble: 0.14,
+    stiffness: 1.45,
+    squash: 0.8,
+    pitch: 1.08,
+    body: 1,
+  },
+  ripe: {
+    grab: 0.8,
+    jiggle: 1,
+    reach: 1,
+    dentFrequency: 25,
+    dentDecay: 5,
+    wobble: 0.36,
+    stiffness: 1.25,
+    squash: 1,
+    pitch: 1,
+    body: 0.75,
+  },
+  juicy: {
+    grab: 1,
+    jiggle: 1.12,
+    reach: 1.1,
+    dentFrequency: 22,
+    dentDecay: 4.2,
+    wobble: 0.44,
+    stiffness: 1.15,
+    squash: 1.05,
+    pitch: 0.94,
+    body: 0.7,
+  },
+};
+
+export const INTERACTION_CONFIG = {
+  MIN_SWIPE_SPEED: 0.7,
+  FULL_SWIPE_SPEED: 3,
+  SAMPLE_WINDOW_MS: 60,
+  COMBO_WINDOW_MS: 900,
+  HEAT_PER_SMACK: 2.8,
+  HEAT_PER_SPEED: 2.4,
+  HEAT_DECAY: 7,
+  HEAT_DECAY_DELAY: 0.6,
+  OIL_RUB_RATE: 0.2,
+  OIL_DRY_RATE: 0.015,
+  RESPAWN_DELAY: 1.3,
+  CHARGE_TIME: 0.45,
+  RESPAWN_DURATION: 0.9,
+  TWERK_IDLE_SECONDS: 20,
+  TWERK_BEAT_HZ: 2.2,
+  TWERK_BEATS: 8,
+  GRAB_FLICK_MS: 150,
+  SCRUB_MIN_SPEED: 0.15,
+  SCRUB_WINDOW_MS: 700,
+  SCRUB_TURN: 5.5,
+  SCRUB_HOLD_MS: 300,
+  GRAB_DENT: 0.055,
+  GRAB_DENT_RADIUS: 0.38,
+  GRAB_REACH: 0.75,
+  WAISTBAND_FROM: 0.55,
+  CLAP_GAP_MS: 320,
+  HEARTBEAT_FROM: 0.45,
+};
+
+export const AUDIO_CONFIG = {
+  slapSounds: [ass2Sound, ass3Sound, ass5Sound],
+  burstSound: uhSound,
+  pitchVariationMin: 0.88,
+  pitchVariationMax: 1.12,
+  silentOffset: 0.08,
 };
