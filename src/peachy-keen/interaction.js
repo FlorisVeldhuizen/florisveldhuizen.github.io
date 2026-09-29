@@ -992,7 +992,7 @@ export class Interaction {
 
   updateOverlays() {
     if (this.talk.showing) {
-      const anchor = this.tempB.copy(this.group.position);
+      const anchor = this.tempB.copy(this.offset);
       anchor.x -= 0.75;
       anchor.y += 1.35;
       const at = this.toScreen(anchor);
