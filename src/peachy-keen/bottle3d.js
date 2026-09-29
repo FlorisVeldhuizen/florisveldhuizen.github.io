@@ -43,33 +43,192 @@ function cubic(a, b, c, d, steps) {
   return points;
 }
 
+const WINE = "#8a2f45";
+const LABEL_FONTS = [
+  "italic 600 118px Fraunces",
+  "500 34px Fraunces",
+  "italic 400 30px Fraunces",
+];
+
+function paperNoise(canvas, count) {
+  const c = canvas.getContext("2d");
+  const { width, height } = canvas;
+  for (let i = 0; i < count; i += 1) {
+    c.fillStyle =
+      Math.random() < 0.5
+        ? "rgba(120, 70, 40, 0.07)"
+        : "rgba(255, 255, 255, 0.1)";
+    c.fillRect(
+      Math.random() * width,
+      Math.random() * height,
+      1 + Math.random() * 2,
+      1 + Math.random() * 2,
+    );
+  }
+}
+
+function drawPeach(canvas, x, y, size) {
+  const c = canvas.getContext("2d");
+  const skin = c.createRadialGradient(
+    x - size * 0.4,
+    y - size * 0.4,
+    size * 0.1,
+    x,
+    y,
+    size * 1.4,
+  );
+  skin.addColorStop(0, "#ffc39a");
+  skin.addColorStop(0.55, "#f0876a");
+  skin.addColorStop(1, "#c4475a");
+  c.fillStyle = skin;
+  c.beginPath();
+  c.arc(x - size * 0.42, y, size * 0.72, 0, Math.PI * 2);
+  c.arc(x + size * 0.42, y, size * 0.72, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = "rgba(138, 47, 69, 0.55)";
+  c.lineWidth = size * 0.07;
+  c.lineCap = "round";
+  c.beginPath();
+  c.moveTo(x, y - size * 0.45);
+  c.quadraticCurveTo(x + size * 0.06, y + size * 0.1, x, y + size * 0.62);
+  c.stroke();
+  c.fillStyle = "#6f8a3c";
+  c.beginPath();
+  c.moveTo(x + size * 0.05, y - size * 0.55);
+  c.quadraticCurveTo(
+    x + size * 0.3,
+    y - size * 1.25,
+    x + size * 0.95,
+    y - size * 1.05,
+  );
+  c.quadraticCurveTo(
+    x + size * 0.6,
+    y - size * 0.5,
+    x + size * 0.05,
+    y - size * 0.55,
+  );
+  c.fill();
+}
+
+function drawLabel(canvas) {
+  const c = canvas.getContext("2d");
+  const { width, height } = canvas;
+  const mid = width / 2;
+  const paper = c.createLinearGradient(0, 0, 0, height);
+  paper.addColorStop(0, "#f8eadc");
+  paper.addColorStop(1, "#ecd4bf");
+  c.fillStyle = paper;
+  c.fillRect(0, 0, width, height);
+  paperNoise(canvas, 5000);
+
+  c.fillStyle = WINE;
+  c.fillRect(0, 0, width, 20);
+  c.fillRect(0, height - 20, width, 20);
+  c.strokeStyle = "#c9964f";
+  c.lineWidth = 3;
+  [30, height - 30].forEach((y) => {
+    c.beginPath();
+    c.moveTo(0, y);
+    c.lineTo(width, y);
+    c.stroke();
+  });
+
+  c.strokeStyle = WINE;
+  c.lineWidth = 3;
+  c.beginPath();
+  c.roundRect(mid - 250, 52, 500, height - 104, 60);
+  c.stroke();
+  c.lineWidth = 1.5;
+  c.beginPath();
+  c.roundRect(mid - 236, 66, 472, height - 132, 48);
+  c.stroke();
+
+  drawPeach(canvas, mid, 136, 40);
+
+  c.fillStyle = WINE;
+  c.textAlign = "center";
+  c.textBaseline = "alphabetic";
+  c.font = `${LABEL_FONTS[0]}, Georgia, serif`;
+  c.fillText("Peach", mid, 298);
+  c.fillRect(mid - 150, 330, 110, 2);
+  c.fillRect(mid + 40, 330, 110, 2);
+  c.beginPath();
+  c.moveTo(mid, 321);
+  c.lineTo(mid + 10, 331);
+  c.lineTo(mid, 341);
+  c.lineTo(mid - 10, 331);
+  c.fill();
+  c.font = `${LABEL_FONTS[1]}, Georgia, serif`;
+  c.letterSpacing = "10px";
+  c.fillText("MASSAGE OIL", mid + 5, 390);
+  c.font = "500 20px Fraunces, Georgia, serif";
+  c.letterSpacing = "5px";
+  c.globalAlpha = 0.7;
+  c.fillText("WARMING · Nº 69 · 100 ML", mid + 3, 426);
+  c.globalAlpha = 1;
+  c.letterSpacing = "0px";
+
+  c.font = `${LABEL_FONTS[2]}, Georgia, serif`;
+  c.globalAlpha = 0.8;
+  c.textAlign = "right";
+  [
+    "Sweet almond",
+    "Apricot kernel",
+    "Warm vanilla",
+    "& a little mischief",
+  ].forEach((line, i) => c.fillText(line, mid - 310, 170 + i * 52));
+  c.textAlign = "left";
+  ["Apply generously.", "Rub in slow", "circles.", "Repeat."].forEach(
+    (line, i) => c.fillText(line, mid + 310, 170 + i * 52),
+  );
+  c.globalAlpha = 1;
+}
+
 function labelTexture() {
   const canvas = document.createElement("canvas");
-  canvas.width = 1024;
-  canvas.height = 256;
+  canvas.width = 1840;
+  canvas.height = 512;
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
-  texture.anisotropy = 4;
+  texture.anisotropy = 8;
   const draw = () => {
-    const c = canvas.getContext("2d");
-    c.fillStyle = "#f3e2d2";
-    c.fillRect(0, 0, 1024, 256);
-    c.strokeStyle = "#8a2f45";
-    c.lineWidth = 3;
-    c.strokeRect(340, 26, 344, 204);
-    c.lineWidth = 1.5;
-    c.strokeRect(352, 38, 320, 180);
-    c.fillStyle = "#8a2f45";
-    c.textAlign = "center";
-    c.font = "italic 600 76px Fraunces, Georgia, serif";
-    c.fillText("Peach", 512, 138);
-    c.font = "500 22px Fraunces, Georgia, serif";
-    c.letterSpacing = "6px";
-    c.fillText("MASSAGE OIL", 515, 186);
+    drawLabel(canvas);
     texture.needsUpdate = true;
   };
   draw();
-  document.fonts?.ready.then(draw);
+  if (document.fonts)
+    Promise.all(LABEL_FONTS.map((font) => document.fonts.load(font))).then(
+      draw,
+    );
+  return texture;
+}
+
+function corkTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const c = canvas.getContext("2d");
+  c.fillStyle = "#c99b6a";
+  c.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 900; i += 1) {
+    const dark = Math.random() < 0.6;
+    c.fillStyle = dark
+      ? `rgba(90, 50, 25, ${0.15 + Math.random() * 0.35})`
+      : "rgba(255, 225, 185, 0.35)";
+    c.beginPath();
+    c.ellipse(
+      Math.random() * 256,
+      Math.random() * 256,
+      0.6 + Math.random() * 2.4,
+      0.6 + Math.random() * 1.4,
+      Math.random() * Math.PI,
+      0,
+      Math.PI * 2,
+    );
+    c.fill();
+  }
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
   return texture;
 }
 
@@ -92,22 +251,33 @@ function vialProfile(shrink = 0) {
 }
 
 function roundProfile(shrink = 0) {
-  const r = 0.21 - shrink;
+  const r = 0.212 - shrink;
+  const bottom = -0.5 + shrink * 1.6;
+  const neck = 0.064 - shrink * 0.4;
   return [
-    [0, -0.5 + shrink],
-    [r - 0.04, -0.5 + shrink],
-    ...arc(r - 0.04, -0.46 + shrink, 0.04, -90, 0, 5).slice(1),
-    [r, 0.12],
+    [0, bottom + 0.012],
+    [0.1, bottom],
+    ...arc(r - 0.05, bottom + 0.05, 0.05, -90, 0, 8).slice(1),
+    [r + 0.002, -0.2],
+    [r, 0.07],
     ...cubic(
-      [r, 0.12],
-      [r, 0.22],
-      [0.1, 0.24],
-      [0.065 - shrink * 0.4, 0.27],
-      10,
+      [r, 0.07],
+      [r, 0.2],
+      [neck + 0.03, 0.205],
+      [neck + 0.004, 0.28],
+      14,
     ),
-    [0.065 - shrink * 0.4, 0.38 - shrink],
+    [neck, 0.3],
+    [neck, 0.37 - shrink],
   ];
 }
+
+const collar = (neck) => [
+  [neck + 0.01, 0.366],
+  [neck + 0.014, 0.376],
+  [neck + 0.01, 0.386],
+  [neck, 0.39],
+];
 
 function decanterProfile(shrink = 0) {
   return [
@@ -222,34 +392,70 @@ export const BOTTLE_STYLES = {
     name: "Apothecary",
     spout: 0.43,
     build() {
-      const outer = [...roundProfile(), ...lip(0.065, 0.43)];
+      const outer = [
+        ...roundProfile(),
+        ...collar(0.064),
+        [0.064, 0.4],
+        [0.082, 0.406],
+        [0.084, 0.424],
+        [0.072, 0.43],
+        [0.05, 0.428],
+        [0.048, 0.36],
+      ];
       const body = new Mesh(lathe(outer, 72), glass(0xfff4ec));
+      body.material.side = DoubleSide;
       const liquid = new Mesh(
-        lathe([...roundProfile(0.025), [0, 0.35]], 64),
+        lathe([...roundProfile(0.022), [0, 0.35]], 64),
         oil(0xe8922c, 0x6a2608),
       );
+      const cork = corkTexture();
       const stopper = new Mesh(
-        new CylinderGeometry(0.07, 0.058, 0.13, 32),
+        lathe(
+          [
+            [0, -0.075],
+            [0.044, -0.075],
+            [0.05, -0.068],
+            [0.056, 0.02],
+            [0.074, 0.028],
+            [0.08, 0.04],
+            [0.078, 0.062],
+            [0.07, 0.07],
+            [0, 0.072],
+          ],
+          40,
+        ),
         new MeshPhysicalMaterial({
-          color: 0xc79a6c,
-          roughness: 0.85,
+          map: cork,
+          bumpMap: cork,
+          bumpScale: 2,
+          roughness: 0.9,
           sheen: 0.4,
           sheenColor: new Color(0xffe0c0),
         }),
       );
-      stopper.position.y = 0.46;
+      stopper.position.y = 0.43;
       const label = new Mesh(
-        new CylinderGeometry(0.2135, 0.2135, 0.24, 72, 1, true),
+        new CylinderGeometry(0.2145, 0.2145, 0.27, 96, 1, true, -2.2, 4.4),
         new MeshPhysicalMaterial({
           map: labelTexture(),
-          roughness: 0.75,
-          sheen: 0.3,
-          sheenColor: new Color(0xffffff),
+          roughness: 0.7,
+          sheen: 0.35,
+          sheenColor: new Color(0xfff2e6),
         }),
       );
-      label.position.y = -0.14;
-      label.rotation.y = Math.PI;
-      body.add(label);
+      label.position.y = -0.17;
+      const ribbon = new Mesh(
+        new CylinderGeometry(0.0685, 0.0685, 0.022, 48, 1, true),
+        new MeshPhysicalMaterial({
+          color: 0x8a2f45,
+          roughness: 0.35,
+          sheen: 1,
+          sheenColor: new Color(0xff9ab4),
+          side: DoubleSide,
+        }),
+      );
+      ribbon.position.y = 0.325;
+      body.add(label, ribbon);
       return { body, liquid, stopper, level: 0.02 };
     },
   },

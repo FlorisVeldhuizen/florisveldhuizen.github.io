@@ -163,6 +163,28 @@ function noiseHit(freqFrom, freqTo, length, volume, type = "bandpass") {
   src.start(now, Math.random() * 0.5, length + 0.05);
 }
 
+export function playSlide(duration, from, to) {
+  if (!ctx || ctx.state !== "running") return;
+  const now = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer();
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.Q.value = 1.2;
+  filter.frequency.setValueAtTime(from, now);
+  filter.frequency.exponentialRampToValueAtTime(to, now + duration);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.001, now);
+  gain.gain.exponentialRampToValueAtTime(0.22, now + duration * 0.4);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  src.connect(filter).connect(gain).connect(master);
+  src.start(now, Math.random() * 0.5, duration + 0.05);
+}
+
+export function playSettle() {
+  noiseHit(500, 180, 0.12, 0.14, "lowpass");
+}
+
 export function playSlice() {
   noiseHit(7000, 1800, 0.18, 0.5);
 }
@@ -244,200 +266,6 @@ export function playStretch(duration) {
   wobble.start(now);
   osc.stop(now + duration);
   wobble.stop(now + duration);
-}
-
-const VOICE_START = 0.25;
-const VOICE_END = 0.7;
-let lastMoan = 0;
-let lastGesture = "";
-
-function breath(at, { length, volume, from = 1400, to = 700 }) {
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer();
-  const band = ctx.createBiquadFilter();
-  band.type = "bandpass";
-  band.Q.value = 0.9;
-  band.frequency.setValueAtTime(from, at);
-  band.frequency.exponentialRampToValueAtTime(to, at + length);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, at);
-  gain.gain.exponentialRampToValueAtTime(volume, at + length * 0.35);
-  gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
-  src.connect(band).connect(gain).connect(master);
-  src.start(at, Math.random() * 0.4, length + 0.05);
-}
-
-function grain(
-  at,
-  {
-    length,
-    rate,
-    bend = [1, 1],
-    volume,
-    offset = VOICE_START,
-    tone = 2600,
-    wobble = 18,
-  },
-) {
-  const src = ctx.createBufferSource();
-  src.buffer = burst;
-  src.playbackRate.setValueCurveAtTime(
-    Float32Array.from(bend, (b) => rate * b),
-    at,
-    length,
-  );
-  src.detune.value = (Math.random() - 0.5) * 120;
-  const vibrato = ctx.createOscillator();
-  vibrato.frequency.value = 4.5 + Math.random() * 2;
-  const vibratoDepth = ctx.createGain();
-  vibratoDepth.gain.value = wobble;
-  vibrato.connect(vibratoDepth).connect(src.detune);
-  const warm = ctx.createBiquadFilter();
-  warm.type = "lowpass";
-  warm.frequency.value = tone;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, at);
-  gain.gain.exponentialRampToValueAtTime(
-    volume,
-    at + Math.min(0.05, length * 0.3),
-  );
-  gain.gain.setValueAtTime(volume, at + length * 0.55);
-  gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
-  src.connect(warm).connect(gain).connect(master);
-  const available = VOICE_END + 0.1 - offset;
-  src.start(at, offset, Math.min(available, length * rate * 1.3));
-  vibrato.start(at);
-  vibrato.stop(at + length);
-}
-
-const GESTURES = {
-  hum(at, v, pitch) {
-    grain(at, {
-      length: 0.5,
-      rate: pitch * 0.88,
-      bend: [1, 1.04, 0.97, 0.92],
-      volume: v * 0.8,
-      tone: 750,
-      wobble: 12,
-    });
-    breath(at + 0.35, { length: 0.35, volume: v * 0.08, from: 900, to: 500 });
-  },
-  ah(at, v, pitch) {
-    grain(at, {
-      length: 0.42,
-      rate: pitch * 1.04,
-      bend: [0.94, 1.1, 1.04, 0.9],
-      volume: v,
-      tone: 3200,
-    });
-  },
-  stutter(at, v, pitch) {
-    const count = 2 + Math.round(Math.random());
-    for (let i = 0; i < count; i += 1) {
-      grain(at + i * 0.16, {
-        length: 0.14,
-        offset: 0.3,
-        rate: pitch * (1 + i * 0.07),
-        bend: [1, 1.06],
-        volume: v * (0.85 + i * 0.1),
-        tone: 3000,
-      });
-    }
-    breath(at + count * 0.16, { length: 0.3, volume: v * 0.1 });
-  },
-  long(at, v, pitch) {
-    grain(at, {
-      length: 0.62,
-      rate: pitch * 0.8,
-      bend: [0.96, 1.08, 1.03, 0.9, 0.84],
-      volume: v,
-      tone: 1900,
-      wobble: 32,
-    });
-  },
-  gasp(at, v, pitch) {
-    breath(at, { length: 0.22, volume: v * 0.18, from: 700, to: 2400 });
-    grain(at + 0.18, {
-      length: 0.2,
-      offset: 0.28,
-      rate: pitch * 1.22,
-      bend: [1.05, 0.95],
-      volume: v * 0.8,
-      tone: 3400,
-    });
-  },
-  sigh(at, v, pitch) {
-    grain(at, {
-      length: 0.45,
-      rate: pitch * 0.92,
-      bend: [1.06, 0.98, 0.8],
-      volume: v * 0.75,
-      tone: 1400,
-    });
-    breath(at + 0.3, { length: 0.5, volume: v * 0.12, from: 1300, to: 400 });
-  },
-};
-
-const MOODS = [
-  ["hum", "sigh", "hum"],
-  ["ah", "long", "gasp", "hum", "sigh"],
-  ["stutter", "ah", "gasp", "long"],
-];
-
-function ready() {
-  return burst && ctx && ctx.state === "running";
-}
-
-export function playMoan(intensity, heat, gesture = null) {
-  if (!ready()) return;
-  const now = ctx.currentTime;
-  if (now - lastMoan < 0.75) return;
-  let name = gesture;
-  if (!name) {
-    const mood = MOODS[Math.min(2, Math.floor(intensity * 3))].filter(
-      (g) => g !== lastGesture,
-    );
-    name = mood[Math.floor(Math.random() * mood.length)];
-  }
-  lastGesture = name;
-  lastMoan = now;
-  const pitch = 0.94 + heat * 0.2 + Math.random() * 0.1;
-  GESTURES[name](now, 0.3 + intensity * 0.35, pitch);
-}
-
-export function playClimax(duration) {
-  if (!ready()) return;
-  const now = ctx.currentTime;
-  lastMoan = now + duration + 0.6;
-  let t = 0;
-  let i = 0;
-  while (t < duration) {
-    const k = t / duration;
-    grain(now + t, {
-      length: 0.16 + (1 - k) * 0.08,
-      offset: 0.3,
-      rate: 0.98 + k * 0.32,
-      bend: [1, 1.07],
-      volume: 0.3 + k * 0.25,
-      tone: 2400 + k * 1200,
-    });
-    t += 0.3 - k * 0.15 + (i % 2) * 0.03;
-    i += 1;
-  }
-  grain(now + duration, {
-    length: 0.7,
-    rate: 1.2,
-    bend: [1.1, 1.18, 1, 0.82],
-    volume: 0.6,
-    tone: 3400,
-    wobble: 40,
-  });
-  breath(now + duration + 0.6, {
-    length: 0.6,
-    volume: 0.1,
-    from: 1200,
-    to: 350,
-  });
 }
 
 export function playSquish(amount) {
@@ -525,4 +353,36 @@ export function playCork(open) {
   osc.connect(gain).connect(master);
   osc.start(now);
   osc.stop(now + 0.12);
+}
+
+function running() {
+  return ctx && ctx.state === "running";
+}
+
+function tone(at, { type = "sine", from, to, length, volume, filter }) {
+  const osc = ctx.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(from, at);
+  osc.frequency.exponentialRampToValueAtTime(to, at + length);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(volume, at + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+  let out = osc;
+  if (filter) {
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.frequency.value = filter;
+    out = osc.connect(lowpass);
+  }
+  out.connect(gain).connect(master);
+  osc.start(at);
+  osc.stop(at + length + 0.02);
+  return osc;
+}
+
+export function playDing() {
+  if (!running()) return;
+  const now = ctx.currentTime;
+  tone(now, { from: 1568, to: 1568, length: 0.25, volume: 0.1 });
+  tone(now + 0.12, { from: 2093, to: 2093, length: 0.35, volume: 0.1 });
 }

@@ -7,23 +7,16 @@ import { Lens } from "./lens";
 import { Interaction } from "./interaction";
 import { UI } from "./ui";
 import { Settings } from "./settings";
-import { Talk, Censor } from "./spicy";
+import { Talk } from "./spicy";
+import { Naughty } from "./naughty";
+import { MoodLight } from "./mood";
 import { unlockAudio, loadSounds, setMuted } from "./audio";
-
-const BLACK_GOLD = { color: 0x0a0408, sheen: 0xd4a24c };
-const BOW_STYLES = {
-  gold: BLACK_GOLD,
-  sheer: { color: 0x0a0408, sheen: 0x6b5a63, opacity: 0.55 },
-  red: { color: 0x6e0a16, sheen: 0xe04a5c },
-  back: { ...BLACK_GOLD, placement: "back" },
-  ties: BLACK_GOLD,
-};
 
 const intro = document.getElementById("intro");
 const introTitle = document.getElementById("intro-title");
 const introStatus = document.getElementById("intro-status");
 
-const { scene, camera, renderer } = initScene();
+const { scene, camera, renderer, lights } = initScene();
 const quality = new QualityGovernor(renderer);
 const backdrop = createBackdrop(scene);
 setupResizeHandler(camera, renderer, () => {
@@ -45,7 +38,7 @@ const lens = new Lens(renderer, scene, camera);
 juice.onSplat = (position, velocity) => lens.splat(position, velocity);
 const ui = new UI();
 const talk = new Talk();
-const censor = new Censor();
+const mood = new MoodLight(scene, renderer, lights);
 
 const settings = new Settings((key, value) => {
   if (key === "sound") setMuted(!value);
@@ -53,14 +46,11 @@ const settings = new Settings((key, value) => {
   if (key === "splatter") lens.enabled = value;
   if (key === "firmness") interaction.setFirmness(value);
   if (key === "tool") interaction.setTool(value);
-  if (key === "bottle") interaction.bottle.setStyle(value);
   if (key === "talk") talk.setLevel(value);
-  if (key === "censor") censor.setMode(value);
-  if (key === "lingerie") interaction.dressUp(true);
-  if (key === "bowColor") {
-    peach.setBowStyle(BOW_STYLES[value] || BOW_STYLES.gold);
-    interaction.dressUp();
-  }
+  if (key === "moodLight") mood.set(value);
+  naughty.set(key, value);
+  if (key === "lingerie" && value) interaction.dressUp(true);
+  if (key === "lingerie" && !value) interaction.undress();
 });
 
 const interaction = new Interaction({
@@ -75,8 +65,8 @@ const interaction = new Interaction({
   ui,
   settings,
   talk,
-  censor,
 });
+const naughty = new Naughty(interaction, talk);
 settings.applyAll();
 
 function setProgress(fraction) {
@@ -124,8 +114,10 @@ renderer.setAnimationLoop(() => {
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
   const delta = realDelta * interaction.timeScale(realDelta);
   interaction.update(delta);
+  naughty.update(delta);
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);
+  mood.update(realDelta, interaction.heat / 100);
   peach.updateRing(camera);
   quality.update(realDelta);
   settings.showFps(quality.fps);

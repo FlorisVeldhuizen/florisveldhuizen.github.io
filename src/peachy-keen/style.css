@@ -409,57 +409,6 @@ button:focus-visible {
   opacity: 1;
 }
 
-.censor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 2;
-  aspect-ratio: 3.4;
-  display: grid;
-  place-items: center;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.censor.is-visible {
-  opacity: 1;
-}
-
-.censor[data-mode="bar"] {
-  background: #000;
-  color: #fff;
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-}
-
-.censor[data-mode="bar"]::after {
-  content: "CENSORED";
-}
-
-.censor[data-mode="blur"] {
-  aspect-ratio: 1.6;
-  border-radius: 40%;
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
-}
-
-.censor[data-mode="heart"] {
-  aspect-ratio: 1;
-  color: var(--welt);
-  font-size: 0;
-}
-
-.censor[data-mode="heart"]::after {
-  content: "♥";
-  font-size: var(--heart-size, 120px);
-  line-height: 1;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
-}
-
 .combos {
   position: fixed;
   inset: 0;
@@ -579,29 +528,6 @@ button:focus-visible {
   pointer-events: none;
 }
 
-.bottle-body {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: none;
-  width: 64px;
-  height: 116px;
-  margin: -58px 0 0 -32px;
-  pointer-events: none;
-}
-
-.bottle.is-drawn .bottle-body {
-  display: block;
-}
-
-.bottle-body svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  filter: drop-shadow(0 8px 12px rgba(22, 4, 10, 0.45));
-}
-
 .bottle-stream {
   position: fixed;
   top: 0;
@@ -617,24 +543,173 @@ button:focus-visible {
 }
 
 .stream-oil {
-  fill: var(--oil);
-  opacity: 0.68;
+  fill: #f6b35c;
+  opacity: 0.72;
+}
+
+.stream-pool {
+  fill: #f6b35c;
+  opacity: 0.45;
+}
+
+.stream-ripple {
+  fill: none;
+  stroke: #e0a68c;
+  stroke-width: 1;
+}
+
+.stream-shade {
+  fill: #d9822f;
+  opacity: 0.3;
 }
 
 .stream-shine {
   fill: none;
-  stroke: #fff6dc;
-  stroke-width: 0.9;
+  stroke: #fff3d2;
+  stroke-width: 1;
   stroke-linecap: round;
-  opacity: 0.5;
+  opacity: 0.85;
 }
 
-.oil-splash {
-  position: fixed;
-  z-index: 4;
-  width: 26px;
-  height: 9px;
-  border: 1.5px solid var(--oil);
-  border-radius: 50%;
+.stream-shine-fill {
+  fill: #fff3d2;
+  opacity: 0.85;
+}
+
+.pop {
+  position: absolute;
+  color: var(--welt);
+  font-size: 30px;
+  font-style: italic;
+  font-weight: 800;
+  font-variation-settings:
+    "SOFT" 100,
+    "WONK" 1;
+  line-height: 1;
+  white-space: nowrap;
   pointer-events: none;
+}
+
+.toast {
+  position: fixed;
+  bottom: calc(var(--gutter) + 56px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 6;
+  display: grid;
+  gap: 2px;
+  min-width: 220px;
+  max-width: calc(100vw - 2 * var(--gutter));
+  padding: 10px 18px 12px;
+  border: 1px solid #d4a24c;
+  border-radius: 14px;
+  background: rgba(30, 5, 12, 0.95);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%);
+}
+
+.toast small {
+  color: #d4a24c;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.toast strong {
+  font-size: 20px;
+  font-style: italic;
+}
+
+.toast span {
+  color: var(--blush-dim);
+  font-size: 14px;
+}
+
+.mood-light {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse 60% 65% at 50% 52%,
+    transparent 30%,
+    rgba(36, 0, 14, 0.6) 70%,
+    rgba(8, 0, 4, 0.95) 100%
+  );
+}
+
+.mood-light i {
+  position: absolute;
+  width: 34vmin;
+  height: 34vmin;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 150, 90, 0.22) 0%,
+    rgba(255, 110, 80, 0.08) 45%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+  animation: bokeh 26s ease-in-out infinite alternate;
+}
+
+.mood-light i:nth-child(1) {
+  top: 62%;
+  left: 4%;
+}
+
+.mood-light i:nth-child(2) {
+  top: 8%;
+  left: 70%;
+  width: 22vmin;
+  height: 22vmin;
+  background: radial-gradient(
+    circle,
+    rgba(255, 60, 120, 0.2) 0%,
+    rgba(255, 40, 100, 0.06) 45%,
+    transparent 70%
+  );
+  animation-duration: 31s;
+  animation-delay: -9s;
+}
+
+.mood-light i:nth-child(3) {
+  top: 70%;
+  left: 78%;
+  width: 18vmin;
+  height: 18vmin;
+  animation-duration: 22s;
+  animation-delay: -14s;
+}
+
+.mood-light i:nth-child(4) {
+  top: 14%;
+  left: 10%;
+  width: 14vmin;
+  height: 14vmin;
+  background: radial-gradient(
+    circle,
+    rgba(255, 60, 120, 0.18) 0%,
+    transparent 70%
+  );
+  animation-duration: 35s;
+  animation-delay: -4s;
+}
+
+@keyframes bokeh {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(6vmin, -5vmin) scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mood-light i {
+    animation: none;
+  }
 }

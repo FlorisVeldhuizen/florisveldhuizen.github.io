@@ -86,7 +86,8 @@ export function initScene() {
   scene.environment = pmrem.fromScene(createRingLightEnvironment(), 0).texture;
   pmrem.dispose();
 
-  scene.add(new HemisphereLight(0xffe4ea, 0x7a3060, 1.9));
+  const hemi = new HemisphereLight(0xffe4ea, 0x7a3060, 1.9);
+  scene.add(hemi);
 
   const rose = new PointLight(0xff4f9a, 70, 30);
   rose.position.set(-4, 2.5, -3.5);
@@ -96,7 +97,7 @@ export function initScene() {
   peachRim.position.set(4, -1, -3);
   scene.add(peachRim);
 
-  return { scene, camera, renderer };
+  return { scene, camera, renderer, lights: { hemi, rose, peachRim } };
 }
 
 export function setupResizeHandler(camera, renderer, onResize) {

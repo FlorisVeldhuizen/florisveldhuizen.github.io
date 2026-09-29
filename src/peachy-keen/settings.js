@@ -7,12 +7,11 @@ const DEFAULTS = {
   tease: true,
   handprints: true,
   tool: "hand",
-  bottle: "model",
   talk: "off",
-  moans: false,
-  censor: "off",
   lingerie: false,
-  bowColor: "gold",
+  edging: false,
+  achievements: false,
+  moodLight: false,
 };
 
 function read() {

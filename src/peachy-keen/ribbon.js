@@ -12,7 +12,6 @@ import {
 import { satinMaterial } from "./band";
 
 const SAMPLES = 24;
-const HIP = 0.365;
 
 function strip(
   points,
@@ -114,7 +113,7 @@ export class RibbonBows {
     this.peach = peach;
     this.group = new Group();
     this.group.visible = false;
-    this.bows = [1, -1].map((side) => {
+    this.bows = [0].map(() => {
       const bow = new Group();
       bow.matrixAutoUpdate = false;
       this.group.add(bow);
@@ -126,9 +125,8 @@ export class RibbonBows {
       };
       const material = satinMaterial();
       followSkin(material, skin);
-      return { side, bow, anchors: [], material, skin, tug: 0, opening: null };
+      return { bow, anchors: [], material, skin };
     });
-    this.placement = "hips";
     this.pull = null;
     this.basis = new Matrix4();
     this.scale = new Vector3(1, 1, 1);
@@ -171,49 +169,32 @@ export class RibbonBows {
     }
     const bowSize = height * 0.05;
     this.bows.forEach((entry) => {
-      entry.parts = bowGeometries(bowSize).map((g) => {
-        const mesh = new Mesh(g, entry.material);
-        entry.bow.add(mesh);
-        return mesh;
-      });
-      const rest = u.uLingerie.value.w - 0.05;
-      let hip = null;
-      let hipScore = Infinity;
-      samples.forEach((sample) => {
-        if (sample.back < 0.25) return;
-        const score =
-          (sample.across - entry.side * HIP) ** 2 + (sample.h - rest) ** 2;
-        if (score < hipScore) {
-          hipScore = score;
-          hip = sample;
-        }
-      });
-      entry.hipAngle = Math.atan2(
-        pos.getZ(hip.i) - bounds.z,
-        pos.getX(hip.i) - bounds.x,
+      bowGeometries(bowSize).forEach((g) =>
+        entry.bow.add(new Mesh(g, entry.material)),
       );
-      let centre = null;
-      let centreScore = Infinity;
+      const rest = u.uLingerie.value.w - 0.05;
+      let spot = null;
+      let spotScore = Infinity;
       samples.forEach((sample) => {
         if (sample.back < 0.8) return;
         const score = 10 * sample.across ** 2 + (sample.h - rest) ** 2;
-        if (score < centreScore) {
-          centreScore = score;
-          centre = sample;
+        if (score < spotScore) {
+          spotScore = score;
+          spot = sample;
         }
       });
-      entry.backAngle = Math.atan2(
-        pos.getZ(centre.i) - bounds.z,
-        pos.getX(centre.i) - bounds.x,
+      entry.angle = Math.atan2(
+        pos.getZ(spot.i) - bounds.z,
+        pos.getX(spot.i) - bounds.x,
       );
       entry.anchors = Array.from({ length: SAMPLES }, (_, k) => {
         const target = 0.15 + (k / (SAMPLES - 1)) * 0.7;
-        let best = hip;
+        let best = spot;
         let bestScore = Infinity;
         samples.forEach((sample) => {
           if (Math.abs(sample.h - target) > 0.02) return;
           const score =
-            Math.abs(sample.azimuth - hip.azimuth) +
+            Math.abs(sample.azimuth - spot.azimuth) +
             Math.abs(sample.h - target);
           if (score < bestScore) {
             bestScore = score;
@@ -229,103 +210,21 @@ export class RibbonBows {
     });
   }
 
-  setStyle({ color, sheen, opacity = 1, placement = "hips" }) {
-    this.placement = placement;
-    this.pull = null;
-    this.bows.forEach(({ material }) => {
-      material.color.set(color);
-      material.sheenColor.set(sheen);
-      material.opacity = opacity;
-      material.transparent = opacity < 1;
-      material.depthWrite = opacity >= 1;
-      material.needsUpdate = true;
-    });
-  }
-
-  entry(side) {
-    return this.bows.find((b) => b.side === side);
-  }
-
-  worldPosition(side, target) {
-    const { bow } = this.entry(side);
-    return target.setFromMatrixPosition(bow.matrixWorld);
-  }
-
-  setTug(side, amount) {
-    const entry = this.entry(side);
-    if (entry.tug === amount) return;
-    entry.tug = amount;
-    this.pull = null;
-  }
-
-  untie(side) {
-    const entry = this.entry(side);
-    entry.opening = { time: 0 };
-    entry.tug = 0;
-    this.pull = null;
-  }
-
-  tie() {
-    this.bows.forEach((entry) => {
-      entry.opening = null;
-      entry.tug = 0;
-      entry.parts?.forEach((part) => {
-        part.scale.setScalar(1);
-        part.rotation.set(0, 0, 0);
-      });
-    });
-    this.pull = null;
-  }
-
-  step(delta) {
-    this.bows.forEach(({ parts, opening, side }) => {
-      if (!opening) return;
-      opening.time += delta;
-      const t = opening.time;
-      const k = Math.min(1, t / 0.3);
-      const pulled = 1 - (1 - k) ** 3;
-      const [loopA, loopB, tailA, tailB, knot] = parts;
-      [loopA, loopB, knot].forEach((part) =>
-        part.scale.setScalar(Math.max(0.001, 1 - pulled)),
-      );
-      const swing = Math.cos(t * 7) * Math.exp(-t * 2.2);
-      [tailA, tailB].forEach((tail, n) => {
-        const dir = n === 0 ? 1 : -1;
-        tail.scale.set(1, 1 + pulled * 0.7, 1);
-        tail.rotation.z = (0.12 * dir + 0.35 * swing * side) * pulled;
-      });
-    });
-  }
-
   update(visible, pull, fade = 1) {
     this.group.visible = visible;
     if (!visible || !this.peach.mesh) return;
     if (this.bows[0].anchors.length === 0) this.prepare();
-    const sag = this.peach.uniforms.uTieSag.value;
-    if (
-      pull === this.pull &&
-      fade === this.fade &&
-      sag.x === this.sagX &&
-      sag.y === this.sagY
-    )
-      return;
+    if (pull === this.pull && fade === this.fade) return;
     this.pull = pull;
     this.fade = fade;
-    this.sagX = sag.x;
-    this.sagY = sag.y;
     const b = this.peach.uniforms.uBounds.value;
     const { band } = this.peach;
     const rest = this.peach.uniforms.uLingerie.value.w;
-    const top = Math.min(rest - 0.05 - pull * 0.36, rest + 0.01);
+    const waist = Math.min(rest - 0.05 - pull * 0.36, rest + 0.01);
+    const onPeach = Math.max(waist, 0.06);
+    const below = Math.max(0, 0.06 - waist);
     const up = new Vector3(0, 1, 0);
-    const back = this.placement === "back";
-    this.bows.forEach(({ bow, skin, side, hipAngle, backAngle, tug }) => {
-      const waist = back ? top : top - (side === 1 ? sag.x : sag.y);
-      const onPeach = Math.max(waist, 0.06);
-      const below = Math.max(0, 0.06 - waist);
-      // eslint-disable-next-line no-param-reassign
-      bow.visible = !back || side === 1;
-      const angle = back ? backAngle : hipAngle;
+    this.bows.forEach(({ bow, skin, angle }) => {
       const normal = new Vector3(Math.cos(angle), 0, Math.sin(angle));
       const radius = band.ringRadius(angle, onPeach);
       const position = new Vector3(
@@ -350,12 +249,7 @@ export class RibbonBows {
         .addScaledVector(z, b.w * 0.0035)
         .addScaledVector(normal, below * b.w * 0.6)
         .addScaledVector(up, -below * b.w);
-      position.addScaledVector(z, tug * b.w * 0.14);
-      this.basis.scale(
-        this.scale
-          .set(1 - tug * 0.15, 1 + tug * 0.9, 1)
-          .multiplyScalar(Math.max(0.001, fade)),
-      );
+      this.basis.scale(this.scale.setScalar(Math.max(0.001, fade)));
       this.basis.setPosition(position);
       bow.matrix.copy(this.basis);
       skin.uBowMatrix.value.copy(this.basis);

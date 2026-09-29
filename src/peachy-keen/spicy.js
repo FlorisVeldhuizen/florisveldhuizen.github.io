@@ -269,7 +269,11 @@ export class Talk {
     const urgent = chance >= 1;
     if ((!urgent && now < this.quietUntil) || Math.random() > chance) return;
     const options = lines.filter((line) => line !== this.last);
-    const line = options[Math.floor(Math.random() * options.length)];
+    this.show(options[Math.floor(Math.random() * options.length)]);
+  }
+
+  show(line) {
+    const now = performance.now();
     this.last = line;
     this.el.textContent = line;
     this.el.classList.add("is-visible");
@@ -305,27 +309,5 @@ export class Talk {
     const margin = 16;
     const left = Math.max(margin + this.el.offsetWidth, x);
     this.el.style.translate = `${left}px ${Math.max(margin, y)}px`;
-  }
-}
-
-export class Censor {
-  constructor() {
-    this.el = document.getElementById("censor");
-    this.mode = "off";
-  }
-
-  setMode(mode) {
-    this.mode = mode;
-    this.el.dataset.mode = mode;
-    this.el.hidden = mode === "off";
-  }
-
-  place(x, y, width, angle, visible) {
-    this.el.classList.toggle("is-visible", visible);
-    if (!visible) return;
-    this.el.style.translate = `${x}px ${y}px`;
-    this.el.style.width = `${width}px`;
-    this.el.style.setProperty("--heart-size", `${width}px`);
-    this.el.style.rotate = `${angle}rad`;
   }
 }

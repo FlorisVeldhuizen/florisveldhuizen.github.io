@@ -1,6 +1,7 @@
 import { Vector2, Vector3, Plane, Raycaster, Quaternion, Matrix4 } from "three";
 import { playCork } from "./audio";
 import { BottleModel } from "./bottle3d";
+import OilStream from "./stream";
 
 const HEIGHT_PX = 116;
 const DEPTH = 2.4;
@@ -9,7 +10,6 @@ const LEAN_ANGLE = 12;
 const STREAM_PX = 58;
 const NORMAL_LEAN = 0.75;
 const AXIS = new Vector3(0, 1, 0);
-const SVG_UNITS = 80;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -44,10 +44,6 @@ class ModelView {
       scale: 1,
       scaleVelocity: 0,
     };
-  }
-
-  setVisible(visible) {
-    this.group.visible = visible;
   }
 
   spoutScreen() {
@@ -153,119 +149,11 @@ class ModelView {
   }
 }
 
-class SvgView {
-  constructor(el) {
-    this.el = el;
-    this.body = el.querySelector(".bottle-body");
-    this.liquid = el.querySelector(".bottle-liquid");
-    this.corkEl = el.querySelector(".bottle-cork");
-    this.svg = el.querySelector(".bottle-body svg");
-    this.lip = this.svg.createSVGPoint();
-    this.spout = 0.375;
-    this.cork = {
-      popped: false,
-      age: 0,
-      x: 0,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      spin: 0,
-      turn: 0,
-      scale: 1,
-      scaleVelocity: 0,
-    };
-  }
-
-  setVisible(visible) {
-    this.el.classList.toggle("is-drawn", visible);
-  }
-
-  spoutScreen() {
-    const matrix = this.svg.getScreenCTM();
-    if (!matrix) return null;
-    this.lip.x = 22;
-    this.lip.y = 10;
-    return this.lip.matrixTransform(matrix);
-  }
-
-  place(b, delta) {
-    this.unit = (HEIGHT_PX * b.size()) / SVG_UNITS;
-    this.angle = b.screen.angle;
-    this.body.style.translate = `${b.screen.x - b.homeX}px ${b.screen.y - b.raise - b.homeY}px`;
-    this.body.style.rotate = `${b.screen.angle}deg`;
-    this.body.style.scale = `${b.size()}`;
-    const surface = 36 + (1 - b.fill) * 30;
-    const tilt = reducedMotion.matches ? 0 : b.slosh * 12;
-    this.liquid.setAttribute(
-      "transform",
-      `rotate(${-b.screen.angle + tilt} 22 40) translate(0 ${surface - 40})`,
-    );
-    this.updateCork(delta);
-  }
-
-  popCork() {
-    const c = this.cork;
-    const radians = (this.angle * Math.PI) / 180;
-    c.popped = true;
-    c.age = 0;
-    c.x = 0;
-    c.y = 0;
-    c.vx = Math.sin(radians) * 260 + (Math.random() - 0.5) * 80;
-    c.vy = -Math.cos(radians) * 260 - 120;
-    c.turn = 0;
-    c.spin = (Math.random() - 0.5) * 900;
-  }
-
-  closeCork() {
-    const c = this.cork;
-    c.popped = false;
-    c.scale = 0;
-    c.scaleVelocity = 0;
-  }
-
-  updateCork(delta) {
-    const c = this.cork;
-    const el = this.corkEl;
-    if (c.popped) {
-      c.age += delta;
-      c.vy += 900 * delta;
-      c.x += c.vx * delta;
-      c.y += c.vy * delta;
-      c.turn += c.spin * delta;
-      const radians = (-this.angle * Math.PI) / 180;
-      const lx =
-        (c.x * Math.cos(radians) - c.y * Math.sin(radians)) / this.unit;
-      const ly =
-        (c.x * Math.sin(radians) + c.y * Math.cos(radians)) / this.unit;
-      el.setAttribute(
-        "transform",
-        `translate(${lx} ${ly}) rotate(${c.turn} 22 6)`,
-      );
-      el.style.opacity = clamp(1 - (c.age - 0.35) / 0.3, 0, 1);
-      return;
-    }
-    c.scaleVelocity += ((1 - c.scale) * 420 - c.scaleVelocity * 16) * delta;
-    c.scale += c.scaleVelocity * delta;
-    const squash = 1 + (1 - c.scale) * 0.4;
-    el.setAttribute(
-      "transform",
-      `translate(22 10) scale(${squash} ${Math.max(0.01, c.scale)}) translate(-22 -10)`,
-    );
-    el.style.opacity = 1;
-  }
-}
-
 export class Bottle {
   constructor(scene, camera) {
     this.el = document.getElementById("bottle");
-    this.stream = document.getElementById("bottle-stream");
-    this.streamPath = this.stream.querySelector(".stream-oil");
-    this.streamShine = this.stream.querySelector(".stream-shine");
-    this.views = {
-      model: new ModelView(scene, camera),
-      drawn: new SvgView(this.el),
-    };
-    this.setStyle("model");
+    this.stream = new OilStream(document.getElementById("bottle-stream"));
+    this.view = new ModelView(scene, camera);
 
     this.screen = { x: 0, y: 0, angle: 0 };
     this.velocity = { x: 0, y: 0, angle: 0 };
@@ -283,7 +171,6 @@ export class Bottle {
     this.raise = 0;
     this.yaw = 0;
     this.hovered = false;
-    this.bend = 0;
     this.time = 0;
     this.calling = false;
     this.carried = false;
@@ -301,15 +188,6 @@ export class Bottle {
     window.addEventListener("resize", () => this.resize());
   }
 
-  setStyle(style) {
-    const next = this.views[style] ? style : "model";
-    Object.entries(this.views).forEach(([name, view]) =>
-      view.setVisible(name === next),
-    );
-    if (this.view?.cork.popped) this.view.closeCork();
-    this.view = this.views[next];
-  }
-
   resize() {
     const rect = this.el.getBoundingClientRect();
     this.homeX = rect.left + rect.width / 2;
@@ -323,7 +201,6 @@ export class Bottle {
   pick() {
     this.carried = true;
     this.el.classList.add("is-carried");
-    this.stream.classList.add("is-visible");
   }
 
   carry(x, y, vx, hit, peach, delta) {
@@ -362,11 +239,11 @@ export class Bottle {
       (-this.slosh * 70 - this.sloshVelocity * 5 - vx * 30 - turn * 0.004) *
       delta;
     this.slosh += this.sloshVelocity * delta;
-    this.bend += (clamp(-vx * 40, -26, 26) - this.bend) * ease(12, delta);
     this.yaw = Math.sin(this.time * 0.6) * 0.25 + clamp(vx * 0.6, -0.5, 0.5);
     this.place(delta);
     const start = this.view.spoutScreen() ?? { x, y: spoutY };
-    this.drawStream(start, { x, y }, pour);
+    const landing = hit ? { x, y } : null;
+    this.stream.update(start, this.screen.angle, landing, pour, delta);
     return pour;
   }
 
@@ -380,44 +257,8 @@ export class Bottle {
     this.view.place(this, delta);
   }
 
-  drawStream(start, end, pour) {
-    this.stream.style.translate = `${start.x}px ${start.y}px`;
-    const b = this.bend * pour;
-    const ex = (end.x - start.x) * pour + b;
-    const ey = (end.y - start.y) * pour;
-    const cx = (ex - b) * 0.6 + b * 0.2;
-    const cy = ey * 0.6;
-    const wobble = reducedMotion.matches ? 0 : Math.sin(this.time * 38) * 0.4;
-    const top = 2.8 * pour + wobble;
-    const tip = 1.3 * pour;
-    this.streamPath.setAttribute(
-      "d",
-      `M ${-top} -2 Q ${cx - top} ${cy} ${ex - tip} ${ey}` +
-        ` L ${ex + tip} ${ey} Q ${cx + top} ${cy} ${top} -2 Z`,
-    );
-    this.streamShine.setAttribute(
-      "d",
-      `M ${-top * 0.35} 0 Q ${cx - top * 0.35} ${cy} ${ex} ${ey * 0.92}`,
-    );
-  }
-
-  // eslint-disable-next-line class-methods-use-this
   splash(x, y) {
-    if (reducedMotion.matches) return;
-    const ring = document.createElement("span");
-    ring.className = "oil-splash";
-    ring.style.left = `${x}px`;
-    ring.style.top = `${y}px`;
-    document.body.appendChild(ring);
-    ring
-      .animate(
-        [
-          { opacity: 0.9, transform: "translate(-50%, -50%) scale(0.3)" },
-          { opacity: 0, transform: "translate(-50%, -50%) scale(1.5)" },
-        ],
-        { duration: 480, easing: "cubic-bezier(.2,.7,.3,1)" },
-      )
-      .finished.then(() => ring.remove());
+    this.stream.splash(x, y);
   }
 
   drop() {
@@ -427,7 +268,6 @@ export class Bottle {
     this.velocity.x = 0;
     this.velocity.y = 0;
     this.el.classList.remove("is-carried");
-    this.stream.classList.remove("is-visible");
     if (this.view.cork.popped) {
       this.view.closeCork();
       playCork(false);
@@ -437,6 +277,7 @@ export class Bottle {
 
   update(delta) {
     if (this.carried) return;
+    if (this.stream.active) this.stream.update(null, 0, undefined, 0, delta);
     this.time += delta;
     const v = this.velocity;
     v.x += ((this.homeX - this.screen.x) * 170 - v.x * 20) * delta;

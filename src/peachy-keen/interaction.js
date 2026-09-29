@@ -5,12 +5,12 @@ import {
   setRub,
   playStretch,
   playSlice,
-  playMoan,
-  playClimax,
   playKiss,
   playHeartbeat,
   playSquish,
   playSnap,
+  playSlide,
+  playSettle,
   playTear,
   playSplash,
   playGlug,
@@ -25,10 +25,6 @@ import { Bottle } from "./bottle";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const buzz = (ms) => navigator.vibrate?.(ms);
-const freshTies = () => ({
-  1: { sag: 0, velocity: 0, untied: false },
-  "-1": { sag: 0, velocity: 0, untied: false },
-});
 const SLICE_HOLD = 0.32;
 const BEAT_LENGTH = 0.32;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -51,7 +47,6 @@ export class Interaction {
     ui,
     settings,
     talk,
-    censor,
   }) {
     Object.assign(this, {
       peach,
@@ -64,7 +59,6 @@ export class Interaction {
       ui,
       settings,
       talk,
-      censor,
     });
 
     this.offset = new Vector3();
@@ -155,19 +149,27 @@ export class Interaction {
       velocity: 0,
       visible: 1,
       dressing: null,
-      ties: freshTies(),
-      tugBack: null,
+      shown: false,
     };
-    this.tug = null;
-    this.bowPoint = new Vector3();
     this.zoom = 0;
     this.zoomVelocity = 0;
+    this.listeners = {};
+    this.chargeGuard = null;
+    this.burstPower = 1;
 
     this.setFirmness("ripe");
     this.setTool("hand");
     this.bindPointer();
     this.bottle.el.addEventListener("pointerdown", (e) => this.pickBottle(e));
     this.bindShake();
+  }
+
+  on(name, listener) {
+    (this.listeners[name] ||= []).push(listener);
+  }
+
+  emit(name, detail) {
+    this.listeners[name]?.forEach((listener) => listener(detail));
   }
 
   setTool(name) {
@@ -214,7 +216,6 @@ export class Interaction {
       p.grabbed = false;
       p.downOnPeach = !!this.raycastAt(e.clientX, e.clientY);
       p.onWaistband = this.onWaistband(e.clientX, e.clientY);
-      p.onBow = this.bowAt(e.clientX, e.clientY);
     });
     const release = (e) => {
       if (
@@ -322,16 +323,25 @@ export class Interaction {
       velocity: 0,
       visible: 1,
       dressing: null,
-      ties: freshTies(),
-      tugBack: null,
     });
-    this.tug = null;
-    this.peach.bows?.tie();
-    this.peach.setTieSag(0, 0);
     if (!this.settings.lingerie || !animate) return;
     g.dressing = { time: 0 };
     g.pull = 1.5;
     g.target = 1.5;
+    playSlide(0.55, 900, 3200);
+  }
+
+  undress() {
+    const g = this.garment;
+    if (!g.shown) return;
+    Object.assign(g, {
+      worn: false,
+      stripping: false,
+      dressing: null,
+      peel: 0,
+      freed: false,
+    });
+    playSlide(0.5, 3000, 800);
   }
 
   updateDressing(delta) {
@@ -347,7 +357,7 @@ export class Interaction {
     this.wobbleAll(0.08);
     this.squashVelocity.x += 1.24;
     this.squashAxis.set(0, 1);
-    playSnap(0.72);
+    playSettle();
     buzz(22);
   }
 
@@ -475,12 +485,17 @@ export class Interaction {
         this.firmness.pitch * tool.pitch,
       );
     }
-    if (this.settings.moans && (strength > 1.1 || this.combo % 4 === 0))
-      playMoan(clamp(strength / 1.6, 0.2, 1), this.heat / 100);
     this.ui.onSmack(this.smacks, this.combo, this.pointer.x, this.pointer.y);
     if (this.combo >= 5) this.talk.say("combo", 0.5);
     else if (this.toolName === "lips") this.talk.say("kiss", 0.4);
     else this.talk.say("smack", 0.3);
+    this.emit("smack", {
+      strength,
+      x: this.pointer.x,
+      y: this.pointer.y,
+      combo: this.combo,
+      total: this.smacks,
+    });
 
     if (this.heat >= 100) this.charge();
   }
@@ -507,7 +522,6 @@ export class Interaction {
     playSquish(0.2);
     buzz(8);
     this.talk.say("grab", 0.7);
-    if (this.settings.moans) playMoan(0.3, this.heat / 100);
   }
 
   updateGrab(delta) {
@@ -696,7 +710,6 @@ export class Interaction {
       if (tension > 0.5) this.lens.splash(flung, this.oil);
     }
     playSlap(0.4 + length * 0.6, this.heat / 100, this.oil, 1.1);
-    if (this.settings.moans) playMoan(Math.min(1, length), this.heat / 100);
     this.talk.say("release", 0.6);
     this.heat = Math.min(100, this.heat + 5 * length);
     this.heatHold = CFG.HEAT_DECAY_DELAY;
@@ -718,80 +731,6 @@ export class Interaction {
     return (
       this.settings.lingerie && this.garment.worn && !this.garment.dressing
     );
-  }
-
-  bowAt(x, y) {
-    if (this.settings.bowColor !== "ties" || !this.canStrip()) return 0;
-    const g = this.garment;
-    const side = [1, -1].find((s) => {
-      if (g.ties[s].untied) return false;
-      const at = this.toScreen(this.peach.bows.worldPosition(s, this.bowPoint));
-      return Math.hypot(at.x - x, at.y - y) < 40;
-    });
-    return side || 0;
-  }
-
-  startTug(side) {
-    this.tug = { side, amount: 0 };
-    this.garment.tugBack = null;
-    playSquish(0.2);
-  }
-
-  updateTug() {
-    const p = this.pointer;
-    const reach = Math.min(window.innerWidth, window.innerHeight) * 0.2;
-    const amount = Math.hypot(p.x - p.downX, p.y - p.downY) / reach;
-    this.idle = 0;
-    if (amount >= 1) {
-      this.untie(this.tug.side);
-      this.tug = null;
-      return;
-    }
-    this.tug.amount = amount;
-    this.peach.bows.setTug(this.tug.side, amount * 0.8);
-  }
-
-  endTug() {
-    const { side, amount } = this.tug;
-    this.tug = null;
-    this.garment.tugBack = { side, amount: amount * 0.8 };
-    if (amount > 0.2) playSnap(amount * 0.4);
-  }
-
-  untie(side) {
-    const g = this.garment;
-    g.ties[side].untied = true;
-    this.peach.bows.untie(side);
-    playSnap(0.55);
-    playSquish(0.4);
-    buzz(25);
-    this.wobbleAll(0.06);
-    if (this.settings.moans) playMoan(0.4, this.heat / 100);
-    this.talk.say("strip", 0.6);
-    this.heat = Math.min(100, this.heat + 10);
-    this.heatHold = CFG.HEAT_DECAY_DELAY;
-  }
-
-  updateTies(delta) {
-    const g = this.garment;
-    if (g.tugBack) {
-      g.tugBack.amount *= Math.exp(-delta * 20);
-      this.peach.bows.setTug(g.tugBack.side, g.tugBack.amount);
-      if (g.tugBack.amount < 0.01) {
-        this.peach.bows.setTug(g.tugBack.side, 0);
-        g.tugBack = null;
-      }
-    }
-    [1, -1].forEach((side) => {
-      const t = g.ties[side];
-      t.velocity += ((t.untied ? 1 : 0) - t.sag) * 90 * delta;
-      t.velocity *= Math.exp(-delta * 7);
-      t.sag += t.velocity * delta;
-    });
-    this.peach.setTieSag(g.ties[1].sag * 0.2, g.ties[-1].sag * 0.2);
-    this.peach.bows?.step(delta);
-    if (g.ties[1].untied && g.ties[-1].untied && g.ties[-1].sag > 0.8)
-      this.removeGarment();
   }
 
   onWaistband(x, y) {
@@ -892,7 +831,6 @@ export class Interaction {
     this.kickVelocity.y += amount * 0.4;
     playSnap(amount);
     buzz(10 + Math.round(amount * 25));
-    if (this.settings.moans && amount > 0.4) playMoan(amount, this.heat / 100);
     this.talk.say("snap", 0.7);
     this.heat = Math.min(100, this.heat + 10 * amount);
     this.heatHold = CFG.HEAT_DECAY_DELAY;
@@ -918,8 +856,8 @@ export class Interaction {
     playSnap(Math.min(1, 0.4 + amount * 0.8));
     playSlap(0.4 + amount * 0.5, this.heat / 100, this.oil, 1.2);
     buzz(20 + Math.round(amount * 30));
-    if (this.settings.moans) playMoan(0.4 + amount * 0.6, this.heat / 100);
     this.talk.say("wedgie", 0.8);
+    this.emit("wedgie", { amount });
     this.heat = Math.min(100, this.heat + 8 + 12 * amount);
     this.heatHold = CFG.HEAT_DECAY_DELAY;
     if (this.heat >= 100) this.charge();
@@ -933,21 +871,21 @@ export class Interaction {
     g.freed = false;
     buzz(30);
     playSnap(0.6);
-    if (this.settings.moans) playMoan(0.6, this.heat / 100, "long");
     this.talk.say("stripped");
+    this.emit("stripped");
     this.heat = Math.min(100, this.heat + 20);
     this.heatHold = CFG.HEAT_DECAY_DELAY;
   }
 
   updateGarment(delta) {
     const g = this.garment;
-    if (!this.settings.lingerie) {
+    if (!this.settings.lingerie && (g.worn || g.visible <= 0)) {
+      g.shown = false;
       this.peach.setLingerie(false, 0, 0);
       return;
     }
     if (g.worn) {
       if (g.dressing) this.updateDressing(delta);
-      this.updateTies(delta);
       const target = g.stripping || g.dressing ? g.target : 0;
       const hike = clamp(-g.pull / 0.45, 0, 1);
       g.velocity += (target - g.pull) * 420 * (1 - 0.5 * hike) * delta;
@@ -968,6 +906,7 @@ export class Interaction {
     }
     g.pull += g.velocity * delta;
     this.peach.setLingerie(true, g.pull, g.visible);
+    g.shown = true;
   }
 
   updateClaps(delta) {
@@ -1052,17 +991,6 @@ export class Interaction {
   }
 
   updateOverlays() {
-    const shown = this.group.visible && this.phase !== "burst";
-    if (this.censor.mode !== "off") {
-      if (shown && this.peach.mesh) {
-        const world = this.peach.seamPoint(this.tempA);
-        const at = this.toScreen(world);
-        const width = 1.3 * this.group.scale.x * this.pixelsPerUnit(world);
-        this.censor.place(at.x, at.y, width, -this.group.rotation.z, true);
-      } else {
-        this.censor.place(0, 0, 0, 0, false);
-      }
-    }
     if (this.talk.showing) {
       const anchor = this.tempB.copy(this.group.position);
       anchor.x -= 0.75;
@@ -1079,6 +1007,7 @@ export class Interaction {
   }
 
   charge() {
+    if (this.chargeGuard?.()) return;
     this.phase = "charging";
     this.phaseTime = 0;
     this.chargeTime = CFG.CHARGE_TIME;
@@ -1098,7 +1027,6 @@ export class Interaction {
     buzz([25, 40, 60]);
     this.ui.onCharge();
     playStretch(this.chargeTime);
-    if (this.settings.moans) playClimax(this.chargeTime);
     this.talk.say("charge");
   }
 
@@ -1133,6 +1061,7 @@ export class Interaction {
     this.startSlice();
     this.finishBurst();
     this.talk.say("burst");
+    this.emit("burst", { total: this.bursts });
   }
 
   wobbleAll(amount) {
@@ -1215,12 +1144,18 @@ export class Interaction {
       h.velocity.copy(h.launch);
       h.holder.position.addScaledVector(h.normal, h.side * 0.2);
     });
-    this.juice.burst(this.peach.mesh, { force: 0.9, flying: 1.5, limit: 160 });
+    const power = this.burstPower;
+    this.burstPower = 1;
+    this.juice.burst(this.peach.mesh, {
+      force: 0.9 * power,
+      flying: 1.5 * power,
+      limit: Math.min(240, Math.round(160 * power)),
+    });
     this.sprayCut();
     this.juice.update(1 / 30);
     this.freeze = 0.05;
     if (!reducedMotion.matches) {
-      this.slowmo = 0.35;
+      this.slowmo = Math.min(0.5, 0.35 * power);
       this.trauma = Math.max(this.trauma, 0.8);
       this.zoomVelocity -= 2;
     }
@@ -1385,7 +1320,7 @@ export class Interaction {
     if (this.rubPulse <= 0) {
       this.rubPulse = 0.16 + Math.random() * 0.12;
       const down = this.tempA.set(0, -0.4, -1).normalize();
-      this.peach.addJiggle(hit.point, down, 0.025 * flow, 0.4);
+      this.peach.addJiggle(hit.point, down, 0.01 * flow, 0.4);
       const normal = this.tempB
         .copy(hit.face.normal)
         .transformDirection(this.peach.mesh.matrixWorld);
@@ -1397,8 +1332,6 @@ export class Interaction {
     this.idle = 0;
     this.twerk = null;
     this.ui.onRub();
-    if (this.settings.moans && Math.random() < delta * 0.4)
-      playMoan(0.2 + this.oil * 0.3, this.heat / 100);
     this.talk.say("rub", delta * 0.5);
   }
 
@@ -1450,28 +1383,8 @@ export class Interaction {
       this.endStrip();
     }
 
-    if (this.tug) {
-      if (p.pressed && this.phase === "live" && this.garment.worn) {
-        this.updateTug();
-        this.ui.setCursorState("grab");
-        return;
-      }
-      this.endTug();
-    }
-
     if (this.phase !== "live" || !p.present) {
       this.ui.setCursorState(null);
-      return;
-    }
-    if (
-      p.pressed &&
-      p.onBow &&
-      p.travel > 6 &&
-      !this.garment.ties[p.onBow].untied
-    ) {
-      this.startTug(p.onBow);
-      this.updateTug();
-      this.ui.setCursorState("grab");
       return;
     }
     const hit = this.raycastAt(p.x, p.y);
@@ -1539,8 +1452,6 @@ export class Interaction {
     this.rubbing = 0.2 + strength * 0.35;
     this.idle = 0;
     this.twerk = null;
-    if (this.settings.moans && strength > 0.6 && Math.random() < delta * 0.5)
-      playMoan(0.2 + strength * 0.2, this.heat / 100);
     this.talk.say("rub", delta * 0.5);
   }
 
@@ -1584,7 +1495,6 @@ export class Interaction {
       this.toolName === "hand" &&
       p.armed &&
       p.downOnPeach &&
-      !p.onBow &&
       (!p.onWaistband || p.travel > 28)
     );
   }

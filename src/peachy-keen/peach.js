@@ -47,7 +47,6 @@ const NOIR = [0x0d0508, 0x3a1a24];
 const LINGERIE_COMMON = `
   uniform vec4 uBounds;
   uniform vec4 uLingerie;
-  uniform vec2 uTieSag;
   uniform vec4 uFabric;
   uniform float uCreaseCurve[${CURVE_SLOTS}];
   uniform vec3 uCreaseSide;
@@ -87,7 +86,7 @@ const LINGERIE_COMMON = `
 
   float waistLine(float across, float back) {
     float top = min(uLingerie.w - uLingerie.y * 0.36 - 0.05, uLingerie.w + 0.01);
-    return top - uTieSag.x * smoothstep(0.0, 0.35, across) - uTieSag.y * smoothstep(0.0, 0.35, -across);
+    return top;
   }
 
   float fabricShape(float across, float h, float back, float waist, float soft) {
@@ -172,7 +171,7 @@ const LINGERIE_COMMON = `
     float rise = smoothstep(-0.015, reach, d);
     float fall = exp(-max(d - reach, 0.0) / (1.6 * reach));
     float push = rise * fall * above * uFabric.z - press * uFabric.y;
-    float tuck = (1.0 - smoothstep(0.14, waistLine(across, back) - 0.12, h)) * smoothstep(0.06, 0.14, h)
+    float tuck = (1.0 - smoothstep(0.14, max(waistLine(across, back) - 0.12, 0.141), h)) * smoothstep(0.06, 0.14, h)
       * exp(-pow(across / 0.03, 2.0)) * smoothstep(0.0, 0.4, back);
     return (push - tuck * (0.8 + 2.0 * hike) * uFabric.y) * smoothstep(0.04, 0.2, h);
   }
@@ -905,7 +904,6 @@ export class Peach {
       uGrabDent: { value: new Vector4(0, 0, 0, 1) },
       uBounds: { value: new Vector4(0, 0, 0, 1) },
       uLingerie: { value: new Vector4(0, 0, 0, 0.7) },
-      uTieSag: { value: new Vector2() },
       uCreaseCurve: { value: new Array(CURVE_SLOTS).fill(0) },
       uBridgeMap: { value: null },
       uFabric: {
@@ -1025,7 +1023,6 @@ export class Peach {
       this.followSkin(material, skin),
     );
     mesh.add(this.bows.group);
-    if (this.bowStyle) this.bows.setStyle(this.bowStyle);
     this.band = new Waistband(this, (material) => this.followSurface(material));
     mesh.add(this.band.mesh);
     this.group.add(model);
@@ -1140,45 +1137,6 @@ export class Peach {
     this.uniforms.uBounds.value.set(center.x, center.y, center.z, height);
     this.fitCreaseCurve(geometry, center, height, box.min.y, angle, normal);
     const seamDir = new Vector3(Math.cos(angle), 0, Math.sin(angle));
-    const targetY = -height * 0.2;
-    const seamAngle = Math.atan2(seamDir.z, seamDir.x);
-    const arcBins = 60;
-    const arcRadius = new Float32Array(arcBins).fill(Infinity);
-    const arcPoint = [];
-    const v = new Vector3();
-    for (let i = 0; i < pos.count; i += 1) {
-      v.fromBufferAttribute(pos, i).sub(center);
-      if (Math.abs(v.y - targetY) < height * 0.04) {
-        let d = Math.atan2(v.z, v.x) - seamAngle;
-        d = Math.atan2(Math.sin(d), Math.cos(d));
-        if (Math.abs(d) < 0.9) {
-          const bin = Math.min(
-            arcBins - 1,
-            Math.floor(((d + 0.9) / 1.8) * arcBins),
-          );
-          const radius = Math.hypot(v.x, v.z);
-          if (radius < arcRadius[bin] || !arcPoint[bin]) {
-            arcRadius[bin] = Math.min(arcRadius[bin], radius);
-            arcPoint[bin] = v.clone();
-          }
-        }
-      }
-    }
-    let deepest = -1;
-    for (let k = 0; k < arcBins; k += 1) {
-      if (arcPoint[k] && (deepest < 0 || arcRadius[k] < arcRadius[deepest]))
-        deepest = k;
-    }
-    const valley = deepest >= 0 ? arcPoint[deepest].clone() : null;
-    this.seamOrigin = (
-      valley ||
-      seamDir
-        .clone()
-        .multiplyScalar(height * 0.4)
-        .setY(-height * 0.3)
-    )
-      .add(center)
-      .addScaledVector(seamDir, height * 0.03);
     this.seamDirection = seamDir;
     this.fleshCenter = center.clone();
     this.fleshHeight = height;
@@ -1677,10 +1635,6 @@ export class Peach {
     return stone;
   }
 
-  seamPoint(target) {
-    return target.copy(this.seamOrigin).applyMatrix4(this.mesh.matrixWorld);
-  }
-
   creaseNormal(target) {
     const c = this.uniforms.uCrease.value;
     return target.set(c.x, c.y, c.z).transformDirection(this.mesh.matrixWorld);
@@ -1807,15 +1761,6 @@ export class Peach {
     [u.uHits, u.uPrints].forEach((slots) =>
       slots.value.forEach((v) => v.setW(-1e4)),
     );
-  }
-
-  setTieSag(plus, minus) {
-    this.uniforms.uTieSag.value.set(plus, minus);
-  }
-
-  setBowStyle(style) {
-    this.bowStyle = style;
-    this.bows?.setStyle(style);
   }
 
   setLingerie(on, pull, visible) {
