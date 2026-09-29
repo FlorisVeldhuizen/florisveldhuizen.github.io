@@ -292,7 +292,7 @@ function glass(tint) {
         "#include <opaque_fragment>",
         `#include <opaque_fragment>
         float facing = abs(dot(normalize(vViewPosition), normal));
-        gl_FragColor = vec4(outgoingLight + uRim * (0.015 + pow(1.0 - facing, 3.0) * 0.28), 1.0);`,
+        gl_FragColor = vec4(outgoingLight + uRim * (0.015 + pow(max(1.0 - facing, 0.0), 3.0) * 0.28), 1.0);`,
       );
   };
   return material;

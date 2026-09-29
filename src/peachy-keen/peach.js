@@ -193,7 +193,7 @@ const LINGERIE_COMMON = `
     roll *= 1.0 + uFabricWobble * (0.6 + over);
     float push = roll * uFabric.z - press * uFabric.y;
     float tuck = (1.0 - smoothstep(0.14, max(waist - 0.12, 0.141), h)) * smoothstep(0.06, 0.14, h)
-      * exp(-pow(across / 0.03, 2.0)) * smoothstep(0.0, 0.4, back);
+      * exp(-(across * across) / 0.0009) * smoothstep(0.0, 0.4, back);
     return (push - tuck * (0.8 + 2.0 * hike) * uFabric.y) * smoothstep(0.04, 0.2, h);
   }
 `;
@@ -507,7 +507,7 @@ const FRAGMENT_HEADER = `
     float sweep = 1.0 - smoothstep(panelTop - 0.01, panelTop + 0.06, softAbs(across));
     float trimCount = 60.0;
     float trimU = fract(q.x * trimCount) - 0.5;
-    float trimBump = sqrt(max(0.0, 1.0 - pow(trimU * 2.0, 2.0)));
+    float trimBump = sqrt(max(0.0, 1.0 - 4.0 * trimU * trimU));
     float trimBottom = waist - (0.03 + trimBump * 0.008) * sweep;
     float trim = (1.0 - smoothstep(-aa, aa, trimBottom - h))
       * (1.0 - smoothstep(-aa, aa, h - waist))

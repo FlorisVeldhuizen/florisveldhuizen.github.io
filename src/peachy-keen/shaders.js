@@ -155,7 +155,8 @@ export function createBackgroundMaterial() {
                 float sheen = pow(0.5 + 0.5 * folds, 8.0);
                 col += pale * sheen * (0.12 + 0.2 * smoke);
 
-                float thread = exp(-pow((smoke - 0.52) * 22.0, 2.0));
+                float strand = (smoke - 0.52) * 22.0;
+                float thread = exp(-strand * strand);
                 col += rose * thread * (0.1 + 0.18 * r.y);
 
                 vec2 toSource = p - vec2(0.45 * aspect, 0.75);
