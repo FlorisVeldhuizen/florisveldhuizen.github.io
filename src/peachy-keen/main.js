@@ -11,7 +11,7 @@ import { Talk } from "./spicy";
 import { Naughty } from "./naughty";
 import { MoodLight } from "./mood";
 import { Wild } from "./wild";
-import { unlockAudio, loadSounds, setMuted } from "./audio";
+import { unlockAudio, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
 
 const intro = document.getElementById("intro");
@@ -36,6 +36,8 @@ const juice = new Juice(scene);
 const droplets = new Droplets(scene);
 const lens = new Lens(renderer, scene, camera);
 juice.onSplat = (position, velocity) => lens.splat(position, velocity);
+lens.onHit = (radius, kind) =>
+  playLensHit(kind === "burst" ? 1 : Math.min(1, radius / 10));
 const ui = new UI();
 const talk = new Talk();
 const mood = new MoodLight(scene, renderer, lights);

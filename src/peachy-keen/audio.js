@@ -255,6 +255,67 @@ export function playSplash() {
   }
 }
 
+let lastLensHit = 0;
+
+function wetGrain(at, { from, to = from, q, length, volume }) {
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer();
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.Q.value = q;
+  filter.frequency.setValueAtTime(from, at);
+  filter.frequency.exponentialRampToValueAtTime(to, at + length);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(
+    volume,
+    at + Math.min(0.01, length / 4),
+  );
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+  src.connect(filter).connect(gain).connect(master);
+  src.start(at, Math.random() * 0.5, length + 0.02);
+}
+
+export function playLensHit(amount) {
+  if (!running() || ctx.currentTime - lastLensHit < 0.35) return;
+  const now = ctx.currentTime;
+  lastLensHit = now;
+  // Grains closer than ~20 ms fuse into one wet event; spread wider they read as rain.
+  const spread = 0.04 + amount * 0.05;
+  const grains = 8 + Math.round(amount * 16);
+  for (let n = 0; n < grains; n += 1) {
+    const t = spread * Math.random() ** 2;
+    wetGrain(now + t, {
+      from: 700 + Math.random() * 2300,
+      q: 0.8 + Math.random() * 0.8,
+      length: 0.004 + Math.random() * 0.01,
+      volume:
+        (0.025 + amount * 0.06) *
+        (1 - t / spread) ** 1.5 *
+        (0.4 + Math.random() * 0.6),
+    });
+  }
+  wetGrain(now + 0.004, {
+    from: 500,
+    to: 1500,
+    q: 3,
+    length: 0.06 + amount * 0.05,
+    volume: 0.03 + amount * 0.07,
+  });
+  if (amount < 0.3) return;
+  for (let n = 0; n < 5; n += 1) {
+    const pitch = 800 + Math.random() * 1200;
+    tone(now + 0.01 + Math.random() * spread, {
+      from: pitch,
+      to: pitch * 1.8,
+      sweep: 0.015,
+      length: 0.022,
+      volume: 0.02 + amount * 0.035,
+      attack: 0.002,
+    });
+  }
+}
+
 export function playSquish(amount) {
   noiseHit(1100, 260, 0.13, 0.25 + amount * 0.3);
   noiseHit(2200, 700, 0.06, 0.12 + amount * 0.1);

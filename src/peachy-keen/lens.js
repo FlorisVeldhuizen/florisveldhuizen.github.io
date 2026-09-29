@@ -95,6 +95,7 @@ export class Lens {
   constructor(renderer, scene, camera) {
     Object.assign(this, { renderer, scene, camera });
     this.enabled = true;
+    this.onHit = null;
     this.drops = [];
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d");
@@ -133,12 +134,13 @@ export class Lens {
     this.material.uniforms.tDrops.value = this.texture;
   }
 
-  addDrop(x, y, r, delay = 0, oil = false) {
+  addDrop(x, y, r, delay = 0, oil = false, hit = null) {
     this.drops.push({
       x,
       y,
       r,
       oil,
+      hit,
       age: -delay,
       life: oil ? OIL_LIFE : LIFE,
       vy: 0,
@@ -175,6 +177,7 @@ export class Lens {
     const y = (0.5 - project.y * 0.5) * this.canvas.height;
     const r = Math.min(90, (5 + Math.random() ** 1.8 * 34) * size);
     this.addDrop(x, y, r);
+    this.onHit?.(r, "burst");
 
     const dx = worldVelocity.x;
     const dy = -worldVelocity.y;
@@ -205,6 +208,8 @@ export class Lens {
           (Math.random() - 0.5) * 30,
         1.5 + Math.random() ** 2 * 9 * amount,
         delay,
+        false,
+        "splash",
       );
     }
   }
@@ -219,8 +224,10 @@ export class Lens {
 
     this.drops = this.drops.filter((d) => d.age < d.life);
     this.drops.forEach((d) => {
+      const pending = d.age < 0;
       d.age += delta;
       if (d.age < 0) return;
+      if (pending && d.hit) this.onHit?.(d.r, d.hit);
       if (d.slides && d.age > d.wait) {
         const drag = d.oil ? 0.4 : 1;
         d.vy = Math.min(
