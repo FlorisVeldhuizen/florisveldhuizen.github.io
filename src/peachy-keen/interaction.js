@@ -313,7 +313,7 @@ export class Interaction {
     if (this.slowmo <= 0) return 1;
     this.slowmo -= realDelta;
     const k = 1 - Math.max(0, this.slowmo) / 0.5;
-    return 0.12 + 0.88 * k * k * k;
+    return 0.25 + 0.75 * k * k * k;
   }
 
   enter() {
@@ -1236,7 +1236,7 @@ export class Interaction {
     });
     this.sprayCut();
     this.juice.update(1 / 30);
-    this.freeze = 0.08;
+    this.freeze = 0.05;
     if (!reducedMotion.matches) {
       this.slowmo = Math.min(0.5, 0.35 * power);
       this.trauma = Math.max(this.trauma, 0.8);
@@ -1249,6 +1249,7 @@ export class Interaction {
     playSnap(1);
     playBurst();
     playSplash();
+    this.emit("snap");
   }
 
   sprayCut() {

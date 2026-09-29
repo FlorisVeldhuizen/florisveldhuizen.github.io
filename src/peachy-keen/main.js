@@ -11,6 +11,7 @@ import { Talk } from "./spicy";
 import { Naughty } from "./naughty";
 import { MoodLight } from "./mood";
 import { Wild } from "./wild";
+import { Shock } from "./shock";
 import { unlockAudio, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
 
@@ -70,6 +71,7 @@ const interaction = new Interaction({
 });
 const naughty = new Naughty(interaction, talk);
 const wild = new Wild({ scene, camera, interaction, talk, backdrop });
+const shock = new Shock(renderer, interaction);
 settings.applyAll();
 
 function setProgress(fraction) {
@@ -98,6 +100,7 @@ peach.load(setProgress).then(async () => {
     renderer.compileAsync(scene, camera),
     renderer.compileAsync(lens.overlay, lens.overlayCamera),
     renderer.compileAsync(juice.mesh, juiceCamera, scene),
+    renderer.compileAsync(shock.scene, shock.camera),
   ]);
   showWarmups(false);
   await compiled;
@@ -172,6 +175,8 @@ renderer.setAnimationLoop(() => {
   juice.splatHalf.set(halfHeight * camera.aspect, halfHeight);
   droplets.update(delta);
   lens.update(delta);
+  shock.update(realDelta);
   backdrop.render();
   lens.render([juice, droplets]);
+  shock.render();
 });
