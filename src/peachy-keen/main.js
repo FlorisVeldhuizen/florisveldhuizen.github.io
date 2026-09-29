@@ -2,7 +2,7 @@ import { Group, Clock, Color } from "three";
 import { initScene, setupResizeHandler, QualityGovernor } from "./scene";
 import { createBackdrop } from "./backdrop";
 import { Peach } from "./peach";
-import { Juice, Droplets } from "./juice";
+import { Juice, Droplets, JUICE_LAYER } from "./juice";
 import { Lens } from "./lens";
 import { Interaction } from "./interaction";
 import { UI } from "./ui";
@@ -89,12 +89,15 @@ peach.load(setProgress).then(async () => {
   };
   showWarmups(true);
   renderer.shadowMap.enabled = true;
+  const juiceCamera = camera.clone();
+  juiceCamera.layers.set(JUICE_LAYER);
   const shadowed = renderer.compileAsync(scene, camera);
   renderer.shadowMap.enabled = false;
   const compiled = Promise.all([
     shadowed,
     renderer.compileAsync(scene, camera),
     renderer.compileAsync(lens.overlay, lens.overlayCamera),
+    renderer.compileAsync(juice.mesh, juiceCamera, scene),
   ]);
   showWarmups(false);
   await compiled;

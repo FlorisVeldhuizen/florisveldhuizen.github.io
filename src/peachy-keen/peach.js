@@ -297,6 +297,41 @@ const VERTEX_NORMAL = `
   #endif
 `;
 
+const MARKER_HEADER = `
+  uniform vec4 uMarker;
+  uniform vec3 uMarkerAxisX;
+  uniform vec3 uMarkerAxisY;
+  uniform vec3 uMarkerColor;
+  uniform float uMarkerShown;
+  uniform float uMarkerShape;
+  uniform vec2 uMarkerStyle;
+
+  float markerShape(vec2 p, float r) {
+    if (uMarkerShape > 1.5) {
+      float w = r * 0.7;
+      float reach = r - w;
+      return length(vec2(p.x, p.y - clamp(p.y, -reach, reach))) - w;
+    }
+    if (uMarkerShape > 0.5) {
+      float ry = p.y > 0.0 ? r * 1.1 : r * 0.9;
+      return (length(vec2(p.x / r, p.y / ry)) - 1.0) * r;
+    }
+    return length(p) - r;
+  }
+
+  // fwidth needs every pixel on the same path, so nothing may return early before it.
+  float markerAmount() {
+    vec3 q = vRestPosition - uMarker.xyz;
+    vec3 normal = cross(uMarkerAxisX, uMarkerAxisY);
+    float d = markerShape(vec2(dot(q, uMarkerAxisX), dot(q, uMarkerAxisY)), uMarker.w);
+    float pixels = d / max(fwidth(d), 1e-6);
+    float ring = 1.0 - smoothstep(uMarkerStyle.x - 0.5, uMarkerStyle.x + 0.5, abs(pixels));
+    float inside = (1.0 - smoothstep(-0.5, 0.5, pixels)) * uMarkerStyle.y;
+    float near = step(abs(dot(q, normal)), uMarker.w);
+    return max(ring, inside) * near * uMarkerShown;
+  }
+`;
+
 const FRAGMENT_HEADER = `
   uniform vec3 uRingCenter;
   uniform vec3 uRingAxisX;
@@ -344,38 +379,7 @@ const FRAGMENT_HEADER = `
   uniform float uPrintInk;
   varying vec3 vRestPosition;
   varying float vFabricPush;
-  uniform vec4 uMarker;
-  uniform vec3 uMarkerAxisX;
-  uniform vec3 uMarkerAxisY;
-  uniform vec3 uMarkerColor;
-  uniform float uMarkerShown;
-  uniform float uMarkerShape;
-  uniform vec2 uMarkerStyle;
-
-  float markerShape(vec2 p, float r) {
-    if (uMarkerShape > 1.5) {
-      float w = r * 0.7;
-      float reach = r - w;
-      return length(vec2(p.x, p.y - clamp(p.y, -reach, reach))) - w;
-    }
-    if (uMarkerShape > 0.5) {
-      float ry = p.y > 0.0 ? r * 1.1 : r * 0.9;
-      return (length(vec2(p.x / r, p.y / ry)) - 1.0) * r;
-    }
-    return length(p) - r;
-  }
-
-  // fwidth needs every pixel on the same path, so nothing may return early before it.
-  float markerAmount() {
-    vec3 q = vRestPosition - uMarker.xyz;
-    vec3 normal = cross(uMarkerAxisX, uMarkerAxisY);
-    float d = markerShape(vec2(dot(q, uMarkerAxisX), dot(q, uMarkerAxisY)), uMarker.w);
-    float pixels = d / max(fwidth(d), 1e-6);
-    float ring = 1.0 - smoothstep(uMarkerStyle.x - 0.5, uMarkerStyle.x + 0.5, abs(pixels));
-    float inside = (1.0 - smoothstep(-0.5, 0.5, pixels)) * uMarkerStyle.y;
-    float near = step(abs(dot(q, normal)), uMarker.w);
-    return max(ring, inside) * near * uMarkerShown;
-  }
+  ${MARKER_HEADER}
 
   float handprintMask() {
     float m = 0.0;
@@ -1084,8 +1088,15 @@ export class Peach {
         .replace("#include <common>", `#include <common>\n${VERTEX_HEADER}`)
         .replace(
           "#include <begin_vertex>",
-          "vec3 transformed = position;\nif (uJiggleActive > 0.5) transformed += jiggle(position, normal);",
+          "vec3 transformed = position;\nvRestPosition = position;\nif (uJiggleActive > 0.5) transformed += jiggle(position, normal);",
         );
+      // eslint-disable-next-line no-param-reassign
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          `#include <common>\nvarying vec3 vRestPosition;\n${MARKER_HEADER}`,
+        )
+        .replace("#include <colorspace_fragment>", MARKER_FRAGMENT);
     };
   }
 

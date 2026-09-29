@@ -1493,7 +1493,12 @@ export class Interaction {
     if (this.garment.stripping) {
       if (p.pressed && this.phase === "live" && this.garment.worn) {
         this.updateStrip(delta);
-        this.ui.setCursorState("grab");
+        const hit = this.raycastAt(p.x, p.y);
+        if (hit) {
+          this.markerSpot = this.marker.fromHit(hit);
+          this.markerStyle = MARKERS.grab;
+        }
+        this.ui.setCursorState(hit ? "hold" : "grab");
         return;
       }
       this.endStrip();
