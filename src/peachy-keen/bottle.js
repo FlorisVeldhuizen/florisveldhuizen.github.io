@@ -2,6 +2,7 @@ import { Vector2, Vector3, Plane, Raycaster, Quaternion, Matrix4 } from "three";
 import { playCork } from "./audio";
 import { BottleModel } from "./bottle3d";
 import OilStream from "./stream";
+import OilShadow from "./oilshadow";
 import { clamp, ease, reducedMotion } from "./util";
 
 const PEACH_BASE = 1.6;
@@ -177,6 +178,7 @@ export class Bottle {
     this.el = document.getElementById("bottle");
     this.stream = new OilStream(document.getElementById("bottle-stream"));
     this.view = new ModelView(scene, camera);
+    this.oilShadow = new OilShadow(scene, camera);
 
     this.screen = { x: 0, y: 0, angle: 0 };
     this.velocity = { x: 0, y: 0, angle: 0 };
@@ -187,6 +189,7 @@ export class Bottle {
     this.swing = 1;
     this.normal = new Vector3(0, 0, 1);
     this.surface = new Vector3();
+    this.spoutWorld = new Vector3();
     this.spoutPoint = { x: 0, y: 0 };
     this.slosh = 0;
     this.sloshVelocity = 0;
@@ -246,7 +249,7 @@ export class Bottle {
     this.el.classList.add("is-carried");
   }
 
-  carry(x, y, vx, hit, peach, delta) {
+  carry(x, y, vx, hit, landing, peach, delta) {
     this.time += delta;
     this.flow += ((hit ? 1 : 0) - this.flow) * ease(9, delta);
     const across = clamp((x - peach.x) / peach.radius, -1, 1);
@@ -285,8 +288,12 @@ export class Bottle {
     this.yaw = Math.sin(this.time * 0.6) * 0.25 + clamp(vx * 0.6, -0.5, 0.5);
     this.place(delta);
     const start = this.view.spoutScreen();
-    const landing = hit ? { x, y } : null;
     this.stream.update(start, this.screen.angle, landing, pour, delta);
+    if (hit) {
+      const spoutZ = this.view.model.spoutWorld(this.spoutWorld).z;
+      this.oilShadow.anchor(start.y, spoutZ, landing.y, hit.point.z);
+    }
+    this.oilShadow.update(this.stream);
     return pour;
   }
 
@@ -345,6 +352,7 @@ export class Bottle {
   update(delta) {
     if (this.carried) return;
     if (this.stream.active) this.stream.update(null, 0, undefined, 0, delta);
+    this.oilShadow.update(this.stream);
     this.time += delta;
     this.updateHome();
     const v = this.velocity;

@@ -6,6 +6,8 @@ import {
   PMREMGenerator,
   HemisphereLight,
   PointLight,
+  DirectionalLight,
+  PCFSoftShadowMap,
   Mesh,
   SphereGeometry,
   MeshBasicMaterial,
@@ -79,6 +81,8 @@ export function initScene() {
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.6;
   renderer.localClippingEnabled = true;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFSoftShadowMap;
   renderer.domElement.id = "stage";
   document.body.prepend(renderer.domElement);
 
@@ -91,8 +95,23 @@ export function initScene() {
     o.material?.dispose();
   });
 
-  const hemi = new HemisphereLight(0xffe4ea, 0x7a3060, 1.9);
+  const hemi = new HemisphereLight(0xffe4ea, 0x7a3060, 1.1);
   scene.add(hemi);
+
+  const key = new DirectionalLight(0xffe2d4, 0.8);
+  key.position.set(-4, 5, 6);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  Object.assign(key.shadow.camera, {
+    left: -3.5,
+    right: 3.5,
+    top: 3.5,
+    bottom: -3.5,
+    near: 1,
+    far: 18,
+  });
+  key.shadow.normalBias = 0.02;
+  scene.add(key);
 
   const rose = new PointLight(0xff4f9a, 70, 30);
   rose.position.set(-4, 2.5, -3.5);
@@ -102,7 +121,7 @@ export function initScene() {
   peachRim.position.set(4, -1, -3);
   scene.add(peachRim);
 
-  return { scene, camera, renderer, lights: { hemi, rose, peachRim } };
+  return { scene, camera, renderer, lights: { hemi, key, rose, peachRim } };
 }
 
 export function setupResizeHandler(camera, renderer, onResize) {

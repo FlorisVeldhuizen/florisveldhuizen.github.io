@@ -23,6 +23,9 @@ import {
 } from "./config";
 import { Bottle } from "./bottle";
 import { clamp, reducedMotion } from "./util";
+import SurfaceMarker, { MARKERS, surfaceNormal } from "./marker";
+
+const DROP_STEP_PX = 12;
 
 const buzz = (ms) => navigator.vibrate?.(ms);
 const SLICE_HOLD = 0.42;
@@ -127,6 +130,9 @@ export class Interaction {
     this.carrying = false;
     this.carryLatched = false;
     this.bottle = new Bottle(scene, camera);
+    this.marker = new SurfaceMarker(peach, camera);
+    this.markerSpot = null;
+    this.markerStyle = MARKERS.hand;
     this.bottle.stream.onLens = (x, y, r) => this.lens.oilSplat(x, y, r);
     this.grab = null;
     this.recoil = null;
@@ -154,6 +160,7 @@ export class Interaction {
     this.zoom = 0;
     this.zoomVelocity = 0;
     this.listeners = {};
+    this.pose = { x: 0, lift: 0, yaw: 0, roll: 0 };
     this.chargeGuard = null;
     this.burstPower = 1;
 
@@ -175,7 +182,7 @@ export class Interaction {
   setTool(name) {
     this.toolName = TOOLS[name] ? name : "hand";
     this.tool = TOOLS[this.toolName];
-    this.peach.setTool(this.toolName === "lips" ? "lips" : "hand");
+    this.peach.setTool(this.toolName);
     this.ui.setTool(this.toolName);
   }
 
@@ -230,9 +237,7 @@ export class Interaction {
     });
     const release = (e) => {
       const tapped =
-        e.type === "pointerup" &&
-        e.timeStamp - p.downAt < 220 &&
-        p.travel < 14;
+        e.type === "pointerup" && e.timeStamp - p.downAt < 220 && p.travel < 14;
       if (this.carrying && e.type === "pointerup") {
         this.carryLatched = !this.carryLatched && tapped;
       }
@@ -338,6 +343,7 @@ export class Interaction {
     });
     if (!this.settings.lingerie || !animate) return;
     g.dressing = { time: 0, landed: false };
+    g.visible = 0;
     g.pull = 1.5;
     g.target = 1.5;
   }
@@ -358,6 +364,8 @@ export class Interaction {
     const g = this.garment;
     g.dressing.time += delta;
     const t = Math.min(1, g.dressing.time / 0.55);
+    const fade = Math.min(1, g.dressing.time / 0.3);
+    g.visible = fade * fade * (3 - 2 * fade);
     g.target = t < 1 ? 1.5 - 1.64 * t * t * (3 - 2 * t) : 0;
     if (!g.dressing.landed && (g.pull <= 0 || t >= 1)) {
       g.dressing.landed = true;
@@ -399,6 +407,43 @@ export class Interaction {
     return this.raycaster.intersectObject(this.peach.mesh, false)[0] || null;
   }
 
+  pourHit(x, y) {
+    const hit = this.raycastAt(x, y);
+    if (hit || !this.peach.mesh) return hit;
+    const bottom =
+      this.toScreen(this.group.position).y +
+      1.4 * this.pixelsPerUnit(this.group.position);
+    let miss = y;
+    let found = null;
+    for (let at = y + DROP_STEP_PX; at < bottom; at += DROP_STEP_PX) {
+      found = this.raycastAt(x, at);
+      if (found) break;
+      miss = at;
+    }
+    if (!found) return null;
+    let near = miss + DROP_STEP_PX;
+    for (let i = 0; i < 4; i += 1) {
+      const middle = (miss + near) / 2;
+      const probe = this.raycastAt(x, middle);
+      if (probe) {
+        found = probe;
+        near = middle;
+      } else {
+        miss = middle;
+      }
+    }
+    return found;
+  }
+
+  landingAt(hit) {
+    const at = this.toScreen(hit.point);
+    const normal = surfaceNormal(hit, this.tempA);
+    const facing = this.tempB.copy(this.camera.position).sub(hit.point);
+    const squash = Math.abs(normal.dot(facing.normalize()));
+    normal.transformDirection(this.camera.matrixWorldInverse);
+    return { ...at, tilt: Math.atan2(-normal.y, normal.x), squash };
+  }
+
   tap() {
     if (this.phase !== "live") return;
     const now = performance.now();
@@ -413,8 +458,8 @@ export class Interaction {
     if (hit) this.smack(hit, 0, 0, 0.9);
   }
 
-  smack(hit, vx, vy, strength) {
-    const { tool } = this;
+  smack(hit, vx, vy, strength, toolName = this.toolName) {
+    const tool = TOOLS[toolName];
     const now = performance.now();
     const tapped = vx === 0 && vy === 0;
     const swipe = tapped
@@ -445,7 +490,7 @@ export class Interaction {
     this.squashAxis.set(Math.abs(swipe.x), Math.abs(swipe.y));
     if (tapped) this.squashAxis.set(0.5, 0.5);
 
-    if (this.settings.handprints) {
+    if (this.settings.handprints && tool.print) {
       const tilt = tapped
         ? (Math.random() - 0.5) * 0.6
         : Math.atan2(swipe.y * Math.sign(swipe.x || 1), Math.abs(swipe.x)) +
@@ -456,7 +501,7 @@ export class Interaction {
         tilt,
         swipe.x < 0,
         Math.min(0.9, 0.45 + strength * 0.3),
-        this.toolName === "lips"
+        toolName === "lips"
           ? 1
           : clamp((strength - 0.5) / 0.7, 0, 1) * (0.75 + Math.random() * 0.25),
         tool.print,
@@ -480,7 +525,7 @@ export class Interaction {
     if (strength * tool.force > 1.3) this.hitStop = 0.045;
     this.kickVelocity.addScaledVector(swipe, 0.5 * strength * tool.force);
 
-    if (this.toolName === "lips") {
+    if (toolName === "lips") {
       playKiss();
     } else {
       playSlap(
@@ -492,7 +537,7 @@ export class Interaction {
     }
     this.ui.onSmack(this.smacks, this.combo, this.pointer.x, this.pointer.y);
     if (this.combo >= 5) this.talk.say("combo", 0.5);
-    else if (this.toolName === "lips") this.talk.say("kiss", 0.4);
+    else if (toolName === "lips") this.talk.say("kiss", 0.4);
     else this.talk.say("smack", 0.3);
     this.emit("smack", {
       strength,
@@ -500,9 +545,18 @@ export class Interaction {
       y: this.pointer.y,
       combo: this.combo,
       total: this.smacks,
+      tool: toolName,
     });
 
     if (this.heat >= 100) this.charge();
+  }
+
+  holdMarker() {
+    if (this.grab) {
+      this.markerSpot = this.grab;
+      this.markerStyle = MARKERS.grab;
+    }
+    this.ui.setCursorState(this.grab ? "hold" : "over");
   }
 
   startGrab(hit) {
@@ -561,9 +615,7 @@ export class Interaction {
     const speed = g.pullVelocity.length();
     g.tension = length / limit;
     g.age += delta;
-    const still =
-      g.age > 0.25 &&
-      motion.speed < CFG.GRAB_STILL_SPEED;
+    const still = g.age > 0.25 && motion.speed < CFG.GRAB_STILL_SPEED;
     g.knead = still
       ? Math.min(1, g.knead + delta / CFG.GRAB_KNEAD_SECONDS)
       : Math.max(0, g.knead - delta * 1.5);
@@ -614,6 +666,7 @@ export class Interaction {
   releaseGrab() {
     const g = this.grab;
     const length = g.pull.length();
+    this.emit("release", { knead: g.knead, length });
     this.velocity.addScaledVector(g.pull, -1.6);
     if (length > 0.08) playSquish(0.2 + length * 0.3);
     if (g.knead > 0.2) {
@@ -1034,6 +1087,7 @@ export class Interaction {
     buzz([25, 40, 60]);
     this.ui.onCharge();
     this.talk.say("charge");
+    this.emit("charge");
   }
 
   updateCharge(delta) {
@@ -1357,7 +1411,7 @@ export class Interaction {
     this.ui.placeCursor(p.x, p.y);
   }
 
-  pour(hit, motion, flow, delta) {
+  pour(hit, landing, motion, flow, delta) {
     const spread = clamp(motion.speed / 1.2, 0, 1);
     this.rubbing = 0.25 + spread * 0.35;
     this.oil = Math.min(
@@ -1373,7 +1427,7 @@ export class Interaction {
         .copy(hit.face.normal)
         .transformDirection(this.peach.mesh.matrixWorld);
       this.droplets.spray(hit.point, normal, down, 0);
-      this.bottle.splash(this.pointer.x, this.pointer.y);
+      this.bottle.splash(landing.x, landing.y);
       playGlug(flow);
       buzz(4);
     }
@@ -1386,19 +1440,31 @@ export class Interaction {
     const p = this.pointer;
     const motion = this.pointerSpeed(performance.now());
     this.ui.shapeCursor(motion.vx, motion.vy, p.present, delta);
+    this.markerSpot = null;
     this.rubbing = 0;
 
     if (this.carrying) {
       if ((p.pressed || this.carryLatched) && this.phase === "live") {
-        const hit = this.raycastAt(p.x, p.y);
+        const hit = this.pourHit(p.x, p.y);
+        const landing = hit ? this.landingAt(hit) : null;
         const peach = {
           x: this.toScreen(this.group.position).x,
           radius: 1.4 * this.pixelsPerUnit(this.group.position),
           center: this.group.position,
           worldRadius: 1.4,
         };
-        const flow = this.bottle.carry(p.x, p.y, motion.vx, hit, peach, delta);
-        if (hit && flow > 0.4) this.pour(hit, motion, flow, delta);
+        const flow = this.bottle.carry(
+          p.x,
+          p.y,
+          motion.vx,
+          hit,
+          landing,
+          peach,
+          delta,
+        );
+        this.markerSpot = hit && this.marker.fromHit(hit);
+        this.markerStyle = MARKERS.oil;
+        if (hit && flow > 0.4) this.pour(hit, landing, motion, flow, delta);
         this.bottle.fling(motion, delta);
         this.ui.setCursorState("carry");
         return;
@@ -1418,7 +1484,7 @@ export class Interaction {
         this.ui.setGrabTension(0);
       } else if (p.pressed && this.phase === "live") {
         this.updateGrab(delta, motion);
-        this.ui.setCursorState(this.grab ? "grab" : "over");
+        this.holdMarker();
         return;
       } else {
         this.releaseGrab();
@@ -1459,7 +1525,7 @@ export class Interaction {
       } else if (this.canGrab()) {
         this.startGrab(hit);
         this.updateGrab(delta, motion);
-        this.ui.setCursorState(this.grab ? "grab" : "over");
+        this.holdMarker();
         return;
       }
     } else {
@@ -1467,6 +1533,8 @@ export class Interaction {
       if (motion.speed > CFG.MASSAGE_MIN_SPEED)
         this.massageAt(hit, motion, delta);
     }
+    this.markerSpot = hit && this.marker.fromHit(hit);
+    this.markerStyle = MARKERS[this.toolName];
     this.ui.setCursorState(p.inside ? "over" : null);
   }
 
@@ -1643,15 +1711,16 @@ export class Interaction {
         ? ((this.heat - 70) / 30) * 0.02
         : 0;
 
+    const { pose } = this;
     g.position.set(
-      this.offset.x,
-      this.offset.y + Math.sin(t * 1.4) * 0.12 * calm,
+      this.offset.x + pose.x,
+      this.offset.y + Math.sin(t * 1.4) * 0.12 * calm + pose.lift,
       this.offset.z,
     );
     g.rotation.set(
       this.tilt.x,
-      Math.sin(t * 0.45) * 0.25 * calm + this.tilt.y,
-      this.tilt.z + Math.sin(t * 43) * tremble,
+      Math.sin(t * 0.45) * 0.25 * calm + this.tilt.y + pose.yaw,
+      this.tilt.z + Math.sin(t * 43) * tremble + pose.roll,
     );
 
     let grow = 1;
@@ -1744,6 +1813,13 @@ export class Interaction {
     }
 
     this.handlePointer(delta);
+    const holding = this.grab && this.markerSpot === this.grab;
+    this.marker.update(
+      this.markerSpot,
+      this.markerStyle,
+      delta,
+      holding ? this.grab.tension * 0.35 : 0,
+    );
     this.updateMassage(delta);
     this.updateRecoil(delta);
     if (this.phase === "live") this.updateTwerk(delta);

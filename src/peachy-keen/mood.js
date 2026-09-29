@@ -1,19 +1,27 @@
 import { Color, PointLight } from "three";
 import { reducedMotion } from "./util";
 
-const DIM = { hemi: 0.3, exposure: 0.92, rose: 2.6, rim: 1.8, env: 0.5 };
+const DIM = {
+  hemi: 0.3,
+  key: 0.3,
+  exposure: 0.92,
+  rose: 2.6,
+  rim: 1.8,
+  env: 0.5,
+};
 const MATTE = { specular: 0.25, sheen: 0.45 };
 const DEEP_ROSE = new Color(0xff1f5c);
 const EMBER = new Color(0xff5a2a);
 const WINE = new Color(0x2a0414);
 
 export class MoodLight {
-  constructor(scene, renderer, { hemi, rose, peachRim }) {
-    Object.assign(this, { scene, renderer, hemi, rose, rim: peachRim });
+  constructor(scene, renderer, { hemi, key, rose, peachRim }) {
+    Object.assign(this, { scene, renderer, hemi, key, rose, rim: peachRim });
     this.base = {
       hemi: hemi.intensity,
       hemiSky: hemi.color.clone(),
       hemiGround: hemi.groundColor.clone(),
+      key: key.intensity,
       rose: rose.intensity,
       roseColor: rose.color.clone(),
       rim: peachRim.intensity,
@@ -85,6 +93,7 @@ export class MoodLight {
     this.hemi.intensity = lerp(base.hemi, base.hemi * DIM.hemi);
     this.hemi.color.copy(base.hemiSky).lerp(EMBER, k * 0.35);
     this.hemi.groundColor.copy(base.hemiGround).lerp(WINE, k);
+    this.key.intensity = lerp(base.key, base.key * DIM.key);
     this.rose.intensity = lerp(
       base.rose,
       base.rose * DIM.rose * (1 + heat * 0.4),

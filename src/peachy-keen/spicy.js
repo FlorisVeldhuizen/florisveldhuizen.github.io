@@ -117,6 +117,19 @@ const LINES = {
       "Be nice to me.",
       "What now? You decide.",
     ],
+    buzz: [
+      "Oh. Oh, that's new.",
+      "Turn it up.",
+      "Don't you dare stop.",
+      "Where did you get that?",
+      "Bzzzz. Yes.",
+    ],
+    disco: [
+      "Watch me move.",
+      "Is this song about me?",
+      "Shake it for you.",
+      "Bounce with me.",
+    ],
   },
   shy: {
     smack: [
@@ -241,6 +254,17 @@ const LINES = {
       "Nobody sees me like this.",
       "Say something.",
       "Be gentle with me.",
+    ],
+    buzz: [
+      "What is that?!",
+      "It tickles… a lot…",
+      "My whole pit is shaking…",
+      "Too much— no, stay.",
+    ],
+    disco: [
+      "I don't dance… usually.",
+      "Is everyone watching?",
+      "My cheeks have rhythm?",
     ],
   },
 };

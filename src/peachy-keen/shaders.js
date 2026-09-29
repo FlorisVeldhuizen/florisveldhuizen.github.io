@@ -13,12 +13,20 @@ export function createBackgroundMaterial() {
     uniforms: {
       time: { value: 0 },
       heat: { value: 0 },
+      disco: { value: 0 },
+      kick: { value: 0 },
+      beat: { value: 0 },
+      ballAt: { value: new Vector2(0, 0.43) },
       resolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
     },
     vertexShader: VERTEX_SHADER,
     fragmentShader: `
             uniform float time;
             uniform float heat;
+            uniform float disco;
+            uniform float kick;
+            uniform float beat;
+            uniform vec2 ballAt;
             uniform vec2 resolution;
             varying vec2 vUv;
 
@@ -76,6 +84,44 @@ export function createBackgroundMaterial() {
                 return step(0.9, h) * twinkle * smoothstep(0.05, 0.0, length(f - o));
             }
 
+            vec3 hue(float x) {
+                return 0.5 + 0.5 * cos(6.2831 * (x + vec3(0.0, 0.33, 0.67)));
+            }
+
+            vec3 club(vec2 p, float smoke) {
+                vec2 d = p - ballAt;
+                float dist = length(d);
+                float ang = atan(d.x, -d.y);
+                vec3 light = vec3(0.0);
+                for (int k = 0; k < 6; k++) {
+                    float fk = float(k);
+                    float swing = sin(beat * 3.14159 * (0.125 + 0.03 * fk) + fk * 1.9);
+                    float a = (fk - 2.5) * 0.32 + swing * 0.45;
+                    float cone = 0.012 + dist * 0.035;
+                    float beam = smoothstep(cone, 0.0, abs(ang - a) * dist);
+                    beam *= smoothstep(0.03, 0.2, dist) * smoothstep(1.5, 0.3, dist);
+                    float pulse = mod(fk, 2.0) < 0.5 ? kick : 1.0 - kick;
+                    light += hue(fk / 6.0 + beat * 0.02) * beam * (0.2 + 0.8 * smoke) * (0.25 + 0.75 * pulse);
+                }
+
+                float spin = beat * 0.06;
+                vec2 polar = vec2((ang + spin) * 9.0, log(dist + 0.02) * 9.0);
+                vec2 cell = floor(polar);
+                vec2 f = fract(polar) - 0.5;
+                float h = hash(cell);
+                vec2 jitter = (vec2(hash(cell + 3.1), hash(cell + 7.7)) - 0.5) * 0.4;
+                float spot = step(0.62, h) * smoothstep(0.2, 0.06, length(f - jitter));
+                light += hue(h * 3.0 + beat * 0.05) * spot * (0.18 + 0.4 * kick) * smoothstep(0.08, 0.35, dist);
+
+                float floorGlow = smoothstep(-0.15, -0.55, p.y);
+                float tiles = 0.5 + 0.5 * sin(p.x * 7.0 + floor(beat) * 2.1);
+                light += hue(floor(beat) * 0.13 + p.x * 0.2) * floorGlow * tiles * (0.12 + 0.28 * kick);
+
+                float haze = exp(-dist * dist * 6.0);
+                light += vec3(1.0, 0.85, 1.0) * haze * (0.05 + 0.12 * kick);
+                return light;
+            }
+
             void main() {
                 vec2 uv = vUv;
                 float aspect = resolution.x / resolution.y;
@@ -125,6 +171,11 @@ export function createBackgroundMaterial() {
                 col += pale * dust * (0.3 + smoke);
 
                 col *= mix(0.65, 1.0, smoothstep(1.4, 0.25, length(p * vec2(0.8, 1.0))));
+
+                if (disco > 0.001) {
+                    col = mix(col, col * vec3(0.35, 0.28, 0.5), disco * 0.7);
+                    col += club(p, smoke) * disco;
+                }
 
                 gl_FragColor = vec4(col, 1.0);
             }

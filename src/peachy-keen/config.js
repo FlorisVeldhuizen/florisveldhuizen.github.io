@@ -23,6 +23,7 @@ export const FABRIC = {
 export const TOOLS = {
   hand: { force: 1, reach: 0.8, print: 1.4, pitch: 1, heat: 1 },
   lips: { force: 0.3, reach: 0.55, print: 0.8, pitch: 1, heat: 0.6 },
+  buzz: { force: 0.25, reach: 0.5, print: 0, pitch: 1.2, heat: 0.4 },
 };
 
 export const PHYSICS_CONFIG = {

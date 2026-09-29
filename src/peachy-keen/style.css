@@ -323,17 +323,17 @@ button:focus-visible {
     height 0.18s ease,
     margin 0.18s ease,
     background-color 0.18s ease,
-    border-color 0.18s ease;
+    border-color 0.18s ease,
+    opacity 0.18s ease;
 }
 
 .cursor[data-state="over"] span {
-  width: 46px;
-  height: 46px;
-  margin: -23px 0 0 -23px;
   border-color: var(--peach);
+  opacity: 0;
 }
 
-.cursor[data-state="carry"] span {
+.cursor[data-state="carry"] span,
+.cursor[data-state="hold"] span {
   opacity: 0;
 }
 
@@ -752,6 +752,40 @@ button:focus-visible {
   }
 
   .mood-light i {
+    animation: none;
+  }
+}
+
+.cursor[data-tool="buzz"] span {
+  width: 24px;
+  margin-left: -12px;
+  border-width: 2px;
+  border-color: #ff5fa8;
+  border-radius: 999px;
+}
+
+.cursor[data-buzzing="true"] span {
+  background-color: rgba(255, 95, 168, 0.3);
+  box-shadow: 0 0 14px rgba(255, 95, 168, 0.6);
+  animation: buzz-cursor 0.04s linear infinite alternate;
+}
+
+@keyframes buzz-cursor {
+  from {
+    translate: -1.5px 1px;
+  }
+  to {
+    translate: 1.5px -1px;
+  }
+}
+
+.buzz-mode {
+  color: #ff6fb8;
+  font-size: 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor[data-buzzing="true"] span {
     animation: none;
   }
 }

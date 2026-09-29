@@ -7,6 +7,8 @@ import {
   Quaternion,
   Matrix4,
   Mesh,
+  MeshDepthMaterial,
+  RGBADepthPacking,
   Vector3,
 } from "three";
 import { satinMaterial, waistHeight } from "./band";
@@ -121,6 +123,8 @@ export class RibbonBows {
     };
     this.material = satinMaterial();
     followSkin(this.material, this.skin);
+    this.depth = new MeshDepthMaterial({ depthPacking: RGBADepthPacking });
+    followSkin(this.depth, this.skin);
     this.prepared = false;
     this.pull = null;
     this.basis = new Matrix4();
@@ -171,9 +175,13 @@ export class RibbonBows {
         }
       }
     }
-    bowGeometries(height * 0.05).forEach((g) =>
-      this.bow.add(new Mesh(g, this.material)),
-    );
+    bowGeometries(height * 0.05).forEach((g) => {
+      const mesh = new Mesh(g, this.material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.customDepthMaterial = this.depth;
+      this.bow.add(mesh);
+    });
     this.angle = Math.atan2(
       pos.getZ(spot) - bounds.z,
       pos.getX(spot) - bounds.x,

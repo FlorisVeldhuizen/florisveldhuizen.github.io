@@ -4,6 +4,8 @@ import {
   LatheGeometry,
   CylinderGeometry,
   MeshPhysicalMaterial,
+  MeshDepthMaterial,
+  RGBADepthPacking,
   Vector2,
   Vector3,
   Plane,
@@ -296,6 +298,19 @@ function glass(tint) {
   return material;
 }
 
+function sparseShadow() {
+  const material = new MeshDepthMaterial({ depthPacking: RGBADepthPacking });
+  material.onBeforeCompile = (shader) => {
+    // Half the shadow-map texels stay open, so soft filtering halves the shadow.
+    // eslint-disable-next-line no-param-reassign
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "void main() {",
+      "void main() {\nif (mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0) > 0.5) discard;",
+    );
+  };
+  return material;
+}
+
 function oil(color, glow) {
   return new MeshPhysicalMaterial({
     color: new Color(color),
@@ -377,6 +392,12 @@ function buildBottle() {
     }),
   );
   ribbon.position.y = 0.325;
+  body.castShadow = true;
+  body.customDepthMaterial = sparseShadow();
+  liquid.castShadow = true;
+  [stopper, label, ribbon].forEach((mesh) => {
+    Object.assign(mesh, { castShadow: true, receiveShadow: true });
+  });
   body.add(label, ribbon);
   return { body, liquid, stopper, level: 0.02 };
 }
@@ -394,6 +415,7 @@ export class BottleModel {
     this.fill = 1;
     this.surface = new Plane(new Vector3(0, -1, 0), 0);
     liquid.material.clippingPlanes = [this.surface];
+    liquid.material.clipShadows = true;
     liquid.renderOrder = 0;
     body.renderOrder = 1;
     this.group.add(liquid, body, stopper);

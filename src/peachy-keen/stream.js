@@ -16,6 +16,8 @@ const BEAD = 12;
 const FLUNG_INHERIT = 0.7;
 const LENS_CHANCE = 0.3;
 const NEAR_SCALE = 7;
+const FLAT = 0.34;
+const MIN_SQUASH = 0.2;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function shape(tag, className, parent) {
@@ -33,6 +35,10 @@ function place(el, x, y, rx, ry) {
 }
 
 const fmt = (v) => v.toFixed(2);
+
+function turn(el, degrees, x, y) {
+  el.setAttribute("transform", `rotate(${fmt(degrees)} ${fmt(x)} ${fmt(y)})`);
+}
 
 const circle = (x, y, r) =>
   `M ${fmt(x - r)} ${fmt(y)} a ${fmt(r)} ${fmt(r)} 0 1 0 ${fmt(r * 2)} 0 a ${fmt(r)} ${fmt(r)} 0 1 0 ${fmt(-r * 2)} 0 Z `;
@@ -108,7 +114,7 @@ export default class OilStream {
     this.spoutVelocity = { x: 0, y: 0 };
     this.floor = Infinity;
     this.impact = null;
-    this.pool = { x: 0, y: 0, size: 0, bump: 0 };
+    this.pool = { x: 0, y: 0, size: 0, bump: 0, tilt: 0, squash: FLAT };
     this.time = 0;
     this.delta = 1 / 60;
   }
@@ -124,11 +130,44 @@ export default class OilStream {
     );
   }
 
+  eachStreak(visit) {
+    this.runs().forEach((run) => {
+      if (run.points.length === 1) {
+        const p = run.points[0];
+        const r = halfWidth(p);
+        if (p.y < this.floor)
+          visit([
+            [p.x, p.y - r, r],
+            [p.x, p.y + r, r],
+          ]);
+        return;
+      }
+      const outline = this.outline(
+        run.points,
+        run.id === this.run && this.emitting,
+      );
+      if (outline) visit(outline.middle);
+    });
+    this.drips.forEach((d) => {
+      if (!d.active) return;
+      const tail = d.r * (1 + clamp(d.vy / 900, 0, 0.5));
+      visit([
+        [d.x, d.y - tail, d.r],
+        [d.x, d.y + tail, d.r],
+      ]);
+    });
+  }
+
   update(spout, angle, landing, pour, delta) {
     this.time += delta;
     this.delta = delta;
     if (landing !== undefined)
       this.floor = landing ? landing.y : window.innerHeight + 40;
+    if (landing?.tilt !== undefined) {
+      const k = ease(16, delta);
+      this.pool.tilt += (landing.tilt - this.pool.tilt) * k;
+      this.pool.squash += (landing.squash - this.pool.squash) * k;
+    }
     if (spout && this.spout) {
       const k = ease(8, delta);
       const step = Math.max(delta, 1 / 60);
@@ -355,7 +394,8 @@ export default class OilStream {
     if (!hidden || !this.poolHidden) {
       const rise = pool.bump * 0.15;
       const rx = pool.size * (1 - rise * 0.4);
-      const ry = pool.size * (0.34 + rise);
+      const ry = pool.size * (Math.max(MIN_SQUASH, pool.squash) + rise);
+      const degrees = (pool.tilt * 180) / Math.PI - 90;
       place(this.poolEl, pool.x, pool.y, rx, ry);
       place(
         this.poolShine,
@@ -364,6 +404,8 @@ export default class OilStream {
         rx * 0.3,
         ry * 0.25,
       );
+      turn(this.poolEl, degrees, pool.x, pool.y);
+      turn(this.poolShine, degrees, pool.x, pool.y);
     }
     this.poolHidden = hidden;
     this.ripples.forEach((ripple) => {
@@ -371,7 +413,8 @@ export default class OilStream {
       if (r.age >= 1) return;
       r.age = Math.min(1, r.age + delta * 2.2);
       const grow = 1 + (1 - (1 - r.age) ** 3) * 1.7;
-      place(r.el, r.x, r.y, r.size * grow, r.size * grow * 0.34);
+      place(r.el, r.x, r.y, r.size * grow, r.size * grow * r.squash);
+      turn(r.el, r.degrees, r.x, r.y);
       r.el.style.opacity = fmt((1 - r.age) * 0.6);
     });
   }
@@ -387,6 +430,8 @@ export default class OilStream {
       x: at.x,
       y: at.y,
       size: Math.max(5, this.pool.size * 1.2),
+      squash: Math.max(MIN_SQUASH, this.pool.squash),
+      degrees: (this.pool.tilt * 180) / Math.PI - 90,
     });
   }
 

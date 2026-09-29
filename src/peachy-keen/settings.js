@@ -2,6 +2,7 @@ const STORAGE_KEY = "peachy-keen-settings";
 const DEFAULTS = {
   sound: true,
   quality: "auto",
+  shadows: "auto",
   splatter: true,
   firmness: "ripe",
   tease: true,
@@ -12,6 +13,7 @@ const DEFAULTS = {
   edging: false,
   achievements: false,
   moodLight: false,
+  disco: false,
 };
 
 function read() {

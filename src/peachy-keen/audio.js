@@ -363,3 +363,561 @@ export function playDing() {
   tone(now, { from: 1568, to: 1568, length: 0.25, volume: 0.1 });
   tone(now + 0.12, { from: 2093, to: 2093, length: 0.35, volume: 0.1 });
 }
+
+let buzzer = null;
+
+export function setBuzz(amount, contact = 0) {
+  if (!running()) return;
+  if (!buzzer) {
+    if (amount <= 0) return;
+    const src = ctx.createOscillator();
+    src.type = "sawtooth";
+    src.frequency.value = 120;
+    const band = ctx.createBiquadFilter();
+    band.type = "lowpass";
+    band.frequency.value = 900;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    src.connect(band).connect(gain).connect(master);
+    src.start();
+    buzzer = { src, band, gain, heardAt: ctx.currentTime };
+  }
+  const now = ctx.currentTime;
+  buzzer.gain.gain.setTargetAtTime(amount * (0.05 + contact * 0.06), now, 0.02);
+  buzzer.src.frequency.setTargetAtTime(
+    (95 + amount * 60) * (1 - contact * 0.12),
+    now,
+    0.08,
+  );
+  buzzer.band.frequency.setTargetAtTime(
+    (900 + amount * 1800) * (1 - contact * 0.7),
+    now,
+    0.05,
+  );
+  buzzer = expireLoop(buzzer, amount > 0);
+}
+
+export const DISCO_BPM = 100;
+const STEP = 60 / DISCO_BPM / 4;
+const SWING = 0.18;
+export const DISCO_FADE = 2.8;
+const DISCO_LEVEL = 0.42;
+const MUFFLE_OPEN = 20000;
+const MUFFLE_CLOSED = 220;
+const midi = (n) => 440 * 2 ** ((n - 69) / 12);
+const ROOTS = [33, 38, 29, 28];
+const CHORDS = [
+  [55, 60, 64, 67, 71],
+  [53, 57, 60, 64, 69],
+  [57, 60, 64, 67, 71],
+  [56, 59, 62, 67],
+];
+const STRINGS = [
+  [64, 67, 71, 76],
+  [65, 69, 72, 76],
+  [64, 67, 72, 76],
+  [64, 68, 71, 74],
+];
+const RUN = [69, 71, 72, 74, 76, 79, 81, 83];
+const BASS_LINE = [
+  [0, 0, 3, 1],
+  [3, 12, 1, 0.45],
+  [6, 7, 2, 0.8],
+  [8, 0, 2, 0.9],
+  [10, 12, 1, 0.55],
+  [11, 10, 1, 0.7],
+  [13, 7, 1, 0.6],
+];
+const COMP = [
+  [0, 3, 1],
+  [3, 1, 0.55],
+  [7, 1, 0.65],
+  [10, 4, 0.9],
+];
+const LEAD = {
+  5: [
+    [2, 76, 2],
+    [4, 74, 1],
+    [5, 72, 1],
+    [6, 69, 5],
+    [12, 72, 1],
+    [13, 75, 1],
+    [14, 76, 2],
+  ],
+  7: [
+    [0, 79, 3],
+    [4, 76, 2],
+    [6, 74, 1],
+    [7, 72, 1],
+    [8, 69, 3],
+    [11, 67, 1],
+    [12, 69, 4],
+  ],
+};
+let disco = null;
+
+function route(
+  node,
+  { verb = 0, pan = 0, chorus = 0, echo = 0, sway = 0 } = {},
+) {
+  const side = Math.round(pan * 10) / 10;
+  const key = [verb, side, chorus, echo, sway].join();
+  let input = disco.routes.get(key);
+  if (!input) {
+    input = ctx.createGain();
+    let out = input;
+    if (side || sway) {
+      const panner = ctx.createStereoPanner();
+      panner.pan.value = side;
+      if (sway) {
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = sway;
+        const depth = ctx.createGain();
+        depth.gain.value = 0.35;
+        lfo.connect(depth).connect(panner.pan);
+        lfo.start();
+        disco.lfos.push(lfo);
+      }
+      out = input.connect(panner);
+    }
+    out.connect(disco.bus);
+    [
+      [verb, disco.verb],
+      [chorus, disco.chorus],
+      [echo, disco.echo],
+    ].forEach(([amount, target]) => {
+      if (!amount) return;
+      const send = ctx.createGain();
+      send.gain.value = amount;
+      out.connect(send).connect(target);
+    });
+    disco.routes.set(key, input);
+  }
+  node.connect(input);
+}
+
+function envelope(at, attack, peak, hold, release) {
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(peak, at + attack);
+  gain.gain.setValueAtTime(peak, at + attack + hold);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + attack + hold + release);
+  return gain;
+}
+
+function oscillator(at, type, frequency, stop) {
+  const osc = ctx.createOscillator();
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, at);
+  osc.start(at);
+  osc.stop(stop);
+  return osc;
+}
+
+function noiseAt(at, type, frequency, q, length, volume, sends) {
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer();
+  const filter = ctx.createBiquadFilter();
+  filter.type = type;
+  filter.frequency.value = frequency;
+  filter.Q.value = q;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(volume, at);
+  gain.gain.exponentialRampToValueAtTime(0.001, at + length);
+  route(src.connect(filter).connect(gain), sends);
+  src.start(at, Math.random() * 0.5, length + 0.02);
+}
+
+function kick(at) {
+  const osc = oscillator(at, "sine", 115, at + 0.45);
+  osc.frequency.exponentialRampToValueAtTime(44, at + 0.13);
+  route(osc.connect(envelope(at, 0.003, 0.62, 0.03, 0.32)));
+  noiseAt(at, "bandpass", 1800, 1, 0.012, 0.08);
+}
+
+function clap(at) {
+  [
+    [0, 1900, 0.16],
+    [0.005, 2400, 0.1],
+  ].forEach(([offset, f, v]) =>
+    noiseAt(at + offset, "bandpass", f, 2.2, 0.1, v, {
+      verb: 0.4,
+      pan: offset ? 0.2 : -0.1,
+    }),
+  );
+}
+
+function bongo(at, high) {
+  const f = high ? 390 : 250;
+  const pan = high ? 0.35 : -0.3;
+  const osc = oscillator(at, "sine", f, at + 0.2);
+  osc.frequency.exponentialRampToValueAtTime(f * 0.78, at + 0.12);
+  route(osc.connect(envelope(at, 0.002, 0.16, 0, 0.14)), { verb: 0.15, pan });
+  noiseAt(at, "bandpass", 3000, 2, 0.015, 0.05, { pan });
+}
+
+function rhodes(at, frequency, length, velocity, pan) {
+  const stop = at + length + 0.1;
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0.0001, at);
+  out.gain.exponentialRampToValueAtTime(0.028 * velocity, at + 0.006);
+  out.gain.exponentialRampToValueAtTime(0.012 * velocity, at + 0.6);
+  out.gain.exponentialRampToValueAtTime(0.0001, at + length);
+  [
+    [0, 1, 1.6 + velocity, 0.9],
+    [4, 14, 0.5 + velocity * 0.6, 0.06],
+  ].forEach(([detune, ratio, index, decay]) => {
+    const carrier = oscillator(at, "sine", frequency, stop);
+    carrier.detune.value = detune;
+    const modulator = oscillator(at, "sine", frequency * ratio, stop);
+    const depth = ctx.createGain();
+    depth.gain.setValueAtTime(frequency * index, at);
+    depth.gain.exponentialRampToValueAtTime(frequency * 0.05, at + decay);
+    modulator.connect(depth).connect(carrier.frequency);
+    carrier.connect(out);
+  });
+  route(out, { verb: 0.3, chorus: 0.4, pan, sway: 3.4 });
+}
+
+function strings(at, notes, length, volume) {
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.Q.value = 0.5;
+  filter.frequency.setValueAtTime(1400, at);
+  filter.frequency.linearRampToValueAtTime(3200, at + length * 0.5);
+  filter.frequency.linearRampToValueAtTime(1800, at + length);
+  const high = ctx.createBiquadFilter();
+  high.type = "highpass";
+  high.frequency.value = 260;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.linearRampToValueAtTime(volume, at + 0.45);
+  gain.gain.setValueAtTime(volume, at + length - 0.3);
+  gain.gain.linearRampToValueAtTime(0.0001, at + length + 0.4);
+  notes.forEach((n) =>
+    [-11, 0, 11].forEach((cents) => {
+      const osc = oscillator(at, "sawtooth", midi(n), at + length + 0.45);
+      osc.detune.value = cents + (Math.random() - 0.5) * 4;
+      osc.connect(high);
+    }),
+  );
+  route(high.connect(filter).connect(gain), { verb: 0.5, chorus: 1 });
+}
+
+function stringRun(at) {
+  RUN.forEach((n, k) => {
+    const t = at + k * (STEP / 2);
+    const gain = envelope(t, 0.02, 0.022, 0.03, 0.18);
+    [-8, 8].forEach((cents) => {
+      const osc = oscillator(t, "sawtooth", midi(n), t + 0.3);
+      osc.detune.value = cents;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 3000;
+      osc.connect(filter).connect(gain);
+    });
+    route(gain, { verb: 0.5, chorus: 0.8 });
+  });
+}
+
+function wah(at, chord) {
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.Q.value = 6;
+  filter.frequency.setValueAtTime(420, at);
+  filter.frequency.exponentialRampToValueAtTime(1800, at + 0.08);
+  filter.frequency.exponentialRampToValueAtTime(650, at + 0.16);
+  const gain = envelope(at, 0.008, 0.035, 0.03, 0.1);
+  chord.slice(0, 3).forEach((n) => {
+    oscillator(at, "sawtooth", midi(n), at + 0.17).connect(filter);
+  });
+  route(filter.connect(gain), { verb: 0.15, pan: 0.3 });
+}
+
+const warmth = (() => {
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i += 1)
+    curve[i] = Math.tanh(((i / 255) * 2 - 1) * 2.2);
+  return curve;
+})();
+
+function bass(at, frequency, length, velocity) {
+  const stop = at + length + 0.05;
+  const sub = oscillator(at, "sine", frequency, stop);
+  const subGain = envelope(
+    at,
+    0.006,
+    0.34 * velocity,
+    length * 0.5,
+    length * 0.5,
+  );
+  route(sub.connect(subGain));
+  const mid = oscillator(at, "sawtooth", frequency, stop);
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.Q.value = 3;
+  filter.frequency.setValueAtTime(500 + velocity * 900, at);
+  filter.frequency.exponentialRampToValueAtTime(
+    260,
+    at + Math.min(length, 0.2),
+  );
+  const high = ctx.createBiquadFilter();
+  high.type = "highpass";
+  high.frequency.value = 110;
+  const shaper = ctx.createWaveShaper();
+  shaper.curve = warmth;
+  const midGain = envelope(
+    at,
+    0.006,
+    0.09 * velocity,
+    length * 0.4,
+    length * 0.5,
+  );
+  route(mid.connect(filter).connect(shaper).connect(high).connect(midGain));
+}
+
+const VOWELS = {
+  ooh: [
+    [300, 1],
+    [870, 0.35],
+    [2250, 0.08],
+  ],
+  aah: [
+    [730, 1],
+    [1090, 0.5],
+    [2440, 0.15],
+  ],
+};
+
+function voice(at, note, length, from) {
+  const f = midi(note);
+  const stop = at + length + 0.6;
+  const source = oscillator(at, "sawtooth", from ? midi(from) : f, stop);
+  source.frequency.exponentialRampToValueAtTime(f, at + 0.06);
+  const vibrato = oscillator(at, "sine", 5.3, stop);
+  const depth = ctx.createGain();
+  depth.gain.setValueAtTime(0, at);
+  depth.gain.linearRampToValueAtTime(f * 0.012, at + Math.min(length, 0.4));
+  vibrato.connect(depth).connect(source.frequency);
+  const gain = envelope(at, 0.07, 0.11, length * 0.7, 0.45);
+  VOWELS.ooh.forEach(([freq, level], k) => {
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.Q.value = 9;
+    band.frequency.setValueAtTime(freq, at);
+    band.frequency.linearRampToValueAtTime(VOWELS.aah[k][0], at + length);
+    const amount = ctx.createGain();
+    amount.gain.value = level;
+    source.connect(band).connect(amount).connect(gain);
+  });
+  route(gain, { verb: 0.5, pan: -0.1 });
+  noiseAt(at, "bandpass", 1400, 1.2, length * 0.8, 0.006, { verb: 0.4 });
+}
+
+function scratch(at, chord, open) {
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.Q.value = 3;
+  filter.frequency.value = open ? 1500 : 1100;
+  const gain = envelope(at, 0.003, open ? 0.03 : 0.018, 0, open ? 0.09 : 0.035);
+  chord.slice(1, 3).forEach((n) => {
+    oscillator(at, "square", midi(n + 12), at + 0.12).connect(filter);
+  });
+  route(filter.connect(gain), { verb: 0.1, pan: 0.45 });
+}
+
+function bell(at, frequency) {
+  const carrier = oscillator(at, "sine", frequency, at + 1.6);
+  const modulator = oscillator(at, "sine", frequency * 3.5, at + 1.6);
+  const depth = ctx.createGain();
+  depth.gain.setValueAtTime(frequency * 1.2, at);
+  depth.gain.exponentialRampToValueAtTime(frequency * 0.02, at + 0.8);
+  modulator.connect(depth).connect(carrier.frequency);
+  route(carrier.connect(envelope(at, 0.004, 0.018, 0, 1.4)), {
+    verb: 0.6,
+    echo: 0.2,
+    pan: (Math.random() - 0.5) * 0.8,
+  });
+}
+
+function discoStep(index, at) {
+  const step = index % 16;
+  const bar8 = Math.floor(index / 16) % 8;
+  const bar = bar8 % CHORDS.length;
+  const chord = CHORDS[bar];
+  const root = ROOTS[bar];
+  if (step % 4 === 0) kick(at);
+  const shaker = [0.04, 0.016, 0.032, 0.022][step % 4];
+  noiseAt(at, "bandpass", 6500, 1.4, 0.05, shaker, { pan: 0.2 });
+  if (step % 4 === 2)
+    noiseAt(at, "highpass", 8000, 1, 0.16, 0.032, { verb: 0.1, pan: -0.2 });
+  if (step === 4 || step === 12) clap(at);
+  if (step === 7 || step === 9) bongo(at, true);
+  if (step === 15 || (bar % 2 && step === 3)) bongo(at, false);
+  if (step === 2 || step === 10) wah(at, chord);
+  if (step % 2 === 1) scratch(at, chord, step % 4 === 3);
+  if (bar8 >= 4 && (step === 0 || step === 6 || step === 11))
+    bell(at, midi(chord[(step + bar8) % chord.length] + 24));
+  BASS_LINE.forEach(([s, offset, length, velocity]) => {
+    if (s === step) bass(at, midi(root + offset), length * STEP, velocity);
+  });
+  if (step === 14) {
+    const next = ROOTS[(bar + 1) % ROOTS.length];
+    bass(at, midi(next + (next > root ? -1 : 1)), 2 * STEP, 0.75);
+  }
+  if (step === 0) strings(at, STRINGS[bar], STEP * 16, 0.0075);
+  if (bar8 === 7 && step === 12) stringRun(at);
+  COMP.forEach(([s, length, velocity]) => {
+    if (s !== step) return;
+    chord.forEach((n, k) =>
+      rhodes(at, midi(n), length * STEP + 0.4, velocity, k % 2 ? 0.25 : -0.25),
+    );
+  });
+  const phrase = LEAD[bar8];
+  const position = phrase ? phrase.findIndex(([s]) => s === step) : -1;
+  if (position >= 0) {
+    const [, note, length] = phrase[position];
+    voice(at, note, length * STEP, position > 0 ? phrase[position - 1][1] : 0);
+  }
+}
+
+function scheduleDisco() {
+  const now = ctx.currentTime;
+  while (disco.start + disco.next * STEP < now + 0.12) {
+    const beatAt = disco.start + disco.next * STEP;
+    const at = beatAt + (disco.next % 2 ? SWING * STEP : 0);
+    if (beatAt >= now - 0.01) discoStep(disco.next, Math.max(at, now));
+    disco.next += 1;
+  }
+}
+
+function reverb() {
+  const length = Math.floor(ctx.sampleRate * 2.6);
+  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+  for (let c = 0; c < 2; c += 1) {
+    const data = impulse.getChannelData(c);
+    for (let i = 0; i < length; i += 1)
+      data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3.4;
+  }
+  const convolver = ctx.createConvolver();
+  convolver.buffer = impulse;
+  return convolver;
+}
+
+function ensemble(out, lfos) {
+  const input = ctx.createGain();
+  [
+    [0.012, 0.47, -0.7],
+    [0.017, 0.61, 0.7],
+    [0.022, 0.29, 0],
+  ].forEach(([base, rate, pan]) => {
+    const delay = ctx.createDelay(0.05);
+    delay.delayTime.value = base;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = rate;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.0035;
+    lfo.connect(depth).connect(delay.delayTime);
+    lfo.start();
+    lfos.push(lfo);
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = pan;
+    const level = ctx.createGain();
+    level.gain.value = 0.45;
+    input.connect(delay).connect(level).connect(panner).connect(out);
+  });
+  return input;
+}
+
+function makeEcho(out) {
+  const input = ctx.createGain();
+  const delay = ctx.createDelay(1);
+  delay.delayTime.value = STEP * 3;
+  const feedback = ctx.createGain();
+  feedback.gain.value = 0.22;
+  const damp = ctx.createBiquadFilter();
+  damp.type = "lowpass";
+  damp.frequency.value = 2400;
+  input.connect(delay).connect(damp).connect(feedback).connect(delay);
+  damp.connect(out);
+  return input;
+}
+
+function freeze(param, now) {
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(param.value, now);
+  return param;
+}
+
+export function startDisco() {
+  if (disco) {
+    if (!disco.stopping) return;
+    clearTimeout(disco.stopping);
+    disco.stopping = null;
+    const now = ctx.currentTime;
+    freeze(disco.bus.gain, now).linearRampToValueAtTime(DISCO_LEVEL, now + 0.4);
+    freeze(disco.muffle.frequency, now).exponentialRampToValueAtTime(
+      MUFFLE_OPEN,
+      now + 0.4,
+    );
+    return;
+  }
+  context();
+  const bus = ctx.createGain();
+  bus.gain.value = DISCO_LEVEL;
+  const muffle = ctx.createBiquadFilter();
+  muffle.type = "lowpass";
+  muffle.frequency.value = MUFFLE_OPEN;
+  muffle.Q.value = 1.5;
+  const glue = ctx.createDynamicsCompressor();
+  glue.threshold.value = -16;
+  glue.knee.value = 10;
+  glue.ratio.value = 3;
+  glue.attack.value = 0.01;
+  glue.release.value = 0.2;
+  bus.connect(muffle).connect(glue).connect(master);
+  const lfos = [];
+  const verb = reverb();
+  const wet = ctx.createGain();
+  wet.gain.value = 0.55;
+  verb.connect(wet).connect(bus);
+  disco = {
+    start: ctx.currentTime + 0.1,
+    next: 0,
+    bus,
+    muffle,
+    stopping: null,
+    verb,
+    chorus: ensemble(bus, lfos),
+    echo: makeEcho(bus),
+    lfos,
+    routes: new Map(),
+  };
+  disco.timer = setInterval(scheduleDisco, 25);
+  scheduleDisco();
+}
+
+export function stopDisco() {
+  if (!disco || disco.stopping) return;
+  const fading = disco;
+  const now = ctx.currentTime;
+  freeze(fading.bus.gain, now).linearRampToValueAtTime(0, now + DISCO_FADE);
+  freeze(fading.muffle.frequency, now).exponentialRampToValueAtTime(
+    MUFFLE_CLOSED,
+    now + DISCO_FADE,
+  );
+  fading.stopping = setTimeout(
+    () => {
+      clearInterval(fading.timer);
+      fading.lfos.forEach((lfo) => lfo.stop());
+      fading.bus.disconnect();
+      if (disco === fading) disco = null;
+    },
+    DISCO_FADE * 1000 + 100,
+  );
+}
+
+export function discoBeat() {
+  if (!disco || !running()) return null;
+  return ((ctx.currentTime - disco.start) * DISCO_BPM) / 60;
+}

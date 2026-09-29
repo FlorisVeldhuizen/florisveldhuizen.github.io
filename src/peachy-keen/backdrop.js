@@ -50,6 +50,13 @@ export function createBackdrop(scene, renderer) {
       renderer.render(smokeScene, smokeCamera);
       renderer.setRenderTarget(previous);
     },
+    setDisco(amount, kick, beat, ballX = 0, ballY = 0.43) {
+      const u = material.uniforms;
+      u.ballAt.value.set(ballX, ballY);
+      u.disco.value = amount;
+      u.kick.value = kick;
+      u.beat.value = beat;
+    },
     setMotion(enabled) {
       speed = enabled ? 1 : 0.15;
     },

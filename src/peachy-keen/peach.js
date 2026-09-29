@@ -2,6 +2,8 @@ import {
   SphereGeometry,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
+  MeshDepthMaterial,
+  RGBADepthPacking,
   Mesh,
   CanvasTexture,
   Vector3,
@@ -39,6 +41,9 @@ import { raycastNearest } from "./raycast";
 import peachyModel from "./assets/peachy.glb?url";
 
 const HIT_LIFE = 3.0;
+const MARKER_FRAGMENT = `#include <colorspace_fragment>
+  float marker = markerAmount();
+  gl_FragColor = mix(gl_FragColor, vec4(uMarkerColor, 1.0), marker);`;
 const CURVE_SLOTS = 16;
 const BRIDGE_BINS = 25;
 const BRIDGE_SPAN = "0.25";
@@ -339,6 +344,38 @@ const FRAGMENT_HEADER = `
   uniform float uPrintInk;
   varying vec3 vRestPosition;
   varying float vFabricPush;
+  uniform vec4 uMarker;
+  uniform vec3 uMarkerAxisX;
+  uniform vec3 uMarkerAxisY;
+  uniform vec3 uMarkerColor;
+  uniform float uMarkerShown;
+  uniform float uMarkerShape;
+  uniform vec2 uMarkerStyle;
+
+  float markerShape(vec2 p, float r) {
+    if (uMarkerShape > 1.5) {
+      float w = r * 0.7;
+      float reach = r - w;
+      return length(vec2(p.x, p.y - clamp(p.y, -reach, reach))) - w;
+    }
+    if (uMarkerShape > 0.5) {
+      float ry = p.y > 0.0 ? r * 1.1 : r * 0.9;
+      return (length(vec2(p.x / r, p.y / ry)) - 1.0) * r;
+    }
+    return length(p) - r;
+  }
+
+  // fwidth needs every pixel on the same path, so nothing may return early before it.
+  float markerAmount() {
+    vec3 q = vRestPosition - uMarker.xyz;
+    vec3 normal = cross(uMarkerAxisX, uMarkerAxisY);
+    float d = markerShape(vec2(dot(q, uMarkerAxisX), dot(q, uMarkerAxisY)), uMarker.w);
+    float pixels = d / max(fwidth(d), 1e-6);
+    float ring = 1.0 - smoothstep(uMarkerStyle.x - 0.5, uMarkerStyle.x + 0.5, abs(pixels));
+    float inside = (1.0 - smoothstep(-0.5, 0.5, pixels)) * uMarkerStyle.y;
+    float near = step(abs(dot(q, normal)), uMarker.w);
+    return max(ring, inside) * near * uMarkerShown;
+  }
 
   float handprintMask() {
     float m = 0.0;
@@ -873,6 +910,13 @@ export class Peach {
       uRingAxisZ: { value: new Vector3() },
       uRingColor: { value: new Color(RING.COLOR).multiplyScalar(2.2) },
       uRingShine: { value: 0 },
+      uMarker: { value: new Vector4() },
+      uMarkerAxisX: { value: new Vector3(1, 0, 0) },
+      uMarkerAxisY: { value: new Vector3(0, 1, 0) },
+      uMarkerColor: { value: new Color() },
+      uMarkerShape: { value: 0 },
+      uMarkerStyle: { value: new Vector2(0.75, 0) },
+      uMarkerShown: { value: 0 },
       uRingIgnite: { value: 0 },
       uEnvSpecular: { value: 1 },
       uTime: { value: 0 },
@@ -1004,14 +1048,21 @@ export class Peach {
             outgoingLight += ringSparkle(-vViewPosition, ringNormal, 0.15 + vRubTilt.w * 0.2);
           }
           #include <opaque_fragment>`,
-        );
+        )
+        .replace("#include <colorspace_fragment>", MARKER_FRAGMENT);
       /* eslint-enable no-param-reassign */
     };
     mesh.material = this.material;
     mesh.raycast = raycastNearest;
+    Object.assign(mesh, {
+      castShadow: true,
+      receiveShadow: true,
+      customDepthMaterial: this.depthMaterial(this.uniforms),
+    });
     this.mesh = mesh;
     this.fabric = new Mesh(mesh.geometry, this.fabricMaterial());
     this.fabric.visible = false;
+    this.fabric.receiveShadow = true;
     this.fabric.renderOrder = 1;
     mesh.add(this.fabric);
     this.bows = new RibbonBows(this, (material, skin) =>
@@ -1019,6 +1070,7 @@ export class Peach {
     );
     mesh.add(this.bows.group);
     this.band = new Waistband(this, (material) => this.followSurface(material));
+    this.band.mesh.receiveShadow = true;
     mesh.add(this.band.mesh);
     this.group.add(model);
   }
@@ -1054,6 +1106,31 @@ export class Peach {
     };
   }
 
+  depthMaterial(uniforms) {
+    const material = new MeshDepthMaterial({
+      depthPacking: RGBADepthPacking,
+      map: this.material.map,
+    });
+    material.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      /* eslint-disable no-param-reassign */
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", `#include <common>\n${VERTEX_HEADER}`)
+        .replace(
+          "#include <begin_vertex>",
+          `${VERTEX_NORMAL}\nvec3 transformed = jiggled;`,
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nuniform float uCutSide;\nuniform vec4 uCutPlane;\nuniform float uStemY;\nvarying vec3 vRestPosition;",
+        )
+        .replace("#include <map_fragment>", CUT_TEST);
+      /* eslint-enable no-param-reassign */
+    };
+    return material;
+  }
+
   fabricMaterial(uniforms = this.uniforms) {
     const material = new MeshPhysicalMaterial({
       color: 0xffffff,
@@ -1082,7 +1159,8 @@ export class Peach {
         );
       shader.fragmentShader = shader.fragmentShader
         .replace("#include <common>", `#include <common>\n${FRAGMENT_HEADER}`)
-        .replace("#include <map_fragment>", FABRIC_FRAGMENT);
+        .replace("#include <map_fragment>", FABRIC_FRAGMENT)
+        .replace("#include <colorspace_fragment>", MARKER_FRAGMENT);
       /* eslint-enable no-param-reassign */
     };
     return material;
@@ -1299,6 +1377,7 @@ export class Peach {
     });
     frozen.uCutSide.value = side;
     frozen.uJiggleActive.value = 0;
+    frozen.uMarkerShown.value = 0;
     this.frozenSets = this.frozenSets || [];
     this.frozenSets.push(frozen);
     return frozen;
@@ -1429,6 +1508,7 @@ export class Peach {
     }
     capUv.needsUpdate = true;
     cap.renderOrder = order + 1;
+    cap.receiveShadow = true;
     half.add(cap);
     half.userData.cap = cap.material;
     if (side > 0) half.add(this.makeStone(plane, normal, side, order));
@@ -1438,8 +1518,12 @@ export class Peach {
       this.cutMaterial(frozen, { side: FrontSide }),
     );
     skin.renderOrder = order + 2;
+    skin.castShadow = true;
+    skin.receiveShadow = true;
+    skin.customDepthMaterial = this.depthMaterial(frozen);
     half.add(skin);
     const fabric = new Mesh(this.mesh.geometry, this.fabricMaterial(frozen));
+    fabric.receiveShadow = true;
     fabric.renderOrder = order + 3;
     half.add(fabric);
     return half;
@@ -1644,6 +1728,8 @@ export class Peach {
     at.addScaledVector(normal, plane.w - at.dot(normal));
     stone.matrix.setPosition(at);
     stone.renderOrder = order + 3;
+    stone.castShadow = true;
+    stone.receiveShadow = true;
     return stone;
   }
 
