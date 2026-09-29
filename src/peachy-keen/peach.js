@@ -537,12 +537,14 @@ const CUT_TEST = `
     vec4 sampledDiffuseColor = vec4(1.0);
   #endif
   float leaf = smoothstep(0.02, 0.12, sampledDiffuseColor.g - sampledDiffuseColor.r);
+  #ifdef PEACH_CUT
   if (uCutSide != 0.0) {
     float stem = step(max(sampledDiffuseColor.r, max(sampledDiffuseColor.g, sampledDiffuseColor.b)), 0.5);
     bool attached = leaf > 0.5 || stem > 0.5 || vRestPosition.y > uStemY;
     float cutSide = (dot(vRestPosition, uCutPlane.xyz) - uCutPlane.w) * uCutSide;
     if (attached ? uCutSide < 0.0 : cutSide < 0.0) discard;
   }
+  #endif
 `;
 
 const FRAGMENT_COLOR = `
@@ -1122,6 +1124,7 @@ export class Peach {
       depthPacking: RGBADepthPacking,
       map: this.material.map,
     });
+    if (uniforms !== this.uniforms) material.defines = { PEACH_CUT: "" };
     material.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, uniforms);
       /* eslint-disable no-param-reassign */
@@ -1401,6 +1404,7 @@ export class Peach {
   cutMaterial(frozen, extra) {
     const material = this.material.clone();
     Object.assign(material, extra);
+    material.defines = { ...material.defines, PEACH_CUT: "" };
     material.onBeforeCompile = (shader) => {
       this.material.onBeforeCompile(shader);
       Object.assign(shader.uniforms, frozen);
@@ -1413,6 +1417,7 @@ export class Peach {
       map: this.material.map,
       ...extra,
     });
+    material.defines = { PEACH_CUT: "" };
     material.onBeforeCompile = (shader) => {
       const { uCutSide, uCutPlane, uStemY } = frozen;
       Object.assign(shader.uniforms, { uCutSide, uCutPlane, uStemY });

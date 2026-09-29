@@ -81,7 +81,12 @@ function setProgress(fraction) {
 peach.load(setProgress).then(async () => {
   setProgress(1);
   group.visible = true;
-  const warmups = [...interaction.prepareHalves(), ...wild.warmups()];
+  const warmups = [
+    ...interaction.prepareHalves(),
+    ...wild.warmups(),
+    juice.mesh,
+    droplets.mesh,
+  ];
   const showWarmups = (visible) => {
     group.visible = visible;
     warmups.forEach((h) => {
@@ -90,24 +95,25 @@ peach.load(setProgress).then(async () => {
     });
   };
   showWarmups(true);
+  camera.layers.enable(JUICE_LAYER);
   renderer.shadowMap.enabled = true;
-  const juiceCamera = camera.clone();
-  juiceCamera.layers.set(JUICE_LAYER);
   const shadowed = renderer.compileAsync(scene, camera);
   renderer.shadowMap.enabled = false;
   const compiled = Promise.all([
     shadowed,
     renderer.compileAsync(scene, camera),
     renderer.compileAsync(lens.overlay, lens.overlayCamera),
-    renderer.compileAsync(juice.mesh, juiceCamera, scene),
     renderer.compileAsync(shock.scene, shock.camera),
   ]);
+  camera.layers.disable(JUICE_LAYER);
   showWarmups(false);
   await compiled;
   // compileAsync skips the shadow pass, so one hidden render builds its depth shaders.
   showWarmups(true);
   renderer.shadowMap.enabled = true;
+  camera.layers.enable(JUICE_LAYER);
   renderer.render(scene, camera);
+  camera.layers.disable(JUICE_LAYER);
   showWarmups(false);
   juice.clear();
   loadSounds();

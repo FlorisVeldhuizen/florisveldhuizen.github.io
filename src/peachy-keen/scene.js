@@ -147,7 +147,9 @@ export class QualityGovernor {
     this.windowTime = 0;
     this.windowFrames = 0;
     this.goodWindows = 0;
+    this.badWindows = 0;
     this.fps = 60;
+    this.refresh = 60;
   }
 
   setMode(mode) {
@@ -171,10 +173,13 @@ export class QualityGovernor {
     this.windowFrames = 0;
     if (this.mode !== "auto") return;
 
-    if (this.fps < 48 && this.ratio > 1) {
+    this.refresh = Math.max(this.refresh, this.fps);
+    this.badWindows = this.fps < this.refresh * 0.85 ? this.badWindows + 1 : 0;
+    if (this.badWindows >= 2 && this.ratio > 1) {
+      this.badWindows = 0;
       this.goodWindows = -30;
       this.apply(Math.max(1, this.ratio - 0.25));
-    } else if (this.fps > 57) {
+    } else if (this.fps > this.refresh * 0.95) {
       this.goodWindows += 1;
       if (this.goodWindows >= 10 && this.ratio < this.max) {
         this.goodWindows = 0;
