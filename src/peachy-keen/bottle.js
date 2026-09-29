@@ -2,6 +2,7 @@ import { Vector2, Vector3, Plane, Raycaster, Quaternion, Matrix4 } from "three";
 import { playCork } from "./audio";
 import { BottleModel } from "./bottle3d";
 import OilStream from "./stream";
+import { clamp, ease, reducedMotion } from "./util";
 
 const PEACH_BASE = 1.6;
 const PEACH_HEIGHT = 3.2;
@@ -14,10 +15,9 @@ const LEAN_ANGLE = 12;
 const STREAM_PX = 58;
 const NORMAL_LEAN = 0.75;
 const AXIS = new Vector3(0, 1, 0);
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const FLING_SPEED = 2.8;
+const FLING_COOLDOWN = 1.2;
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const ease = (rate, delta) => 1 - Math.exp(-delta * rate);
 const wrap = (degrees) => ((((degrees + 180) % 360) + 360) % 360) - 180;
 
 class ModelView {
@@ -27,7 +27,7 @@ class ModelView {
     this.model = new BottleModel();
     this.group = this.model.group;
     scene.add(this.group);
-    this.spout = this.model.spec.spout;
+    this.spout = this.model.spout;
     this.stopper = this.model.stopper;
     this.stopperY = this.stopper.position.y;
     this.stopper.material.transparent = true;
@@ -197,6 +197,8 @@ export class Bottle {
     this.time = 0;
     this.calling = false;
     this.carried = false;
+    this.peak = { speed: 0, vx: 0, vy: 0 };
+    this.flingWait = 0;
 
     this.el.addEventListener("pointerenter", () => {
       this.hovered = true;
@@ -282,10 +284,34 @@ export class Bottle {
     this.slosh += this.sloshVelocity * delta;
     this.yaw = Math.sin(this.time * 0.6) * 0.25 + clamp(vx * 0.6, -0.5, 0.5);
     this.place(delta);
-    const start = this.view.spoutScreen() ?? { x, y: spoutY };
+    const start = this.view.spoutScreen();
     const landing = hit ? { x, y } : null;
     this.stream.update(start, this.screen.angle, landing, pour, delta);
     return pour;
+  }
+
+  fling(motion, delta) {
+    const { peak } = this;
+    peak.speed *= 1 - ease(6, delta);
+    if (motion.speed > peak.speed) Object.assign(peak, motion);
+    this.flingWait -= delta;
+    if (
+      motion.speed > peak.speed * 0.5 ||
+      peak.speed < FLING_SPEED ||
+      this.flingWait > 0 ||
+      !this.view.cork.popped ||
+      reducedMotion.matches
+    ) {
+      return;
+    }
+    const amount = clamp(peak.speed / (FLING_SPEED * 2), 0.5, 1) * this.fill;
+    this.flingWait = FLING_COOLDOWN;
+    this.fill = Math.max(0.3, this.fill - amount * 0.03);
+    this.sloshVelocity += 4;
+    const unit = Math.min(window.innerWidth, window.innerHeight);
+    const spout = this.view.spoutScreen();
+    this.stream.fling(spout, peak.vx * unit, peak.vy * unit, amount);
+    peak.speed = 0;
   }
 
   place(delta) {

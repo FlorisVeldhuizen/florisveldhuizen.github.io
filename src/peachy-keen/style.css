@@ -304,7 +304,7 @@ button:focus-visible {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease;
-  will-change: translate, scale;
+  will-change: translate, scale, rotate;
 }
 
 .cursor.is-visible {
@@ -449,7 +449,6 @@ button:focus-visible {
 }
 
 .intro-title {
-  --progress: 0%;
   margin: 0;
   font-size: clamp(44px, 7.5vw, 104px);
   font-style: italic;
@@ -547,14 +546,6 @@ button:focus-visible {
 
   .hints {
     font-size: 14px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition-duration: 0.01ms !important;
   }
 }
 
@@ -754,6 +745,12 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+
   .mood-light i {
     animation: none;
   }

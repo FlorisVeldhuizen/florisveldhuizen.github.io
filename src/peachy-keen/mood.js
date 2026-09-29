@@ -1,6 +1,6 @@
 import { Color, PointLight } from "three";
+import { reducedMotion } from "./util";
 
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const DIM = { hemi: 0.3, exposure: 0.92, rose: 2.6, rim: 1.8, env: 0.5 };
 const MATTE = { specular: 0.25, sheen: 0.45 };
 const DEEP_ROSE = new Color(0xff1f5c);
@@ -35,6 +35,8 @@ export class MoodLight {
     this.overlay.innerHTML = "<i></i><i></i><i></i><i></i>";
     document.body.appendChild(this.overlay);
     this.shown = -1;
+    this.dimmed = -1;
+    this.redim = 0;
   }
 
   set(on) {
@@ -92,7 +94,13 @@ export class MoodLight {
     this.rim.color.copy(base.rimColor).lerp(EMBER, k);
     this.candle.intensity = k * 26 * this.flicker();
     this.halo.intensity = k * (130 + heat * 70);
-    this.dimReflections(lerp(1, DIM.env));
+    this.redim -= delta;
+    // Also re-runs every second so materials created while mood is on get dimmed.
+    if (k !== this.dimmed || this.redim <= 0) {
+      this.dimmed = k;
+      this.redim = 1;
+      this.dimReflections(lerp(1, DIM.env));
+    }
     this.renderer.toneMappingExposure = lerp(
       base.exposure,
       base.exposure * DIM.exposure,
@@ -102,6 +110,7 @@ export class MoodLight {
     if (opacity !== this.shown) {
       this.shown = opacity;
       this.overlay.style.opacity = opacity;
+      this.overlay.style.visibility = opacity ? "" : "hidden";
     }
   }
 }

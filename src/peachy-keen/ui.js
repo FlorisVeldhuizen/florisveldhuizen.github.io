@@ -1,4 +1,4 @@
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+import { reducedMotion } from "./util";
 
 export class UI {
   constructor() {
@@ -150,7 +150,7 @@ export class UI {
 
   onHeartbeat() {
     if (reducedMotion.matches) return;
-    this.heatFill.parentElement.animate([{ scaleY: "1" }, { scaleY: "1.4" }, { scaleY: "1" }], {
+    this.heatFill.parentElement.animate([{ scale: "1 1" }, { scale: "1 1.4" }, { scale: "1 1" }], {
       duration: 320,
       easing: "ease-in-out",
     });

@@ -1,7 +1,4 @@
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const ease = (rate, delta) => 1 - Math.exp(-delta * rate);
+import { clamp, ease, reducedMotion } from "./util";
 
 const GRAVITY = 2400;
 const EMIT_RATE = 120;
@@ -16,6 +13,9 @@ const RIPPLES = 4;
 const STIFFNESS = 40;
 const MAX_GAP = 14;
 const BEAD = 12;
+const FLUNG_INHERIT = 0.7;
+const LENS_CHANCE = 0.3;
+const NEAR_SCALE = 7;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function shape(tag, className, parent) {
@@ -33,6 +33,16 @@ function place(el, x, y, rx, ry) {
 }
 
 const fmt = (v) => v.toFixed(2);
+
+const circle = (x, y, r) =>
+  `M ${fmt(x - r)} ${fmt(y)} a ${fmt(r)} ${fmt(r)} 0 1 0 ${fmt(r * 2)} 0 a ${fmt(r)} ${fmt(r)} 0 1 0 ${fmt(-r * 2)} 0 Z `;
+
+const drawn = new WeakMap();
+function setPath(el, d) {
+  if (drawn.get(el) === d) return;
+  drawn.set(el, d);
+  el.setAttribute("d", d);
+}
 
 function smooth(points, command) {
   let d = `${command} ${fmt(points[0][0])} ${fmt(points[0][1])}`;
@@ -84,6 +94,10 @@ export default class OilStream {
       r: 0,
       hang: 0,
     }));
+    this.flungEl = shape("path", "stream-oil", el);
+    this.flungShine = shape("path", "stream-shine-fill", el);
+    this.flung = [];
+    this.onLens = null;
     this.particles = [];
     this.pending = [];
     this.run = 0;
@@ -102,6 +116,7 @@ export default class OilStream {
   get active() {
     return (
       this.particles.length > 0 ||
+      this.flung.length > 0 ||
       this.pool.size > 0.2 ||
       this.pending.length > 0 ||
       this.drips.some((d) => d.active) ||
@@ -126,11 +141,12 @@ export default class OilStream {
 
     const flowing = !!spout && pour > 0.05;
     if (flowing && !this.emitting) this.run += 1;
-    if (!flowing && this.emitting) this.pending.push(0.1, 0.34);
+    if (!flowing && this.emitting && spout) this.pending.push(0.1, 0.34);
     this.emitting = flowing;
     this.simulate(delta);
     if (flowing) this.emit(previous ?? spout, spout, angle, pour, delta);
     this.updateDrips(delta);
+    this.updateFlung(delta);
     this.draw();
     this.el.classList.toggle("is-visible", this.active);
   }
@@ -205,7 +221,7 @@ export default class OilStream {
         this.pieces -= 1;
         const { run } = p;
         for (let j = i; j >= 0 && rope[j].run === run; j -= 1)
-          Object.assign(rope[j], { run: this.pieces });
+          rope[j].run = this.pieces;
       }
     }
   }
@@ -296,8 +312,7 @@ export default class OilStream {
       if (run.points.length === 1 && !attached) {
         const p = run.points[0];
         if (p.y >= this.floor) return;
-        const r = halfWidth(p) * 1.2 + 0.3;
-        body += `M ${fmt(p.x - r)} ${fmt(p.y)} a ${fmt(r)} ${fmt(r)} 0 1 0 ${fmt(r * 2)} 0 a ${fmt(r)} ${fmt(r)} 0 1 0 ${fmt(-r * 2)} 0 Z `;
+        body += circle(p.x, p.y, halfWidth(p) * 1.2 + 0.3);
         return;
       }
       const outline = this.outline(run.points, attached);
@@ -314,16 +329,16 @@ export default class OilStream {
       body +=
         `${smooth(left, "M")} ${endCap} ${fmt(back[0][0])} ${fmt(back[0][1])}` +
         ` ${smooth(back, "L")} ${topCap} `;
-      shade += `${smooth(offset(middle, -0.35), "M")} ${smooth(offset(middle, -1).reverse(), "L")} Z `;
+      shade += `${smooth(offset(middle, -0.35), "M")} ${smooth(back, "L")} Z `;
       const from = Math.floor(middle.length * 0.12);
       const to = Math.ceil(middle.length * (landed ? 0.8 : 0.9));
       if (to - from >= 2)
         shine += `${smooth(offset(middle.slice(from, to), 0.45), "M")} `;
       if (landed && !this.impact) this.impact = landed;
     });
-    this.body.setAttribute("d", body);
-    this.shade.setAttribute("d", shade);
-    this.shine.setAttribute("d", shine);
+    setPath(this.body, body);
+    setPath(this.shade, shade);
+    setPath(this.shine, shine);
     this.drawPool();
   }
 
@@ -336,17 +351,21 @@ export default class OilStream {
       pool.x = impact.x;
       pool.y = impact.y;
     }
-    const rise = pool.bump * 0.15;
-    const rx = pool.size * (1 - rise * 0.4);
-    const ry = pool.size * (0.34 + rise);
-    place(this.poolEl, pool.x, pool.y, rx, ry);
-    place(
-      this.poolShine,
-      pool.x - rx * 0.32,
-      pool.y - ry * 0.35,
-      rx * 0.3,
-      ry * 0.25,
-    );
+    const hidden = pool.size < 0.01;
+    if (!hidden || !this.poolHidden) {
+      const rise = pool.bump * 0.15;
+      const rx = pool.size * (1 - rise * 0.4);
+      const ry = pool.size * (0.34 + rise);
+      place(this.poolEl, pool.x, pool.y, rx, ry);
+      place(
+        this.poolShine,
+        pool.x - rx * 0.32,
+        pool.y - ry * 0.35,
+        rx * 0.3,
+        ry * 0.25,
+      );
+    }
+    this.poolHidden = hidden;
     this.ripples.forEach((ripple) => {
       const r = ripple;
       if (r.age >= 1) return;
@@ -369,6 +388,56 @@ export default class OilStream {
       y: at.y,
       size: Math.max(5, this.pool.size * 1.2),
     });
+  }
+
+  fling(spout, vx, vy, amount) {
+    const count = Math.round(5 + amount * 8);
+    for (let i = 0; i < count; i += 1) {
+      const toLens = Math.random() < LENS_CHANCE;
+      const speed =
+        FLUNG_INHERIT * (0.6 + Math.random() * 0.6) * (toLens ? 0.3 : 1);
+      this.flung.push({
+        x: spout.x,
+        y: spout.y,
+        vx: vx * speed + (Math.random() - 0.5) * 160,
+        vy: vy * speed + (Math.random() - 0.5) * 160,
+        z: 0,
+        vz: toLens ? 3 + Math.random() * 1.5 : 0,
+        r: 1 + Math.random() ** 1.5 * 2.5 * amount,
+      });
+    }
+  }
+
+  updateFlung(delta) {
+    if (this.flung.length === 0 && this.flungDrawn === false) return;
+    const drag = Math.exp(-delta * AIR_DRAG * 0.5);
+    let body = "";
+    let shine = "";
+    this.flung = this.flung.filter((drop) => {
+      const d = drop;
+      d.vy += GRAVITY * (d.vz > 0 ? 0.3 : 1) * delta;
+      d.vx *= drag;
+      d.x += d.vx * delta;
+      d.y += d.vy * delta;
+      d.z += d.vz * delta;
+      const onScreen =
+        d.x > 0 &&
+        d.x < window.innerWidth &&
+        d.y > 0 &&
+        d.y < window.innerHeight;
+      if (d.z >= 1) {
+        if (onScreen) this.onLens?.(d.x, d.y, d.r * NEAR_SCALE);
+        return false;
+      }
+      if (d.y > window.innerHeight + 40) return false;
+      const r = d.r * (1 + d.z * (NEAR_SCALE - 1));
+      body += circle(d.x, d.y, r);
+      shine += circle(d.x - r * 0.35, d.y - r * 0.4, r * 0.3);
+      return true;
+    });
+    setPath(this.flungEl, body);
+    setPath(this.flungShine, shine);
+    this.flungDrawn = this.flung.length > 0;
   }
 
   updateDrips(delta) {

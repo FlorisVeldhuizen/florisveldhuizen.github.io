@@ -57,6 +57,18 @@ function rayToHull(hull, dx, dz) {
   return best;
 }
 
+function sliceAt(h) {
+  const f = Math.min(
+    SLICES - 1,
+    Math.max(0, ((h - LOW) / (HIGH - LOW)) * (SLICES - 1)),
+  );
+  const k = Math.floor(f);
+  return [k, Math.min(SLICES - 1, k + 1), f - k];
+}
+
+export const waistHeight = (rest, pull) =>
+  Math.min(rest - 0.05 - pull * 0.36, rest + 0.01);
+
 export function satinMaterial() {
   return new MeshPhysicalMaterial({
     color: 0x0a0408,
@@ -172,13 +184,7 @@ export class Waistband {
 
   ringRadius(angle, waist) {
     if (!this.radii) this.prepare();
-    const f = Math.min(
-      SLICES - 1,
-      Math.max(0, ((waist - LOW) / (HIGH - LOW)) * (SLICES - 1)),
-    );
-    const k = Math.floor(f);
-    const t = f - k;
-    const next = Math.min(SLICES - 1, k + 1);
+    const [k, next, t] = sliceAt(waist);
     const a = ((((angle / (Math.PI * 2)) % 1) + 1) % 1) * AROUND;
     const i = Math.floor(a) % AROUND;
     const j = (i + 1) % AROUND;
@@ -193,32 +199,20 @@ export class Waistband {
   }
 
   sliceRadius(i, h) {
-    const f = Math.min(
-      SLICES - 1,
-      Math.max(0, ((h - LOW) / (HIGH - LOW)) * (SLICES - 1)),
-    );
-    const k = Math.floor(f);
-    const next = Math.min(SLICES - 1, k + 1);
-    return this.radii[k][i] * (1 - (f - k)) + this.radii[next][i] * (f - k);
+    const [k, next, t] = sliceAt(h);
+    return this.radii[k][i] * (1 - t) + this.radii[next][i] * t;
   }
 
   update(visible, pull, fade) {
     this.mesh.visible = visible;
-    if (!visible || !this.peach.mesh) return;
+    if (!visible) return;
     if (!this.radii) this.prepare();
     const key = `${pull.toFixed(4)}:${fade.toFixed(3)}`;
     if (key === this.key) return;
     this.key = key;
     const b = this.peach.uniforms.uBounds.value;
     const rest = this.peach.uniforms.uLingerie.value.w;
-    const waist = Math.min(rest - 0.05 - pull * 0.36, rest + 0.01);
-    const f = Math.min(
-      SLICES - 1,
-      Math.max(0, ((waist - LOW) / (HIGH - LOW)) * (SLICES - 1)),
-    );
-    const k = Math.floor(f);
-    const t = f - k;
-    const next = Math.min(SLICES - 1, k + 1);
+    const waist = waistHeight(rest, pull);
     const half =
       b.w * 0.011 * (1 - 0.3 * Math.min(1, Math.max(0, pull))) * fade;
     const reach = half * 1.35;
@@ -228,35 +222,35 @@ export class Waistband {
     const nrm = this.normals.array;
     const uv = this.coords.array;
     let travelled = 0;
-    let previous = null;
+    let px = 0;
+    let pz = 0;
     for (let n = 0; n <= AROUND; n += 1) {
       const i = n % AROUND;
       const angle = (i / AROUND) * Math.PI * 2;
-      const r = this.radii[k][i] * (1 - t) + this.radii[next][i] * t + lift;
+      const r = this.sliceRadius(i, waist) + lift;
       const top = this.sliceRadius(i, waist + reach / b.w) + lift;
       const bottom = this.sliceRadius(i, waist - reach / b.w) + lift;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
       const x = b.x + cos * r;
       const z = b.z + sin * r;
-      if (previous) travelled += Math.hypot(x - previous[0], z - previous[1]);
-      previous = [x, z];
+      if (n > 0) travelled += Math.hypot(x - px, z - pz);
+      px = x;
+      pz = z;
       const slope = Math.hypot(2 * reach, top - bottom);
       const nx = (2 * reach) / slope;
       const ny = -(top - bottom) / slope;
-      [
-        [y + reach, n * 2, 1.35, top],
-        [y - reach, n * 2 + 1, -1.35, bottom],
-      ].forEach(([vy, v, side, radius]) => {
+      for (let v = n * 2, s = 0; s < 2; v += 1, s += 1) {
+        const radius = s ? bottom : top;
         p[v * 3] = b.x + cos * radius;
-        p[v * 3 + 1] = vy;
+        p[v * 3 + 1] = s ? y - reach : y + reach;
         p[v * 3 + 2] = b.z + sin * radius;
         nrm[v * 3] = cos * nx;
         nrm[v * 3 + 1] = ny;
         nrm[v * 3 + 2] = sin * nx;
         uv[v * 2] = travelled / b.w;
-        uv[v * 2 + 1] = side;
-      });
+        uv[v * 2 + 1] = s ? -1.35 : 1.35;
+      }
     }
     this.positions.needsUpdate = true;
     this.normals.needsUpdate = true;

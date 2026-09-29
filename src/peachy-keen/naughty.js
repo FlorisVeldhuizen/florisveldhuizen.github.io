@@ -1,6 +1,6 @@
 import { playDing, playHeartbeat } from "./audio";
+import { reducedMotion } from "./util";
 
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
 const ACHIEVEMENTS = {

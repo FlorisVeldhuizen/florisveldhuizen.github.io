@@ -9,7 +9,7 @@ import {
   Mesh,
   Vector3,
 } from "three";
-import { satinMaterial } from "./band";
+import { satinMaterial, waistHeight } from "./band";
 
 function strip(
   points,
@@ -111,23 +111,25 @@ export class RibbonBows {
     this.peach = peach;
     this.group = new Group();
     this.group.visible = false;
-    this.bows = [0].map(() => {
-      const bow = new Group();
-      bow.matrixAutoUpdate = false;
-      this.group.add(bow);
-      const skin = {
-        uAnchorNormal: { value: new Vector3(0, 0, 1) },
-        uBowInverse: { value: new Matrix3() },
-        uBowMatrix: { value: new Matrix4() },
-      };
-      const material = satinMaterial();
-      followSkin(material, skin);
-      return { bow, material, skin };
-    });
+    this.bow = new Group();
+    this.bow.matrixAutoUpdate = false;
+    this.group.add(this.bow);
+    this.skin = {
+      uAnchorNormal: { value: new Vector3(0, 0, 1) },
+      uBowInverse: { value: new Matrix3() },
+      uBowMatrix: { value: new Matrix4() },
+    };
+    this.material = satinMaterial();
+    followSkin(this.material, this.skin);
     this.prepared = false;
     this.pull = null;
     this.basis = new Matrix4();
     this.scale = new Vector3(1, 1, 1);
+    this.normal = new Vector3();
+    this.position = new Vector3();
+    this.x = new Vector3();
+    this.y = new Vector3();
+    this.z = new Vector3();
   }
 
   prepare() {
@@ -146,7 +148,9 @@ export class RibbonBows {
       const j = Math.min(i + 1, curve.length - 1);
       return curve[i] + (curve[j] - curve[i]) * (f - i);
     };
-    const samples = [];
+    const rest = u.uLingerie.value.w - 0.05;
+    let spot = -1;
+    let spotScore = Infinity;
     for (let i = 0; i < pos.count; i += 1) {
       const x = pos.getX(i);
       const y = pos.getY(i);
@@ -155,79 +159,66 @@ export class RibbonBows {
       const rz = z - bounds.z;
       const back =
         (rx * creaseSide.x + rz * creaseSide.z) / (Math.hypot(rx, rz) || 1);
-      const h = (y - bounds.y) / height + 0.5;
-      const across =
-        (x * plane.x + y * plane.y + z * plane.z - plane.w) / height -
-        offsetAt(h);
-      samples.push({ i, h, across, back });
-    }
-    const bowSize = height * 0.05;
-    this.bows.forEach((entry) => {
-      bowGeometries(bowSize).forEach((g) =>
-        entry.bow.add(new Mesh(g, entry.material)),
-      );
-      const rest = u.uLingerie.value.w - 0.05;
-      let spot = null;
-      let spotScore = Infinity;
-      samples.forEach((sample) => {
-        if (sample.back < 0.8) return;
-        const score = 10 * sample.across ** 2 + (sample.h - rest) ** 2;
+      if (back >= 0.8) {
+        const h = (y - bounds.y) / height + 0.5;
+        const across =
+          (x * plane.x + y * plane.y + z * plane.z - plane.w) / height -
+          offsetAt(h);
+        const score = 10 * across ** 2 + (h - rest) ** 2;
         if (score < spotScore) {
           spotScore = score;
-          spot = sample;
+          spot = i;
         }
-      });
-      entry.angle = Math.atan2(
-        pos.getZ(spot.i) - bounds.z,
-        pos.getX(spot.i) - bounds.x,
-      );
-    });
+      }
+    }
+    bowGeometries(height * 0.05).forEach((g) =>
+      this.bow.add(new Mesh(g, this.material)),
+    );
+    this.angle = Math.atan2(
+      pos.getZ(spot) - bounds.z,
+      pos.getX(spot) - bounds.x,
+    );
   }
 
   update(visible, pull, fade = 1) {
     this.group.visible = visible;
-    if (!visible || !this.peach.mesh) return;
+    if (!visible) return;
     if (!this.prepared) this.prepare();
     if (pull === this.pull && fade === this.fade) return;
     this.pull = pull;
     this.fade = fade;
     const b = this.peach.uniforms.uBounds.value;
     const { band } = this.peach;
-    const rest = this.peach.uniforms.uLingerie.value.w;
-    const waist = Math.min(rest - 0.05 - pull * 0.36, rest + 0.01);
+    const { angle, skin, x, y, z } = this;
+    const waist = waistHeight(this.peach.uniforms.uLingerie.value.w, pull);
     const onPeach = Math.max(waist, 0.06);
     const below = Math.max(0, 0.06 - waist);
-    const up = new Vector3(0, 1, 0);
-    this.bows.forEach(({ bow, skin, angle }) => {
-      const normal = new Vector3(Math.cos(angle), 0, Math.sin(angle));
-      const radius = band.ringRadius(angle, onPeach);
-      const position = new Vector3(
-        b.x + normal.x * radius,
-        b.y + (onPeach - 0.5) * b.w,
-        b.z + normal.z * radius,
-      );
-      const drop = 0.08;
-      const bulge =
-        band.ringRadius(angle, Math.max(0.06, onPeach - drop)) - radius;
-      const x = up.clone().cross(normal).normalize();
-      const y = normal
-        .clone()
-        .multiplyScalar(-bulge)
-        .addScaledVector(up, drop * b.w)
-        .normalize();
-      const z = x.clone().cross(y).normalize();
-      this.basis.makeBasis(x, y, z);
-      skin.uAnchorNormal.value.copy(z);
-      position
-        .addScaledVector(z, b.w * 0.0035)
-        .addScaledVector(normal, below * b.w * 0.6)
-        .addScaledVector(up, -below * b.w);
-      this.basis.scale(this.scale.setScalar(Math.max(0.001, fade)));
-      this.basis.setPosition(position);
-      bow.matrix.copy(this.basis);
-      skin.uBowMatrix.value.copy(this.basis);
-      skin.uBowInverse.value.setFromMatrix4(this.basis).invert();
-      bow.matrixWorldNeedsUpdate = true;
-    });
+    const normal = this.normal.set(Math.cos(angle), 0, Math.sin(angle));
+    const radius = band.ringRadius(angle, onPeach);
+    const position = this.position.set(
+      b.x + normal.x * radius,
+      b.y + (onPeach - 0.5) * b.w,
+      b.z + normal.z * radius,
+    );
+    const drop = 0.08;
+    const bulge =
+      band.ringRadius(angle, Math.max(0.06, onPeach - drop)) - radius;
+    x.set(0, 1, 0).cross(normal).normalize();
+    y.copy(normal).multiplyScalar(-bulge);
+    y.y += drop * b.w;
+    y.normalize();
+    z.crossVectors(x, y).normalize();
+    this.basis.makeBasis(x, y, z);
+    skin.uAnchorNormal.value.copy(z);
+    position
+      .addScaledVector(z, b.w * 0.0035)
+      .addScaledVector(normal, below * b.w * 0.6);
+    position.y -= below * b.w;
+    this.basis.scale(this.scale.setScalar(Math.max(0.001, fade)));
+    this.basis.setPosition(position);
+    this.bow.matrix.copy(this.basis);
+    skin.uBowMatrix.value.copy(this.basis);
+    skin.uBowInverse.value.setFromMatrix4(this.basis).invert();
+    this.bow.matrixWorldNeedsUpdate = true;
   }
 }

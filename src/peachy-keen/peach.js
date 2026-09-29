@@ -1,5 +1,6 @@
 import {
   SphereGeometry,
+  MeshBasicMaterial,
   MeshPhysicalMaterial,
   Mesh,
   CanvasTexture,
@@ -43,6 +44,10 @@ const BRIDGE_BINS = 25;
 const BRIDGE_SPAN = "0.25";
 
 const NOIR = [0x0d0508, 0x3a1a24];
+const FABRIC_SPRINGS = [
+  ["bulge", "bulgeVelocity"],
+  ["depth", "depthVelocity"],
+];
 
 const LINGERIE_COMMON = `
   uniform vec4 uBounds;
@@ -57,20 +62,18 @@ const LINGERIE_COMMON = `
     return (p.y - uBounds.y) / uBounds.w + 0.5;
   }
 
-  float acrossOf(vec3 p, vec4 plane, float h) {
+  float backness(vec3 p) {
+    vec2 r = p.xz - uBounds.xz;
+    return dot(r, uCreaseSide.xz) / max(length(r), 1e-4);
+  }
+
+  float acrossOf(vec3 p, vec4 plane, float h, float back) {
     float f = clamp(h, 0.0, 1.0) * ${CURVE_SLOTS - 1}.0;
     int i = int(floor(f));
     int j = min(i + 1, ${CURVE_SLOTS - 1});
     float offset = mix(uCreaseCurve[i], uCreaseCurve[j], fract(f));
-    vec2 fromAxis = p.xz - uBounds.xz;
-    float rear = dot(fromAxis, uCreaseSide.xz) / max(length(fromAxis), 1e-4);
-    offset *= (1.0 - smoothstep(0.35, 0.6, h)) * smoothstep(-0.2, 0.3, rear);
+    offset *= (1.0 - smoothstep(0.35, 0.6, h)) * smoothstep(-0.2, 0.3, back);
     return (dot(p, plane.xyz) - plane.w) / uBounds.w - offset;
-  }
-
-  float backness(vec3 p) {
-    vec2 r = p.xz - uBounds.xz;
-    return dot(r, uCreaseSide.xz) / max(length(r), 1e-4);
   }
 
   float softMin(float a, float b, float k) {
@@ -86,9 +89,8 @@ const LINGERIE_COMMON = `
     return sqrt(x * x + 0.00004);
   }
 
-  float waistLine(float across, float back) {
-    float top = min(uLingerie.w - uLingerie.y * 0.36 - 0.05, uLingerie.w + 0.01);
-    return top;
+  float waistLine() {
+    return min(uLingerie.w - uLingerie.y * 0.36 - 0.05, uLingerie.w + 0.01);
   }
 
   float fabricShape(float across, float h, float back, float waist, float soft) {
@@ -102,9 +104,9 @@ const LINGERIE_COMMON = `
 
   vec2 fabricDistance(float across, float h, float back) {
     float eps = 0.004;
-    float waist = waistLine(across, back);
+    float waist = waistLine();
     float s0 = fabricShape(across, h, back, waist, 0.0);
-    float sx = fabricShape(across + eps, h, back, waistLine(across + eps, back), 0.0);
+    float sx = fabricShape(across + eps, h, back, waist, 0.0);
     float sh = fabricShape(across, h + eps, back, waist, 0.0);
     float edge = s0 / max(length(vec2(sx - s0, sh - s0) / eps), 0.35);
     return vec2(edge, abs(h - waist));
@@ -112,7 +114,8 @@ const LINGERIE_COMMON = `
 
   float fabricShadow(vec3 p, vec4 plane) {
     float h = heightOf(p);
-    vec2 shape = fabricDistance(acrossOf(p, plane, h), h, backness(p));
+    float back = backness(p);
+    vec2 shape = fabricDistance(acrossOf(p, plane, h, back), h, back);
     float edge = shape.x / 0.01;
     float contact = step(0.0, shape.x) * exp(-edge * edge);
     float strap = shape.y / 0.02;
@@ -122,11 +125,8 @@ const LINGERIE_COMMON = `
 
   uniform sampler2D uBridgeMap;
 
-  float bridgeLift(vec3 p, vec4 plane) {
-    float h = heightOf(p);
-    float across = acrossOf(p, plane, h);
-    float back = backness(p);
-    float waist = waistLine(across, back);
+  float bridgeLift(vec3 p, vec4 plane, float h, float back) {
+    float waist = waistLine();
     float upper = pow(smoothstep(0.1, waist - 0.03, h), 1.6) * (1.0 - smoothstep(waist + 0.02, waist + 0.05, h));
     float raw = (dot(p, plane.xyz) - plane.w) / uBounds.w;
     vec2 size = vec2(${BRIDGE_BINS}.0, ${CURVE_SLOTS}.0);
@@ -142,8 +142,12 @@ const LINGERIE_COMMON = `
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y) * upper * smoothstep(0.0, 0.4, back);
   }
 
+  float bridgeLift(vec3 p, vec4 plane) {
+    return bridgeLift(p, plane, heightOf(p), backness(p));
+  }
+
   vec2 fabricRegion(float across, float h, float back) {
-    float waist = waistLine(across, back);
+    float waist = waistLine();
     float panel = fabricShape(across, h, back, waist, 0.02);
     float band = softAbs(h - waist) - 0.008;
     return vec2(softMin(panel, band, 0.025), band);
@@ -156,8 +160,8 @@ const LINGERIE_COMMON = `
 
   float fabricPush(vec3 p, vec4 plane) {
     float h = heightOf(p);
-    float across = acrossOf(p, plane, h);
     float back = backness(p);
+    float across = acrossOf(p, plane, h, back);
     float r = 0.016;
     vec2 c = fabricRegion(across, h, back);
     float xp = fabricRegion(across + r, h, back).x;
@@ -173,16 +177,17 @@ const LINGERIE_COMMON = `
     float reach = 0.07 * uFabric.w;
     float covered = 1.0 - smoothstep(-0.06 * spread, 0.05 * spread, d);
     float banded = 1.0 - smoothstep(-0.02, 0.06, c.y);
-    float spanned = smoothstep(0.0, 0.008, bridgeLift(p, plane));
+    float spanned = smoothstep(0.0, 0.008, bridgeLift(p, plane, h, back));
     float press = covered * (1.0 - 0.7 * pull + 0.6 * hike) * (1.0 - 0.9 * spanned) + banded * (0.5 + 1.1 * pull + 1.2 * hike);
-    float over = smoothstep(-0.03, 0.03, h - waistLine(across, back));
+    float waist = waistLine();
+    float over = smoothstep(-0.03, 0.03, h - waist);
     float roll = mix(
       fleshRoll(d, reach * spread * (0.9 + 0.6 * hike), reach * (1.3 + 1.2 * hike)) * (1.7 + 1.8 * hike),
       fleshRoll(d, reach * spread * (1.3 + 0.6 * pull), reach * (1.6 + 1.0 * pull)) * (2.2 + 0.6 * pull) * (1.0 - 0.4 * hike),
       over);
     roll *= 1.0 + uFabricWobble * (0.6 + over);
     float push = roll * uFabric.z - press * uFabric.y;
-    float tuck = (1.0 - smoothstep(0.14, max(waistLine(across, back) - 0.12, 0.141), h)) * smoothstep(0.06, 0.14, h)
+    float tuck = (1.0 - smoothstep(0.14, max(waist - 0.12, 0.141), h)) * smoothstep(0.06, 0.14, h)
       * exp(-pow(across / 0.03, 2.0)) * smoothstep(0.0, 0.4, back);
     return (push - tuck * (0.8 + 2.0 * hike) * uFabric.y) * smoothstep(0.04, 0.2, h);
   }
@@ -247,7 +252,7 @@ const VERTEX_HEADER = `
     }
     float hold = 1.0;
     if (uLingerie.x > 0.5 && uLingerie.z > 0.0) {
-      float gap = (heightOf(p) - waistLine(0.0, 0.0)) / 0.07;
+      float gap = (heightOf(p) - waistLine()) / 0.07;
       hold = 1.0 - 0.4 * exp(-gap * gap) * uLingerie.z;
     }
     float limit = uBounds.w * 0.07 * uFirmness.w;
@@ -360,17 +365,12 @@ const FRAGMENT_HEADER = `
   ${LINGERIE_COMMON}
 
   uniform vec3 uFabricColor;
-  uniform vec3 uFabricAccent;
 
   float surfaceArc(vec3 p) {
     vec2 r = p.xz - uBounds.xz;
     vec2 side = normalize(uCreaseSide.xz);
     float angle = atan(dot(r, vec2(-side.y, side.x)), abs(dot(r, side)));
     return angle * length(r) / uBounds.w;
-  }
-
-  float laceHash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
   }
 
   float tulle(vec2 q) {
@@ -392,18 +392,6 @@ const FRAGMENT_HEADER = `
     return max(petals * eye * veins * 0.85, cord);
   }
 
-  float allover(vec2 q, float aa) {
-    vec2 cell = q * 15.0;
-    cell.x += 0.5 * mod(floor(cell.y), 2.0);
-    vec2 f = fract(cell) - 0.5;
-    float scale = aa * 15.0;
-    float flower = rosette(f, 0.22, scale);
-    float dots = 1.0 - smoothstep(0.045, 0.045 + scale + 0.02, length(abs(f) - vec2(0.5)));
-    float vine = (1.0 - smoothstep(0.012, 0.03 + scale, abs(length(f) - 0.38)))
-      * smoothstep(-0.2, 0.2, sin(atan(f.y, f.x) * 2.0));
-    return max(max(flower, dots * 0.8), vine * 0.6);
-  }
-
   float roseMotif(vec2 f, float size, float aa) {
     float r = length(f) / size;
     if (r > 1.3) return 0.0;
@@ -420,24 +408,11 @@ const FRAGMENT_HEADER = `
     return max(max(petals, fill), heart);
   }
 
-  float leafMotif(vec2 f, float angle, float aa) {
-    vec2 d = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * f;
-    d.x -= 0.27;
-    float e = length(vec2(d.x / 0.1, d.y / 0.058));
-    float w = aa / 0.058 + 0.1;
-    float body = (1.0 - smoothstep(1.0 - w, 1.0, e)) * 0.45;
-    float rib = (1.0 - smoothstep(0.004, 0.004 + aa, abs(d.y))) * step(e, 1.0);
-    float outline = 1.0 - smoothstep(0.0, 0.14 + w, abs(e - 1.0));
-    return max(max(body, rib), outline);
-  }
-
   float romance(vec2 q, float aa) {
     float scale = 6.5;
     vec2 g = vec2(q.x + q.y, q.y - q.x) * scale;
-    vec2 id = floor(g);
     vec2 f = fract(g) - 0.5;
     float s = aa * scale * 1.4;
-    float turn = 0.0;
     vec2 stem = f - vec2(0.0, 0.06);
     float m = roseMotif(stem, 0.22, s);
     m = max(m, rosette(stem - vec2(0.21, -0.2), 0.075, s));
@@ -453,35 +428,16 @@ const FRAGMENT_HEADER = `
     return max(max(m, vine * 0.55), knot * 0.85);
   }
 
-  float floral(vec2 q, float density) {
-    vec2 grid = q * 22.0;
-    vec2 id = floor(grid);
-    float rnd = laceHash(id);
-    vec2 f = fract(grid) - 0.5 + (vec2(laceHash(id + 7.0), laceHash(id + 13.0)) - 0.5) * 0.2;
-    float turn = rnd * 6.2832;
-    f = mat2(cos(turn), -sin(turn), sin(turn), cos(turn)) * f;
-    float r = length(f);
-    float a = atan(f.y, f.x);
-    float petals = 5.0 + floor(rnd * 2.0);
-    float outline = 0.26 * (0.62 + 0.38 * abs(cos(a * petals * 0.5)));
-    float w = fwidth(r) + 0.01;
-    float flower = (1.0 - smoothstep(outline - w, outline, r)) * smoothstep(0.035, 0.035 + w, r);
-    float cord = 1.0 - smoothstep(0.0, 0.022 + w, abs(r - outline));
-    float gap = smoothstep(0.92, 1.0, cos(a * petals)) * step(0.08, r);
-    return max(flower * (1.0 - gap * 0.8) * 0.8, cord) * step(1.0 - density, laceHash(id + 3.0));
-  }
-
-  vec4 lingerie(out float rough, out float metal) {
-    rough = 0.75;
-    metal = 0.0;
+  vec4 lingerie() {
     if (uLingerie.x < 0.5 || uLingerie.z <= 0.0) return vec4(0.0);
     vec3 p = vRestPosition;
     float h = heightOf(p);
-    float across = acrossOf(p, uCutPlane, h);
     float back = backness(p);
-    float waist = waistLine(across, back);
+    float across = acrossOf(p, uCutPlane, h, back);
+    float waist = waistLine();
     float aa = max(fwidth(h), fwidth(across)) * 0.8 + 1e-4;
     vec2 shape = fabricDistance(across, h, back);
+    if (shape.x > 0.03 && (h < waist - 0.05 || h > waist + 0.01)) return vec4(0.0);
     vec2 q = vec2(surfaceArc(p), h - waist);
 
     float scallopOn = 1.0 - smoothstep(waist - 0.07, waist - 0.035, h);
@@ -502,11 +458,9 @@ const FRAGMENT_HEADER = `
     picot *= scallopOn;
     float edgeFlower = rosette(vec2(c.x, shape.x + 0.014), 0.0068, aa) * scallopOn;
 
-    float border = panel * smoothstep(-0.034, -0.014, shape.x);
-    float satin = 0.0;
-
     float body = romance(q, aa) * (1.0 - smoothstep(-0.028, -0.025, shape.x));
-    float alpha = panel * max(0.18 + tulle(q) * 0.3, max(body * 0.92, edgeFlower));
+    float net = tulle(q);
+    float alpha = panel * max(0.18 + net * 0.3, max(body * 0.92, edgeFlower));
 
     float panelTop = mix(0.3, 0.282, smoothstep(-0.3, 0.3, back));
     float sweep = 1.0 - smoothstep(panelTop - 0.01, panelTop + 0.06, softAbs(across));
@@ -522,38 +476,40 @@ const FRAGMENT_HEADER = `
     vec2 corner = vec2(softAbs(across) - panelTop, h - waist + 0.022);
     float medallion = rosette(corner, 0.013, aa) * smoothstep(-0.2, 0.2, back);
     float medallionRing = (1.0 - smoothstep(0.0012 - aa, 0.0012 + aa, abs(length(corner) - 0.016))) * smoothstep(-0.2, 0.2, back);
-    alpha = max(alpha, trim * max(max(trimFlower, tulle(q) * 0.45), trimCord));
+    alpha = max(alpha, trim * max(max(trimFlower, net * 0.45), trimCord));
     alpha = max(alpha, max(medallion, medallionRing) * step(h, waist));
     alpha = max(alpha, max(max(cord, picot) * 0.9, header * 0.9 * panel));
-    vec3 color = mix(uFabricColor, uFabricAccent * 0.5 + uFabricColor * 0.5, satin * 0.6);
-    alpha = max(alpha, satin);
-    rough = mix(rough, 0.3, satin);
-    return vec4(color, alpha * uLingerie.z);
+    return vec4(uFabricColor, alpha * uLingerie.z);
   }
 `;
 
 const FABRIC_FRAGMENT = `
-  float fabricRough;
-  float fabricMetal;
   if (uCutSide != 0.0 && (dot(vRestPosition, uCutPlane.xyz) - uCutPlane.w) * uCutSide < 0.0) discard;
-  vec4 garment = lingerie(fabricRough, fabricMetal);
+  vec4 garment = lingerie();
   if (garment.a < 0.02) discard;
   diffuseColor = vec4(garment.rgb, garment.a);
 `;
 
-const FRAGMENT_COLOR = `
+const CUT_TEST = `
   #include <map_fragment>
+  #ifndef USE_MAP
+    vec4 sampledDiffuseColor = vec4(1.0);
+  #endif
   float leaf = smoothstep(0.02, 0.12, sampledDiffuseColor.g - sampledDiffuseColor.r);
-  float welt = handprintMask() * (1.0 - leaf);
-  vec3 ink = mix(diffuseColor.rgb * vec3(1.02, 0.42, 0.46), vec3(0.62, 0.0, 0.08), uPrintInk);
-  diffuseColor.rgb = mix(diffuseColor.rgb, ink, welt * mix(0.55, 0.95, uPrintInk));
-  diffuseColor.rgb *= mix(vec3(1.0), vec3(1.08, 0.7, 0.72), uHeat * 0.6);
   if (uCutSide != 0.0) {
     float stem = step(max(sampledDiffuseColor.r, max(sampledDiffuseColor.g, sampledDiffuseColor.b)), 0.5);
     bool attached = leaf > 0.5 || stem > 0.5 || vRestPosition.y > uStemY;
     float cutSide = (dot(vRestPosition, uCutPlane.xyz) - uCutPlane.w) * uCutSide;
     if (attached ? uCutSide < 0.0 : cutSide < 0.0) discard;
   }
+`;
+
+const FRAGMENT_COLOR = `
+  ${CUT_TEST}
+  float welt = handprintMask() * (1.0 - leaf);
+  vec3 ink = mix(diffuseColor.rgb * vec3(1.02, 0.42, 0.46), vec3(0.62, 0.0, 0.08), uPrintInk);
+  diffuseColor.rgb = mix(diffuseColor.rgb, ink, welt * mix(0.55, 0.95, uPrintInk));
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(1.08, 0.7, 0.72), uHeat * 0.6);
   if (uLingerie.x > 0.5 && uLingerie.z > 0.0) {
     diffuseColor.rgb *= 1.0 - fabricShadow(vRestPosition, uCutPlane) * uLingerie.z * (1.0 - leaf);
     float squeeze = smoothstep(0.0, 0.6, -vFabricPush) * (1.0 - leaf);
@@ -951,7 +907,6 @@ export class Peach {
       uFabricWobble: { value: 0 },
       uFabricDepth: { value: FABRIC.depth },
       uFabricColor: { value: new Color(NOIR[0]) },
-      uFabricAccent: { value: new Color(NOIR[1]) },
       uCreaseSide: { value: new Vector3(1, 0, 0) },
     };
     this.printTextures = {};
@@ -1127,15 +1082,7 @@ export class Peach {
         );
       shader.fragmentShader = shader.fragmentShader
         .replace("#include <common>", `#include <common>\n${FRAGMENT_HEADER}`)
-        .replace("#include <map_fragment>", FABRIC_FRAGMENT)
-        .replace(
-          "#include <roughnessmap_fragment>",
-          "#include <roughnessmap_fragment>\nroughnessFactor = fabricRough;",
-        )
-        .replace(
-          "#include <metalnessmap_fragment>",
-          "#include <metalnessmap_fragment>\nmetalnessFactor = fabricMetal;",
-        );
+        .replace("#include <map_fragment>", FABRIC_FRAGMENT);
       /* eslint-enable no-param-reassign */
     };
     return material;
@@ -1330,14 +1277,13 @@ export class Peach {
   }
 
   refreshHalves() {
-    const sheen = this.fabric?.material.sheenColor;
-    if (sheen)
-      this.halfFabrics?.forEach((f) => f.material.sheenColor.copy(sheen));
     (this.frozenSets || []).forEach((frozen) => {
       Object.entries(this.uniforms).forEach(([key, u]) => {
         if (key === "uCutSide" || key === "uJiggleActive") return;
         const target = frozen[key];
-        if (u.value?.copy && target.value?.copy) target.value.copy(u.value);
+        if (u.value?.isTexture) target.value = u.value;
+        else if (u.value?.copy && target.value?.copy)
+          target.value.copy(u.value);
         else if (Array.isArray(u.value))
           target.value = u.value.map((v) => v.clone?.() ?? v);
         else target.value = u.value;
@@ -1348,7 +1294,8 @@ export class Peach {
   freezeUniforms(side) {
     const frozen = {};
     Object.entries(this.uniforms).forEach(([key, u]) => {
-      frozen[key] = { value: u.value?.clone ? u.value.clone() : u.value };
+      const cloned = u.value?.clone && !u.value.isTexture;
+      frozen[key] = { value: cloned ? u.value.clone() : u.value };
     });
     frozen.uCutSide.value = side;
     frozen.uJiggleActive.value = 0;
@@ -1361,10 +1308,9 @@ export class Peach {
     this.frozenSets?.forEach((frozen) => frozen.uLingerie.value.setZ(visible));
   }
 
-  cutMaterial(side, extra) {
+  cutMaterial(frozen, extra) {
     const material = this.material.clone();
     Object.assign(material, extra);
-    const frozen = this.freezeUniforms(side);
     material.onBeforeCompile = (shader) => {
       this.material.onBeforeCompile(shader);
       Object.assign(shader.uniforms, frozen);
@@ -1372,9 +1318,39 @@ export class Peach {
     return material;
   }
 
+  stencilMaterial(frozen, extra) {
+    const material = new MeshBasicMaterial({
+      map: this.material.map,
+      ...extra,
+    });
+    material.onBeforeCompile = (shader) => {
+      const { uCutSide, uCutPlane, uStemY } = frozen;
+      Object.assign(shader.uniforms, { uCutSide, uCutPlane, uStemY });
+      /* eslint-disable no-param-reassign */
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nvarying vec3 vRestPosition;",
+        )
+        .replace(
+          "#include <begin_vertex>",
+          "#include <begin_vertex>\nvRestPosition = position;",
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nuniform float uCutSide;\nuniform vec4 uCutPlane;\nuniform float uStemY;\nvarying vec3 vRestPosition;",
+        )
+        .replace("#include <map_fragment>", CUT_TEST);
+      /* eslint-enable no-param-reassign */
+    };
+    return material;
+  }
+
   makeHalf(side, order) {
     const half = new Group();
     half.matrixAutoUpdate = false;
+    const frozen = this.freezeUniforms(side);
     const stencil = {
       colorWrite: false,
       depthWrite: false,
@@ -1383,14 +1359,14 @@ export class Peach {
       stencilFunc: AlwaysStencilFunc,
     };
     const passes = [
-      this.cutMaterial(side, {
+      this.stencilMaterial(frozen, {
         ...stencil,
         side: BackSide,
         stencilZPass: IncrementWrapStencilOp,
         stencilZFail: IncrementWrapStencilOp,
         stencilFail: IncrementWrapStencilOp,
       }),
-      this.cutMaterial(side, {
+      this.stencilMaterial(frozen, {
         ...stencil,
         side: FrontSide,
         stencilZPass: DecrementWrapStencilOp,
@@ -1459,16 +1435,12 @@ export class Peach {
 
     const skin = new Mesh(
       this.mesh.geometry,
-      this.cutMaterial(side, { side: FrontSide }),
+      this.cutMaterial(frozen, { side: FrontSide }),
     );
     skin.renderOrder = order + 2;
     half.add(skin);
-    const fabric = new Mesh(
-      this.mesh.geometry,
-      this.fabricMaterial(this.freezeUniforms(side)),
-    );
+    const fabric = new Mesh(this.mesh.geometry, this.fabricMaterial(frozen));
     fabric.renderOrder = order + 3;
-    this.halfFabrics = [...(this.halfFabrics || []), fabric];
     half.add(fabric);
     return half;
   }
@@ -1733,10 +1705,7 @@ export class Peach {
   updateFabricSpring(delta) {
     const s = this.fabricSpring;
     if (!s) return;
-    [
-      ["bulge", "bulgeVelocity"],
-      ["depth", "depthVelocity"],
-    ].forEach(([key, velocity]) => {
+    FABRIC_SPRINGS.forEach(([key, velocity]) => {
       s[velocity] +=
         ((s.target[key] - s[key]) * 130 - s[velocity] * 3.5) * delta;
       s[key] += s[velocity] * delta;

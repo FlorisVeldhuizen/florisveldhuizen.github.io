@@ -11,6 +11,7 @@ import { Talk } from "./spicy";
 import { Naughty } from "./naughty";
 import { MoodLight } from "./mood";
 import { unlockAudio, loadSounds, setMuted } from "./audio";
+import { reducedMotion } from "./util";
 
 const intro = document.getElementById("intro");
 const introTitle = document.getElementById("intro-title");
@@ -18,14 +19,12 @@ const introStatus = document.getElementById("intro-status");
 
 const { scene, camera, renderer, lights } = initScene();
 const quality = new QualityGovernor(renderer);
-const backdrop = createBackdrop(scene);
+const backdrop = createBackdrop(scene, renderer);
 setupResizeHandler(camera, renderer, () => {
   backdrop.resize();
   lens.resize();
 });
-backdrop.setMotion(
-  !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-);
+backdrop.setMotion(!reducedMotion.matches);
 
 const group = new Group();
 group.visible = false;
@@ -61,7 +60,6 @@ const interaction = new Interaction({
   juice,
   droplets,
   lens,
-  backdrop,
   ui,
   settings,
   talk,
@@ -126,5 +124,6 @@ renderer.setAnimationLoop(() => {
   juice.splatHalf.set(halfHeight * camera.aspect, halfHeight);
   droplets.update(delta);
   lens.update(delta);
+  backdrop.render();
   lens.render([juice, droplets]);
 });

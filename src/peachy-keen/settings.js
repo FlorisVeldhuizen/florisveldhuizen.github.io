@@ -73,9 +73,9 @@ export class Settings {
   }
 
   showFps(fps) {
+    if (this.panel.hidden) return;
     const text = `${Math.round(fps)} frames per second`;
-    if (!this.panel.hidden && text !== this.fps.textContent)
-      this.fps.textContent = text;
+    if (text !== this.fps.textContent) this.fps.textContent = text;
   }
 
   save() {

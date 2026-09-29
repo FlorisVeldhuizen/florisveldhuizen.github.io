@@ -67,21 +67,6 @@ export function setMuted(muted) {
   master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.02);
 }
 
-function wetSquelch(now, intensity, oil) {
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer();
-  const band = ctx.createBiquadFilter();
-  band.type = "bandpass";
-  band.Q.value = 3;
-  band.frequency.setValueAtTime(2400, now);
-  band.frequency.exponentialRampToValueAtTime(500, now + 0.12);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.35 * intensity * oil, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-  src.connect(band).connect(gain).connect(master);
-  src.start(now, Math.random() * 0.5, 0.16);
-}
-
 export function playSlap(intensity, heat, oil, pitch = 1) {
   if (slaps.length === 0) return;
   const now = ctx.currentTime;
@@ -102,7 +87,8 @@ export function playSlap(intensity, heat, oil, pitch = 1) {
   src.connect(tone).connect(gain).connect(master);
   src.start(now, AUDIO_CONFIG.silentOffset);
 
-  if (oil > 0.15) wetSquelch(now, intensity, oil);
+  if (oil > 0.15)
+    noiseHit(2400, 500, 0.14, 0.35 * intensity * oil, "bandpass", { q: 3 });
 }
 
 export function playBurst() {
@@ -126,81 +112,89 @@ export function playBurst() {
   thump.stop(now + 0.45);
 }
 
+function noiseLoop() {
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer();
+  src.loop = true;
+  const band = ctx.createBiquadFilter();
+  band.type = "bandpass";
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  src.connect(band).connect(gain).connect(master);
+  src.start();
+  return { src, band, gain, heardAt: ctx.currentTime };
+}
+
+function expireLoop(loop, audible) {
+  const now = ctx.currentTime;
+  if (audible) loop.heardAt = now;
+  if (now - loop.heardAt < 1) return loop;
+  loop.src.stop();
+  loop.src.disconnect();
+  loop.gain.disconnect();
+  return null;
+}
+
 export function setRub(amount, oil) {
-  if (!ctx || ctx.state !== "running") return;
+  if (!running()) return;
   if (!rub) {
     if (amount <= 0) return;
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuffer();
-    src.loop = true;
-    const band = ctx.createBiquadFilter();
-    band.type = "bandpass";
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    src.connect(band).connect(gain).connect(master);
-    src.start();
-    rub = { band, gain };
+    rub = noiseLoop();
   }
   const now = ctx.currentTime;
   rub.gain.gain.setTargetAtTime(amount * (0.05 + oil * 0.1), now, 0.05);
   rub.band.frequency.setTargetAtTime(700 + amount * 900 - oil * 300, now, 0.05);
   rub.band.Q.value = 1.5 + oil * 5;
+  rub = expireLoop(rub, amount > 0);
 }
 
-function noiseHit(freqFrom, freqTo, length, volume, type = "bandpass") {
-  if (!ctx || ctx.state !== "running") return;
+function noiseHit(
+  freqFrom,
+  freqTo,
+  length,
+  volume,
+  type = "bandpass",
+  { q = 2, attack = 0 } = {},
+) {
+  if (!running()) return;
   const now = ctx.currentTime;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuffer();
   const filter = ctx.createBiquadFilter();
   filter.type = type;
-  filter.Q.value = 2;
+  filter.Q.value = q;
   filter.frequency.setValueAtTime(freqFrom, now);
   filter.frequency.exponentialRampToValueAtTime(freqTo, now + length);
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(volume, now);
+  if (attack) {
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + attack);
+  } else {
+    gain.gain.setValueAtTime(volume, now);
+  }
   gain.gain.exponentialRampToValueAtTime(0.001, now + length);
   src.connect(filter).connect(gain).connect(master);
   src.start(now, Math.random() * 0.5, length + 0.05);
 }
 
 export function playSlide(duration, from, to) {
-  if (!ctx || ctx.state !== "running") return;
-  const now = ctx.currentTime;
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer();
-  const filter = ctx.createBiquadFilter();
-  filter.type = "bandpass";
-  filter.Q.value = 1.2;
-  filter.frequency.setValueAtTime(from, now);
-  filter.frequency.exponentialRampToValueAtTime(to, now + duration);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.001, now);
-  gain.gain.exponentialRampToValueAtTime(0.22, now + duration * 0.4);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-  src.connect(filter).connect(gain).connect(master);
-  src.start(now, Math.random() * 0.5, duration + 0.05);
+  noiseHit(from, to, duration, 0.22, "bandpass", {
+    q: 1.2,
+    attack: duration * 0.4,
+  });
 }
 
 export function setSlide(speed, height) {
-  if (!ctx || ctx.state !== "running") return;
+  if (!running()) return;
   if (!slide) {
     if (speed <= 0) return;
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuffer();
-    src.loop = true;
-    const band = ctx.createBiquadFilter();
-    band.type = "bandpass";
-    band.Q.value = 1.2;
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    src.connect(band).connect(gain).connect(master);
-    src.start();
-    slide = { band, gain };
+    slide = noiseLoop();
+    slide.band.Q.value = 1.2;
   }
   const now = ctx.currentTime;
   slide.gain.gain.setTargetAtTime(Math.min(1, speed) * 0.22, now, 0.02);
   slide.band.frequency.setTargetAtTime(900 + height * 2300, now, 0.02);
+  slide = expireLoop(slide, speed > 0);
 }
 
 export function playSettle() {
@@ -212,7 +206,7 @@ export function playSlice() {
 }
 
 export function playTear(duration) {
-  if (!ctx || ctx.state !== "running") return;
+  if (!running()) return;
   const now = ctx.currentTime;
   const end = now + duration;
   const src = ctx.createBufferSource();
@@ -244,26 +238,20 @@ export function playTear(duration) {
 }
 
 export function playSplash() {
-  if (!ctx || ctx.state !== "running") return;
+  if (!running()) return;
   noiseHit(1800, 260, 0.38, 0.45, "lowpass");
   noiseHit(3200, 900, 0.12, 0.3);
   const now = ctx.currentTime;
   for (let n = 0; n < 7; n += 1) {
-    const at = now + 0.04 + Math.random() * 0.32;
-    const osc = ctx.createOscillator();
     const pitch = 900 + Math.random() * 1600;
-    osc.frequency.setValueAtTime(pitch, at);
-    osc.frequency.exponentialRampToValueAtTime(pitch * 1.8, at + 0.03);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(
-      0.05 + Math.random() * 0.05,
-      at + 0.004,
-    );
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.04);
-    osc.connect(gain).connect(master);
-    osc.start(at);
-    osc.stop(at + 0.05);
+    tone(now + 0.04 + Math.random() * 0.32, {
+      from: pitch,
+      to: pitch * 1.8,
+      sweep: 0.03,
+      length: 0.04,
+      volume: 0.05 + Math.random() * 0.05,
+      attack: 0.004,
+    });
   }
 }
 
@@ -274,96 +262,76 @@ export function playSquish(amount) {
 
 export function playKiss() {
   noiseHit(3200, 1100, 0.05, 0.45);
-  if (!ctx || ctx.state !== "running") return;
-  const now = ctx.currentTime + 0.03;
-  const osc = ctx.createOscillator();
-  osc.frequency.setValueAtTime(900, now);
-  osc.frequency.exponentialRampToValueAtTime(1600, now + 0.05);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.008);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
-  osc.connect(gain).connect(master);
-  osc.start(now);
-  osc.stop(now + 0.08);
+  if (!running()) return;
+  tone(ctx.currentTime + 0.03, {
+    from: 900,
+    to: 1600,
+    sweep: 0.05,
+    length: 0.07,
+    volume: 0.12,
+    attack: 0.008,
+  });
 }
 
 export function playHeartbeat(strength) {
-  if (!ctx || ctx.state !== "running") return;
+  if (!running()) return;
   const now = ctx.currentTime;
   [
     [0, 1],
     [0.2, 0.7],
-  ].forEach(([offset, level]) => {
-    const at = now + offset;
-    const osc = ctx.createOscillator();
-    osc.frequency.setValueAtTime(95, at);
-    osc.frequency.exponentialRampToValueAtTime(50, at + 0.18);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(0.16 * strength * level, at + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.24);
-    osc.connect(gain).connect(master);
-    osc.start(at);
-    osc.stop(at + 0.26);
-  });
+  ].forEach(([offset, level]) =>
+    tone(now + offset, {
+      from: 95,
+      to: 50,
+      sweep: 0.18,
+      length: 0.24,
+      volume: 0.16 * strength * level,
+      attack: 0.04,
+    }),
+  );
 }
 
 export function playGlug(amount) {
-  if (!ctx || ctx.state !== "running") return;
+  if (!running()) return;
   const now = ctx.currentTime;
   const from = 180 + Math.random() * 120;
-  const osc = ctx.createOscillator();
-  osc.frequency.setValueAtTime(from, now);
-  osc.frequency.exponentialRampToValueAtTime(from * 2.6, now + 0.07);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.06 + amount * 0.08, now + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
-  osc.connect(gain).connect(master);
-  osc.start(now);
-  osc.stop(now + 0.1);
+  tone(now, {
+    from,
+    to: from * 2.6,
+    sweep: 0.07,
+    length: 0.09,
+    volume: 0.06 + amount * 0.08,
+  });
 }
 
 export function playCork(open) {
   noiseHit(open ? 1800 : 900, open ? 600 : 400, 0.05, open ? 0.5 : 0.3);
-  if (!ctx || ctx.state !== "running") return;
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  osc.frequency.setValueAtTime(open ? 520 : 380, now);
-  osc.frequency.exponentialRampToValueAtTime(open ? 260 : 300, now + 0.08);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.18, now + 0.005);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
-  osc.connect(gain).connect(master);
-  osc.start(now);
-  osc.stop(now + 0.12);
+  if (!running()) return;
+  tone(ctx.currentTime, {
+    from: open ? 520 : 380,
+    to: open ? 260 : 300,
+    sweep: 0.08,
+    length: 0.1,
+    volume: 0.18,
+    attack: 0.005,
+  });
 }
 
 function running() {
   return ctx && ctx.state === "running";
 }
 
-function tone(at, { type = "sine", from, to, length, volume, filter }) {
+function tone(at, { from, to, sweep, length, volume, attack = 0.01 }) {
   const osc = ctx.createOscillator();
-  osc.type = type;
   osc.frequency.setValueAtTime(from, at);
-  osc.frequency.exponentialRampToValueAtTime(to, at + length);
+  osc.frequency.exponentialRampToValueAtTime(to, at + (sweep ?? length));
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0.0001, at);
-  gain.gain.exponentialRampToValueAtTime(volume, at + 0.01);
+  gain.gain.exponentialRampToValueAtTime(volume, at + attack);
   gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
-  let out = osc;
-  if (filter) {
-    const lowpass = ctx.createBiquadFilter();
-    lowpass.frequency.value = filter;
-    out = osc.connect(lowpass);
-  }
-  out.connect(gain).connect(master);
+  osc.connect(gain).connect(master);
   osc.start(at);
   osc.stop(at + length + 0.02);
-  return osc;
 }
 
 export function playSnap(amount) {

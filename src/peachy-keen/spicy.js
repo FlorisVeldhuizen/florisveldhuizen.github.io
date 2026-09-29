@@ -1,4 +1,4 @@
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+import { reducedMotion } from "./util";
 
 const LINES = {
   cheeky: {
@@ -76,11 +76,7 @@ const LINES = {
       "Still jiggling. For you.",
       "Please?",
     ],
-    clap: [
-      "Ha! Let them hear.",
-      "I'm all yours.",
-      "Oh, stop. …Don't.",
-    ],
+    clap: ["Ha! Let them hear.", "I'm all yours.", "Oh, stop. …Don't."],
     kiss: [
       "Oh. Hi.",
       "Mm. More, please.",
@@ -135,7 +131,7 @@ const LINES = {
     ],
     combo: [
       "I can't think…",
-      "My face is so warm.",
+      "I'm all flustered…",
       "Don't tell anyone.",
       "Please don't stop.",
       "Are you always like this?",
@@ -270,18 +266,29 @@ export class Talk {
     const urgent = chance >= 1;
     if ((!urgent && now < this.quietUntil) || Math.random() > chance) return;
     const options = lines.filter((line) => line !== this.last);
-    this.show(options[Math.floor(Math.random() * options.length)]);
+    const line = options[Math.floor(Math.random() * options.length)];
+    this.show(line, event === "burst");
   }
 
-  show(line) {
+  show(line, soft = false) {
+    if (this.level === "off") return;
     const now = performance.now();
     this.snap = !this.showing;
     this.last = line;
     this.el.textContent = line;
     this.el.classList.add("is-visible");
+    this.width = this.el.offsetWidth;
     this.until = now + 1300 + line.length * 45;
     this.quietUntil = this.until + 1200;
-    if (!reducedMotion.matches) {
+    if (soft && !reducedMotion.matches) {
+      this.el.animate(
+        [
+          { opacity: 0, scale: "0.9" },
+          { opacity: 1, scale: "1" },
+        ],
+        { duration: 500, easing: "cubic-bezier(.3,.7,.4,1)" },
+      );
+    } else if (!reducedMotion.matches) {
       this.el.animate(
         [
           { scale: "0.6", rotate: "-6deg" },
@@ -304,14 +311,14 @@ export class Talk {
 
   place(x, y) {
     if (!this.showing) return;
-    if (performance.now() > this.until) {
+    const now = performance.now();
+    if (now > this.until) {
       this.hide();
       return;
     }
     const margin = 16;
-    const left = Math.max(margin + this.el.offsetWidth, x);
+    const left = Math.max(margin + this.width, x);
     const top = Math.max(margin, y);
-    const now = performance.now();
     if (this.snap) {
       this.snap = false;
       this.x = left;

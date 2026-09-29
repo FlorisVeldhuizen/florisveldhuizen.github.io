@@ -83,8 +83,13 @@ export function initScene() {
   document.body.prepend(renderer.domElement);
 
   const pmrem = new PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(createRingLightEnvironment(), 0).texture;
+  const env = createRingLightEnvironment();
+  scene.environment = pmrem.fromScene(env, 0).texture;
   pmrem.dispose();
+  env.traverse((o) => {
+    o.geometry?.dispose();
+    o.material?.dispose();
+  });
 
   const hemi = new HemisphereLight(0xffe4ea, 0x7a3060, 1.9);
   scene.add(hemi);
@@ -101,10 +106,16 @@ export function initScene() {
 }
 
 export function setupResizeHandler(camera, renderer, onResize) {
+  let pending = false;
   window.addEventListener("resize", () => {
-    fitCamera(camera);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    onResize?.();
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      fitCamera(camera);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      onResize?.();
+    });
   });
 }
 
@@ -122,9 +133,7 @@ export class QualityGovernor {
 
   setMode(mode) {
     this.mode = mode;
-    if (mode === "sharp") this.apply(this.max);
-    if (mode === "fast") this.apply(1);
-    if (mode === "auto") this.apply(this.max);
+    this.apply(mode === "fast" ? 1 : this.max);
   }
 
   apply(ratio) {

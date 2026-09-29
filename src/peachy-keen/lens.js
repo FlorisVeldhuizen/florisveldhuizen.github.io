@@ -13,13 +13,14 @@ import {
 import { JUICE_LAYER, juiceMaterial, dropletPositionAt } from "./juice";
 
 const LIFE = 4.2;
+const OIL_LIFE = 6;
 const CANVAS_WIDTH = 720;
 const SURFACE = 0.2;
 const FALLOFF = [0.5, 0.444, 0.311, 0.172, 0.075, 0];
 const project = new Vector3();
 const SPRITE_SIZE = 256;
 
-function drawBlobSprite() {
+function drawBlobSprite(channel) {
   const sprite = document.createElement("canvas");
   sprite.width = SPRITE_SIZE;
   sprite.height = SPRITE_SIZE;
@@ -27,7 +28,9 @@ function drawBlobSprite() {
   const half = SPRITE_SIZE / 2;
   const g = ctx.createRadialGradient(half, half, 0, half, half, half);
   FALLOFF.forEach((v, i) => {
-    g.addColorStop(i / (FALLOFF.length - 1), `rgb(${Math.round(v * 255)},0,0)`);
+    const c = [0, 0, 0];
+    c[channel] = Math.round(v * 255);
+    g.addColorStop(i / (FALLOFF.length - 1), `rgb(${c})`);
   });
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
@@ -54,12 +57,14 @@ const LensShader = {
     varying vec2 vUv;
 
     float heightAt(vec2 uv) {
-      float f = texture2D(tDrops, uv).r;
+      vec4 d = texture2D(tDrops, uv);
+      float f = d.r + d.g;
       return sqrt(clamp((f - ${SURFACE.toFixed(2)}) / 0.3, 0.0, 1.0));
     }
 
     void main() {
-      float f = texture2D(tDrops, vUv).r;
+      vec4 drops = texture2D(tDrops, vUv);
+      float f = drops.r + drops.g;
       if (f < ${(SURFACE - 0.01).toFixed(2)}) discard;
       vec4 base = texture2D(tDiffuse, vUv);
       float h = heightAt(vUv);
@@ -68,17 +73,18 @@ const LensShader = {
       vec3 n = normalize(vec3(-hx, -hy, 0.35));
 
       float body = smoothstep(${(SURFACE - 0.01).toFixed(2)}, ${(SURFACE + 0.02).toFixed(2)}, f);
-      vec3 juice = vec3(1.0, 0.66, 0.46);
-      vec3 refracted = texture2D(tDiffuse, vUv - n.xy * 0.035).rgb;
-      vec3 col = refracted * mix(vec3(1.0), juice, 0.38 + h * 0.25) + juice * 0.025 * h;
+      float oil = clamp(drops.g / f, 0.0, 1.0);
+      vec3 juice = mix(vec3(1.0, 0.66, 0.46), vec3(1.0, 0.74, 0.22), oil);
+      vec3 refracted = texture2D(tDiffuse, vUv - n.xy * mix(0.035, 0.06, oil)).rgb;
+      vec3 col = refracted * mix(vec3(1.0), juice, 0.38 + h * 0.25 + oil * 0.2) + juice * mix(0.025, 0.08, oil) * h;
 
       float edge = 1.0 - smoothstep(0.0, 0.35, h);
       col *= 1.0 - edge * 0.18;
 
       vec3 light = normalize(vec3(-0.45, 0.6, 0.66));
-      float spec = pow(max(dot(n, light), 0.0), 120.0);
+      float spec = pow(max(dot(n, light), 0.0), mix(120.0, 60.0, oil));
       float caustic = pow(max(dot(n, normalize(vec3(0.35, -0.7, 0.6))), 0.0), 8.0);
-      col += spec * 1.2 + caustic * 0.1 * juice;
+      col += spec * mix(1.2, 1.6, oil) + caustic * mix(0.1, 0.25, oil) * juice;
 
       gl_FragColor = vec4(mix(base.rgb, col, body), base.a);
     }
@@ -92,8 +98,8 @@ export class Lens {
     this.drops = [];
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d");
-    this.sprite = drawBlobSprite();
-    this.texture = new CanvasTexture(this.canvas);
+    this.sprite = drawBlobSprite(0);
+    this.oilSprite = drawBlobSprite(1);
 
     this.material = new ShaderMaterial({
       uniforms: LensShader.uniforms,
@@ -102,7 +108,6 @@ export class Lens {
       depthTest: false,
       depthWrite: false,
     });
-    this.pass = this.material;
     this.overlay = new Scene();
     const quad = new Mesh(new PlaneGeometry(2, 2), this.material);
     quad.frustumCulled = false;
@@ -119,27 +124,48 @@ export class Lens {
     const h = window.innerHeight;
     this.canvas.width = CANVAS_WIDTH;
     this.canvas.height = Math.round((CANVAS_WIDTH * h) / w);
-    this.pass.uniforms.uTexel.value.set(
+    this.material.uniforms.uTexel.value.set(
       1.5 / this.canvas.width,
       1.5 / this.canvas.height,
     );
-    this.texture.dispose();
+    this.texture?.dispose();
     this.texture = new CanvasTexture(this.canvas);
-    this.pass.uniforms.tDrops.value = this.texture;
+    this.material.uniforms.tDrops.value = this.texture;
   }
 
-  addDrop(x, y, r, delay = 0) {
+  addDrop(x, y, r, delay = 0, oil = false) {
     this.drops.push({
       x,
       y,
       r,
+      oil,
       age: -delay,
+      life: oil ? OIL_LIFE : LIFE,
       vy: 0,
       seed: Math.random() * 10,
       trail: [],
-      slides: r > 9 && Math.random() < 0.85,
-      wait: 0.25 + Math.random() * 0.8,
+      slides: r > (oil ? 6 : 9) && Math.random() < 0.85,
+      wait: (oil ? 0.8 : 0.25) + Math.random() * 0.8,
     });
+  }
+
+  oilSplat(x, y, r) {
+    if (!this.enabled) return;
+    const scale = this.canvas.width / window.innerWidth;
+    const size = r * scale;
+    this.addDrop(x * scale, y * scale, size, 0, true);
+    const count = Math.floor(Math.random() * 3);
+    for (let i = 0; i < count; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const along = size * (1.2 + Math.random() * 0.8);
+      this.addDrop(
+        x * scale + Math.cos(angle) * along,
+        y * scale + Math.sin(angle) * along,
+        Math.max(1.2, size * (0.15 + Math.random() * 0.2)),
+        0,
+        true,
+      );
+    }
   }
 
   splat(worldPosition, worldVelocity, size = 1) {
@@ -183,10 +209,6 @@ export class Lens {
     }
   }
 
-  isActive() {
-    return this.drops.length > 0;
-  }
-
   update(delta) {
     if (this.drops.length === 0) return;
     const { ctx, canvas } = this;
@@ -195,37 +217,42 @@ export class Lens {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = "lighter";
 
-    this.drops = this.drops.filter((d) => d.age < LIFE);
+    this.drops = this.drops.filter((d) => d.age < d.life);
     this.drops.forEach((d) => {
       d.age += delta;
       if (d.age < 0) return;
       if (d.slides && d.age > d.wait) {
-        d.vy = Math.min(18 + d.r * 2.2, d.vy + (20 + d.r) * delta);
+        const drag = d.oil ? 0.4 : 1;
+        d.vy = Math.min(
+          (18 + d.r * 2.2) * drag,
+          d.vy + (20 + d.r) * drag * delta,
+        );
         d.y += d.vy * delta;
         d.x += Math.sin(d.age * 2.3 + d.seed) * 6 * delta;
-        d.r = Math.max(5, d.r - delta * 1.4);
+        d.r = Math.max(5, d.r - delta * (d.oil ? 0.5 : 1.4));
         const last = d.trail[d.trail.length - 1];
         if (!last || d.y - last.y > 2) {
-          d.trail.push({ x: d.x, y: d.y, r: d.r * 0.42 });
+          d.trail.push({ x: d.x, y: d.y, r: d.r * (d.oil ? 0.6 : 0.42) });
         }
       }
       d.trail.forEach((t) => {
-        t.r -= delta * 1.6;
+        t.r -= delta * (d.oil ? 0.7 : 1.6);
       });
       d.trail = d.trail.filter((t) => t.r > 0.8);
 
-      const evaporate = Math.min(1, (LIFE - d.age) / 1.4);
+      const evaporate = Math.min(1, (d.life - d.age) / 1.4);
       const grow = Math.min(1, 0.35 + d.age * 14);
-      d.trail.forEach((t) => this.blob(t.x, t.y, t.r * evaporate));
-      this.blob(d.x, d.y, d.r * grow * evaporate);
+      const sprite = d.oil ? this.oilSprite : this.sprite;
+      d.trail.forEach((t) => this.blob(sprite, t.x, t.y, t.r * evaporate));
+      this.blob(sprite, d.x, d.y, d.r * grow * evaporate);
     });
     this.texture.needsUpdate = true;
   }
 
-  blob(x, y, r) {
+  blob(sprite, x, y, r) {
     if (r < 0.6) return;
     const reach = r * 1.8;
-    this.ctx.drawImage(this.sprite, x - reach, y - reach, reach * 2, reach * 2);
+    this.ctx.drawImage(sprite, x - reach, y - reach, reach * 2, reach * 2);
   }
 
   captureFrame() {
@@ -239,7 +266,7 @@ export class Lens {
       this.frame = new FramebufferTexture(this.size.x, this.size.y);
       this.frame.minFilter = LinearFilter;
       this.frame.magFilter = LinearFilter;
-      this.pass.uniforms.tDiffuse.value = this.frame;
+      this.material.uniforms.tDiffuse.value = this.frame;
     }
     this.renderer.copyFramebufferToTexture(this.origin, this.frame);
     return this.frame;

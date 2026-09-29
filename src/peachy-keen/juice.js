@@ -80,7 +80,6 @@ export class Juice {
     this.mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.particles = [];
-    this.age = 0;
     this.splatZ = Infinity;
     this.splatHalf = new Vector2();
     this.onSplat = null;
@@ -265,9 +264,11 @@ export class Droplets {
   update(delta) {
     this.mesh.visible = this.drops.length > 0;
     if (this.drops.length === 0) return;
-    this.drops = this.drops.filter((d) => d.age < DROPLET_LIFE);
-    this.drops.forEach((d, i) => {
+    this.drops = this.drops.filter((d) => {
       d.age += delta;
+      return d.age < DROPLET_LIFE;
+    });
+    this.drops.forEach((d, i) => {
       d.velocity.y -= GRAVITY * delta;
       d.position.addScaledVector(d.velocity, delta);
       const t = d.age / DROPLET_LIFE;

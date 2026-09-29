@@ -266,7 +266,7 @@ const collar = (neck) => [
   [neck, 0.39],
 ];
 
-function glass(tint, extra = {}) {
+function glass(tint) {
   const rim = new Color(tint);
   const material = new MeshPhysicalMaterial({
     color: 0x000000,
@@ -279,7 +279,7 @@ function glass(tint, extra = {}) {
     envMapIntensity: 1.3,
     clearcoat: 0.4,
     clearcoatRoughness: 0.03,
-    ...extra,
+    side: DoubleSide,
   });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, { uRim: { value: rim } });
@@ -312,85 +312,83 @@ function oil(color, glow) {
   });
 }
 
-const APOTHECARY = {
-  spout: 0.43,
-  build() {
-    const outer = [
-      ...roundProfile(),
-      ...collar(0.064),
-      [0.064, 0.4],
-      [0.082, 0.406],
-      [0.084, 0.424],
-      [0.072, 0.43],
-      [0.05, 0.428],
-      [0.048, 0.36],
-    ];
-    const body = new Mesh(lathe(outer, 72), glass(0xfff4ec));
-    body.material.side = DoubleSide;
-    const liquid = new Mesh(
-      lathe([...roundProfile(0.022), [0, 0.35]], 64),
-      oil(0xe8922c, 0x6a2608),
-    );
-    const cork = corkTexture();
-    const stopper = new Mesh(
-      lathe(
-        [
-          [0, -0.075],
-          [0.044, -0.075],
-          [0.05, -0.068],
-          [0.056, 0.02],
-          [0.074, 0.028],
-          [0.08, 0.04],
-          [0.078, 0.062],
-          [0.07, 0.07],
-          [0, 0.072],
-        ],
-        40,
-      ),
-      new MeshPhysicalMaterial({
-        map: cork,
-        bumpMap: cork,
-        bumpScale: 2,
-        roughness: 0.9,
-        sheen: 0.4,
-        sheenColor: new Color(0xffe0c0),
-      }),
-    );
-    stopper.position.y = 0.43;
-    const label = new Mesh(
-      new CylinderGeometry(0.2145, 0.2145, 0.27, 96, 1, true, -2.2, 4.4),
-      new MeshPhysicalMaterial({
-        map: labelTexture(),
-        roughness: 0.7,
-        sheen: 0.35,
-        sheenColor: new Color(0xfff2e6),
-      }),
-    );
-    label.position.y = -0.17;
-    const ribbon = new Mesh(
-      new CylinderGeometry(0.0685, 0.0685, 0.022, 48, 1, true),
-      new MeshPhysicalMaterial({
-        color: 0x8a2f45,
-        roughness: 0.35,
-        sheen: 1,
-        sheenColor: new Color(0xff9ab4),
-        side: DoubleSide,
-      }),
-    );
-    ribbon.position.y = 0.325;
-    body.add(label, ribbon);
-    return { body, liquid, stopper, level: 0.02 };
-  },
-};
+const SPOUT = 0.43;
+
+function buildBottle() {
+  const outer = [
+    ...roundProfile(),
+    ...collar(0.064),
+    [0.064, 0.4],
+    [0.082, 0.406],
+    [0.084, 0.424],
+    [0.072, 0.43],
+    [0.05, 0.428],
+    [0.048, 0.36],
+  ];
+  const body = new Mesh(lathe(outer, 72), glass(0xfff4ec));
+  const liquid = new Mesh(
+    lathe([...roundProfile(0.022), [0, 0.35]], 64),
+    oil(0xe8922c, 0x6a2608),
+  );
+  const cork = corkTexture();
+  const stopper = new Mesh(
+    lathe(
+      [
+        [0, -0.075],
+        [0.044, -0.075],
+        [0.05, -0.068],
+        [0.056, 0.02],
+        [0.074, 0.028],
+        [0.08, 0.04],
+        [0.078, 0.062],
+        [0.07, 0.07],
+        [0, 0.072],
+      ],
+      40,
+    ),
+    new MeshPhysicalMaterial({
+      map: cork,
+      bumpMap: cork,
+      bumpScale: 2,
+      roughness: 0.9,
+      sheen: 0.4,
+      sheenColor: new Color(0xffe0c0),
+    }),
+  );
+  stopper.position.y = 0.43;
+  const label = new Mesh(
+    new CylinderGeometry(0.2145, 0.2145, 0.27, 96, 1, true, -2.2, 4.4),
+    new MeshPhysicalMaterial({
+      map: labelTexture(),
+      roughness: 0.7,
+      sheen: 0.35,
+      sheenColor: new Color(0xfff2e6),
+    }),
+  );
+  label.position.y = -0.17;
+  const ribbon = new Mesh(
+    new CylinderGeometry(0.0685, 0.0685, 0.022, 48, 1, true),
+    new MeshPhysicalMaterial({
+      color: 0x8a2f45,
+      roughness: 0.35,
+      sheen: 1,
+      sheenColor: new Color(0xff9ab4),
+      side: DoubleSide,
+    }),
+  );
+  ribbon.position.y = 0.325;
+  body.add(label, ribbon);
+  return { body, liquid, stopper, level: 0.02 };
+}
 
 const worldCenter = new Vector3();
 const normal = new Vector3();
 
 export class BottleModel {
   constructor() {
-    this.spec = APOTHECARY;
+    this.spout = SPOUT;
     this.group = new Group();
-    const { body, liquid, stopper, level } = APOTHECARY.build();
+    const { body, liquid, stopper, level } = buildBottle();
     this.stopper = stopper;
     this.level = level;
     this.fill = 1;
@@ -404,8 +402,8 @@ export class BottleModel {
   updateLiquid(slosh = 0) {
     this.group.updateMatrixWorld();
     this.group.getWorldPosition(worldCenter);
-    const scale = this.group.getWorldScale(new Vector3()).y;
-    const up = Math.cos(this.group.rotation.z);
+    const scale = this.group.scale.y;
+    const up = normal.set(0, 1, 0).transformDirection(this.group.matrixWorld).y;
     const height = (this.level - (1 - this.fill) * 0.3) * up;
     worldCenter.y += height * scale;
     this.surface.setFromNormalAndCoplanarPoint(
@@ -415,6 +413,6 @@ export class BottleModel {
   }
 
   spoutWorld(target) {
-    return this.group.localToWorld(target.set(0, this.spec.spout, 0));
+    return this.group.localToWorld(target.set(0, this.spout, 0));
   }
 }

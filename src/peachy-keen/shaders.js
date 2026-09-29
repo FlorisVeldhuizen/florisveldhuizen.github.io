@@ -13,14 +13,12 @@ export function createBackgroundMaterial() {
     uniforms: {
       time: { value: 0 },
       heat: { value: 0 },
-      shock: { value: -1 },
       resolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
     },
     vertexShader: VERTEX_SHADER,
     fragmentShader: `
             uniform float time;
             uniform float heat;
-            uniform float shock;
             uniform vec2 resolution;
             varying vec2 vUv;
 
@@ -59,10 +57,10 @@ export function createBackgroundMaterial() {
                 vec3 teal = vec3(0.12, 0.40, 0.46);
                 vec3 violet = vec3(0.32, 0.26, 0.60);
                 vec3 berry = vec3(0.58, 0.22, 0.46);
-                vec3 dustyRose = vec3(0.68, 0.34, 0.42);
+                vec3 oceanBlue = vec3(0.16, 0.30, 0.58);
                 vec3 c = mix(teal, violet, smoothstep(0.0, 1.0, x));
                 c = mix(c, berry, smoothstep(1.0, 2.0, x));
-                c = mix(c, dustyRose, smoothstep(2.0, 3.0, x));
+                c = mix(c, oceanBlue, smoothstep(2.0, 3.0, x));
                 return mix(c, teal, smoothstep(3.0, 4.0, x));
             }
 
@@ -81,12 +79,6 @@ export function createBackgroundMaterial() {
             void main() {
                 vec2 uv = vUv;
                 float aspect = resolution.x / resolution.y;
-                if (shock >= 0.0) {
-                    vec2 fromCenter = (uv - 0.5) * vec2(aspect, 1.0);
-                    float radius = length(fromCenter);
-                    float ring = exp(-pow((radius - shock * 1.1) * 11.0, 2.0)) * exp(-shock * 2.2);
-                    uv -= normalize(fromCenter + 1e-5) * ring * 0.05;
-                }
                 vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
                 float t = time * 0.022;
                 vec2 sp = p * 0.9;
@@ -133,8 +125,36 @@ export function createBackgroundMaterial() {
                 col += pale * dust * (0.3 + smoke);
 
                 col *= mix(0.65, 1.0, smoothstep(1.4, 0.25, length(p * vec2(0.8, 1.0))));
-                col += (hash(gl_FragCoord.xy + fract(time * 0.37) * 97.0) - 0.5) * 0.025;
 
+                gl_FragColor = vec4(col, 1.0);
+            }
+        `,
+    depthTest: false,
+    depthWrite: false,
+  });
+}
+
+export function createBackdropBlitMaterial(smoke) {
+  return new ShaderMaterial({
+    uniforms: {
+      tSmoke: { value: smoke },
+      time: { value: 0 },
+    },
+    vertexShader: VERTEX_SHADER,
+    fragmentShader: `
+            uniform sampler2D tSmoke;
+            uniform float time;
+            varying vec2 vUv;
+
+            float hash(vec2 p) {
+                p = fract(p * vec2(123.34, 456.21));
+                p += dot(p, p + 45.32);
+                return fract(p.x * p.y);
+            }
+
+            void main() {
+                vec3 col = texture2D(tSmoke, vUv).rgb;
+                col += (hash(gl_FragCoord.xy + fract(time * 0.37) * 97.0) - 0.5) * 0.025;
                 gl_FragColor = vec4(col, 1.0);
             }
         `,

@@ -22,14 +22,13 @@ import {
   INTERACTION_CONFIG as CFG,
 } from "./config";
 import { Bottle } from "./bottle";
+import { clamp, reducedMotion } from "./util";
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const buzz = (ms) => navigator.vibrate?.(ms);
 const SLICE_HOLD = 0.42;
 const TEARS = [0.22, 0.42, 0.6];
 const WINDUP_FROM = 0.72;
 const BEAT_LENGTH = 0.32;
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function spring(x, v, k, c, h) {
   v.addScaledVector(x, -k * h).multiplyScalar(1 - c * h);
@@ -45,7 +44,6 @@ export class Interaction {
     juice,
     droplets,
     lens,
-    backdrop,
     ui,
     settings,
     talk,
@@ -57,7 +55,6 @@ export class Interaction {
       juice,
       droplets,
       lens,
-      backdrop,
       ui,
       settings,
       talk,
@@ -130,6 +127,7 @@ export class Interaction {
     this.carrying = false;
     this.carryLatched = false;
     this.bottle = new Bottle(scene, camera);
+    this.bottle.stream.onLens = (x, y, r) => this.lens.oilSplat(x, y, r);
     this.grab = null;
     this.recoil = null;
     this.grabPlane = new Plane();
@@ -144,7 +142,6 @@ export class Interaction {
     this.lastJoltAt = 0;
     this.saidHot = false;
     this.garment = {
-      peel: 0,
       worn: true,
       stripping: false,
       target: 0,
@@ -224,8 +221,12 @@ export class Interaction {
       p.downY = e.clientY;
       p.travel = 0;
       p.grabbed = false;
-      p.downOnPeach = !!this.raycastAt(e.clientX, e.clientY);
-      p.onWaistband = this.onWaistband(e.clientX, e.clientY);
+      const hit = this.raycastAt(e.clientX, e.clientY);
+      p.downOnPeach = !!hit;
+      p.onWaistband =
+        !!hit &&
+        this.canStrip() &&
+        this.peach.heightAt(hit.point) > CFG.WAISTBAND_FROM;
     });
     const release = (e) => {
       const tapped =
@@ -291,8 +292,7 @@ export class Interaction {
     this.squashVelocity.x += size * 1.1;
     this.squashAxis.set(Math.abs(x), Math.abs(y)).normalize();
     this.wobbleAll(0.05 + size * 0.05);
-    this.idle = 0;
-    this.twerk = null;
+    this.wake();
     this.talk.say("shake", 0.2);
   }
 
@@ -349,7 +349,6 @@ export class Interaction {
       worn: false,
       stripping: false,
       dressing: null,
-      peel: 0,
       freed: false,
     });
     playSlide(0.5, 3000, 800);
@@ -474,18 +473,10 @@ export class Interaction {
       if (strength > 1) this.lens.splash(flung, this.oil);
     }
 
-    this.combo =
-      now - this.lastSmackAt < CFG.COMBO_WINDOW_MS ? this.combo + 1 : 1;
-    this.lastSmackAt = now;
-    this.smacks += 1;
-    this.idle = 0;
-    this.twerk = null;
-    this.heat = Math.min(
-      100,
-      this.heat +
-        (CFG.HEAT_PER_SMACK + CFG.HEAT_PER_SPEED * strength) * tool.heat,
+    this.countSmack(now);
+    this.addHeat(
+      (CFG.HEAT_PER_SMACK + CFG.HEAT_PER_SPEED * strength) * tool.heat,
     );
-    this.heatHold = CFG.HEAT_DECAY_DELAY;
     if (strength * tool.force > 1.3) this.hitStop = 0.045;
     this.kickVelocity.addScaledVector(swipe, 0.5 * strength * tool.force);
 
@@ -538,7 +529,7 @@ export class Interaction {
     this.talk.say("grab", 0.7);
   }
 
-  updateGrab(delta) {
+  updateGrab(delta, motion) {
     const g = this.grab;
     const world = this.tempA
       .copy(g.local)
@@ -572,7 +563,7 @@ export class Interaction {
     g.age += delta;
     const still =
       g.age > 0.25 &&
-      this.pointerSpeed(performance.now()).speed < CFG.GRAB_STILL_SPEED;
+      motion.speed < CFG.GRAB_STILL_SPEED;
     g.knead = still
       ? Math.min(1, g.knead + delta / CFG.GRAB_KNEAD_SECONDS)
       : Math.max(0, g.knead - delta * 1.5);
@@ -616,10 +607,8 @@ export class Interaction {
     this.velocity.addScaledVector(g.pull, 9 * delta);
     const lever = this.tempB.copy(world).sub(this.group.position);
     this.spin.addScaledVector(lever.cross(g.pull), 9 * delta);
-    this.heat = Math.min(99, this.heat + 2 * delta * (0.2 + length));
-    this.heatHold = CFG.HEAT_DECAY_DELAY;
-    this.idle = 0;
-    this.twerk = null;
+    this.addHeat(2 * delta * (0.2 + length), 99);
+    this.wake();
   }
 
   releaseGrab() {
@@ -725,10 +714,9 @@ export class Interaction {
     }
     playSlap(0.4 + length * 0.6, this.heat / 100, this.oil, 1.1);
     this.talk.say("release", 0.6);
-    this.heat = Math.min(100, this.heat + 5 * length);
-    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    this.addHeat(5 * length);
     this.ui.onSnapback(at.x, at.y, length / CFG.GRAB_REACH);
-    if (this.heat >= 100 && this.phase === "live") this.charge();
+    if (this.heat >= 100) this.charge();
   }
 
   cheekPoint(side, dy) {
@@ -745,12 +733,6 @@ export class Interaction {
     return (
       this.settings.lingerie && this.garment.worn && !this.garment.dressing
     );
-  }
-
-  onWaistband(x, y) {
-    if (!this.canStrip()) return false;
-    const hit = this.raycastAt(x, y);
-    return !!hit && this.peach.heightAt(hit.point) > CFG.WAISTBAND_FROM;
   }
 
   isStripPull() {
@@ -770,7 +752,7 @@ export class Interaction {
     this.talk.say("strip", 0.6);
   }
 
-  updateStrip() {
+  updateStrip(delta) {
     const p = this.pointer;
     const g = this.garment;
     const wanted = clamp(
@@ -783,12 +765,12 @@ export class Interaction {
     if (g.pull < 0) {
       const hike = Math.min(1, -g.pull / 0.45);
       const lifting = Math.max(0, -0.17 - g.pull) / 0.2;
-      g.liftHold = lifting > 0 ? (g.liftHold || 0) + 1 / 60 : 0;
+      g.liftHold = lifting > 0 ? (g.liftHold || 0) + delta : 0;
       const giving = Math.min(1, g.liftHold / 0.9) ** 2;
       const t = this.clock;
       const tugBack = Math.max(0, Math.sin(t * 2.6)) ** 2;
       this.velocity.y +=
-        (hike * 2 + lifting * 24 * giving - lifting * tugBack * 5) * (1 / 60);
+        (hike * 2 + lifting * 24 * giving - lifting * tugBack * 5) * delta;
       this.spin.z += Math.sin(t * 4.1) * 0.05 * lifting;
       this.spin.x += Math.sin(t * 2.9 + 1.3) * 0.025 * lifting;
       this.squashAxis.set(0, 1);
@@ -809,14 +791,12 @@ export class Interaction {
         buzz(4);
       }
       g.notch = notch;
-      this.heat = Math.min(99, this.heat + hike * 0.3);
-      this.heatHold = CFG.HEAT_DECAY_DELAY;
+      this.addHeat(hike * 18 * delta, 99);
       if (hike > 0.6) this.talk.say("wedgie", 0.02);
     } else {
       g.notch = 0;
     }
-    this.idle = 0;
-    this.twerk = null;
+    this.wake();
     if (g.target >= 1) this.removeGarment();
   }
 
@@ -846,8 +826,7 @@ export class Interaction {
     playSnap(amount);
     buzz(10 + Math.round(amount * 25));
     this.talk.say("snap", 0.7);
-    this.heat = Math.min(100, this.heat + 10 * amount);
-    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    this.addHeat(10 * amount);
     if (this.heat >= 100) this.charge();
   }
 
@@ -872,8 +851,7 @@ export class Interaction {
     buzz(20 + Math.round(amount * 30));
     this.talk.say("wedgie", 0.8);
     this.emit("wedgie", { amount });
-    this.heat = Math.min(100, this.heat + 8 + 12 * amount);
-    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    this.addHeat(8 + 12 * amount);
     if (this.heat >= 100) this.charge();
   }
 
@@ -881,14 +859,12 @@ export class Interaction {
     const g = this.garment;
     g.worn = false;
     g.stripping = false;
-    g.peel = 0;
     g.freed = false;
     buzz(30);
     playSnap(0.6);
     this.talk.say("stripped");
     this.emit("stripped");
-    this.heat = Math.min(100, this.heat + 20);
-    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    this.addHeat(20);
   }
 
   updateGarment(delta) {
@@ -905,7 +881,6 @@ export class Interaction {
       g.velocity += (target - g.pull) * 420 * (1 - 0.5 * hike) * delta;
       g.velocity *= Math.exp(-delta * 14);
     } else if (g.visible > 0) {
-      g.peel += delta;
       g.velocity += (1.9 - g.pull) * 70 * delta;
       g.velocity *= Math.exp(-delta * 6);
       if (!g.freed && g.pull > 1.05) {
@@ -955,14 +930,8 @@ export class Interaction {
     this.velocity.z += 0.8;
     this.kickVelocity.y += 0.5;
     const now = performance.now();
-    this.combo =
-      now - this.lastSmackAt < CFG.COMBO_WINDOW_MS ? this.combo + 1 : 1;
-    this.lastSmackAt = now;
-    this.smacks += 1;
-    this.idle = 0;
-    this.twerk = null;
-    this.heat = Math.min(100, this.heat + CFG.HEAT_PER_SMACK);
-    this.heatHold = CFG.HEAT_DECAY_DELAY;
+    this.countSmack(now);
+    this.addHeat(CFG.HEAT_PER_SMACK);
     playSlap(1, this.heat / 100, this.oil, this.firmness.pitch * 1.1);
     const at = this.toScreen(g);
     this.ui.onSmack(this.smacks, this.combo, at.x, at.y);
@@ -1024,8 +993,26 @@ export class Interaction {
     }
   }
 
+  wake() {
+    this.idle = 0;
+    this.twerk = null;
+  }
+
+  countSmack(now) {
+    this.combo =
+      now - this.lastSmackAt < CFG.COMBO_WINDOW_MS ? this.combo + 1 : 1;
+    this.lastSmackAt = now;
+    this.smacks += 1;
+    this.wake();
+  }
+
+  addHeat(amount, cap = 100) {
+    this.heat = Math.min(cap, this.heat + amount);
+    this.heatHold = CFG.HEAT_DECAY_DELAY;
+  }
+
   charge() {
-    if (this.chargeGuard?.()) return;
+    if (this.phase !== "live" || this.chargeGuard?.()) return;
     this.phase = "charging";
     this.phaseTime = 0;
     this.chargeTime = CFG.CHARGE_TIME;
@@ -1086,7 +1073,8 @@ export class Interaction {
     this.group.updateMatrixWorld(true);
     this.startSlice();
     this.finishBurst();
-    this.talk.say("burst");
+    this.talk.hide();
+    this.burstLinePending = true;
     this.emit("burst", { total: this.bursts });
   }
 
@@ -1114,14 +1102,12 @@ export class Interaction {
         mesh,
         side,
         velocity: new Vector3(),
-        spin: new Vector3(),
       };
     });
     return this.halves.map((h) => h.holder);
   }
 
   startSlice() {
-    if (!this.halves) this.prepareHalves();
     const center = this.group.position.clone();
     const normal = this.peach.creaseNormal(new Vector3());
     const toCenter = new Matrix4().makeTranslation(
@@ -1149,9 +1135,6 @@ export class Interaction {
         .add(new Vector3(0, 4.2 + Math.random(), -5));
       h.velocity.set(0, 0, 0);
       h.yaw = -Math.sign(-h.side * normal.x || 1) * 1.05;
-      h.roll = 0;
-      h.rollVelocity = h.side * (2 + Math.random());
-      h.landed = false;
     });
     this.halvesAge = 0;
     this.tearCount = 0;
@@ -1394,8 +1377,7 @@ export class Interaction {
       playGlug(flow);
       buzz(4);
     }
-    this.idle = 0;
-    this.twerk = null;
+    this.wake();
     this.ui.onRub();
     this.talk.say("rub", delta * 0.5);
   }
@@ -1417,6 +1399,7 @@ export class Interaction {
         };
         const flow = this.bottle.carry(p.x, p.y, motion.vx, hit, peach, delta);
         if (hit && flow > 0.4) this.pour(hit, motion, flow, delta);
+        this.bottle.fling(motion, delta);
         this.ui.setCursorState("carry");
         return;
       }
@@ -1432,8 +1415,9 @@ export class Interaction {
         this.grab = null;
         p.grabbed = false;
         this.peach.releaseGrab();
+        this.ui.setGrabTension(0);
       } else if (p.pressed && this.phase === "live") {
-        this.updateGrab(delta);
+        this.updateGrab(delta, motion);
         this.ui.setCursorState(this.grab ? "grab" : "over");
         return;
       } else {
@@ -1442,7 +1426,7 @@ export class Interaction {
     }
     if (this.garment.stripping) {
       if (p.pressed && this.phase === "live" && this.garment.worn) {
-        this.updateStrip();
+        this.updateStrip(delta);
         this.ui.setCursorState("grab");
         return;
       }
@@ -1474,7 +1458,7 @@ export class Interaction {
         this.startStrip();
       } else if (this.canGrab()) {
         this.startGrab(hit);
-        this.updateGrab(delta);
+        this.updateGrab(delta, motion);
         this.ui.setCursorState(this.grab ? "grab" : "over");
         return;
       }
@@ -1516,8 +1500,7 @@ export class Interaction {
       this.peach.addJiggle(hit.point, dir, 0.03 * strength, 0.55);
     }
     this.rubbing = 0.2 + strength * 0.35;
-    this.idle = 0;
-    this.twerk = null;
+    this.wake();
     this.talk.say("rub", delta * 0.5);
   }
 
@@ -1744,6 +1727,15 @@ export class Interaction {
 
     if (this.phase === "entering" && this.phaseTime >= CFG.RESPAWN_DURATION) {
       this.phase = "live";
+    }
+    if (
+      this.burstLinePending &&
+      (this.phase === "live" ||
+        (this.phase === "entering" &&
+          this.phaseTime >= CFG.RESPAWN_DURATION * 0.5))
+    ) {
+      this.burstLinePending = false;
+      this.talk.say("burst");
     }
     if (this.phase === "charging") this.updateCharge(delta);
     this.updateHalves(delta);

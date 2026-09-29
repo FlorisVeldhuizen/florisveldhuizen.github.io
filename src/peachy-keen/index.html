@@ -18,20 +18,20 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <section class="score" aria-live="polite">
+    <section class="score">
       <p class="score-count">
         <span id="count">0</span> <span id="count-unit">smacks</span>
       </p>
-      <p id="bursts" hidden></p>
+      <p id="bursts" aria-live="polite" hidden></p>
       <div id="meters" class="meters">
         <div class="meter">
-          <span class="meter-label">Heat</span>
+          <span>Heat</span>
           <span class="meter-track"
             ><span id="heat-fill" class="meter-fill heat"></span
           ></span>
         </div>
         <div class="meter">
-          <span class="meter-label">Oil</span>
+          <span>Oil</span>
           <span class="meter-track"
             ><span id="oil-fill" class="meter-fill oil"></span
           ></span>
