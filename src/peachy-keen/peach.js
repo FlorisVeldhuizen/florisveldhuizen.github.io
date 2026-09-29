@@ -48,6 +48,8 @@ const LINGERIE_COMMON = `
   uniform vec4 uBounds;
   uniform vec4 uLingerie;
   uniform vec4 uFabric;
+  uniform float uFabricWobble;
+  uniform float uFabricDepth;
   uniform float uCreaseCurve[${CURVE_SLOTS}];
   uniform vec3 uCreaseSide;
 
@@ -147,6 +149,11 @@ const LINGERIE_COMMON = `
     return vec2(softMin(panel, band, 0.025), band);
   }
 
+  float fleshRoll(float d, float rise, float tail) {
+    float x = max(d + 0.012, 0.0);
+    return (1.0 - exp(-x * x / (rise * rise))) * exp(-x / tail);
+  }
+
   float fabricPush(vec3 p, vec4 plane) {
     float h = heightOf(p);
     float across = acrossOf(p, plane, h);
@@ -162,15 +169,19 @@ const LINGERIE_COMMON = `
     d /= sqrt(dot(gradient, gradient) * 0.7 + 0.3);
     float pull = clamp(uLingerie.y, 0.0, 1.0);
     float hike = clamp(-uLingerie.y / 0.45, 0.0, 1.0);
+    float spread = sqrt(max(1.0, uFabricDepth / ${FABRIC.depth.toFixed(4)}));
     float reach = 0.07 * uFabric.w;
-    float covered = 1.0 - smoothstep(-0.05, 0.035, d);
-    float banded = 1.0 - smoothstep(-0.02, 0.03, c.y);
+    float covered = 1.0 - smoothstep(-0.06 * spread, 0.05 * spread, d);
+    float banded = 1.0 - smoothstep(-0.02, 0.06, c.y);
     float spanned = smoothstep(0.0, 0.008, bridgeLift(p, plane));
     float press = covered * (1.0 - 0.7 * pull + 0.6 * hike) * (1.0 - 0.9 * spanned) + banded * (0.5 + 1.1 * pull + 1.2 * hike);
-    float above = mix(0.8, 1.3 + pull * 0.5, smoothstep(-0.03, 0.03, h - waistLine(across, back)));
-    float rise = smoothstep(-0.015, reach, d);
-    float fall = exp(-max(d - reach, 0.0) / (1.6 * reach));
-    float push = rise * fall * above * uFabric.z - press * uFabric.y;
+    float over = smoothstep(-0.03, 0.03, h - waistLine(across, back));
+    float roll = mix(
+      fleshRoll(d, reach * spread * (0.9 + 0.6 * hike), reach * (1.3 + 1.2 * hike)) * (1.7 + 1.8 * hike),
+      fleshRoll(d, reach * spread * (1.3 + 0.6 * pull), reach * (1.6 + 1.0 * pull)) * (2.2 + 0.6 * pull) * (1.0 - 0.4 * hike),
+      over);
+    roll *= 1.0 + uFabricWobble * (0.6 + over);
+    float push = roll * uFabric.z - press * uFabric.y;
     float tuck = (1.0 - smoothstep(0.14, max(waistLine(across, back) - 0.12, 0.141), h)) * smoothstep(0.06, 0.14, h)
       * exp(-pow(across / 0.03, 2.0)) * smoothstep(0.0, 0.4, back);
     return (push - tuck * (0.8 + 2.0 * hike) * uFabric.y) * smoothstep(0.04, 0.2, h);
@@ -181,6 +192,7 @@ const VERTEX_HEADER = `
   uniform float uTime;
   uniform float uJiggleActive;
   uniform vec4 uFirmness;
+  uniform vec3 uBounce;
   uniform vec4 uHits[${PEACH_CONFIG.MAX_HITS}];
   uniform vec4 uHitDirs[${PEACH_CONFIG.MAX_HITS}];
   uniform vec4 uCrease;
@@ -189,13 +201,18 @@ const VERTEX_HEADER = `
   uniform vec4 uGrabDent;
   attribute float stiffness;
   varying vec3 vRestPosition;
+  varying vec4 vRubTilt;
   ${LINGERIE_COMMON}
+  varying float vFabricPush;
+  float lastFabricPush;
 
   vec3 jiggle(vec3 p, vec3 n) {
     vec3 d = vec3(0.0);
+    lastFabricPush = 0.0;
     if (uLingerie.x > 0.5 && uLingerie.z > 0.0) {
       float tension = (uFabric.x + clamp(abs(uLingerie.y), 0.0, 1.0) * 0.6) * uLingerie.z;
-      d += n * uBounds.w * 0.01 * tension * fabricPush(p, uCrease);
+      lastFabricPush = fabricPush(p, uCrease);
+      d += n * uBounds.w * uFabricDepth * tension * lastFabricPush;
     }
     if (uGrabPull.w > 0.0) {
       float g = length(p - uGrab.xyz) / uGrab.w;
@@ -217,14 +234,16 @@ const VERTEX_HEADER = `
       float cheekBody = sameCheek * smoothstep(0.0, 0.9, fromCrease);
       float pad = exp(-dist * dist * dist * 0.6);
       float spring = exp(-t * uFirmness.y) * cos(t * uFirmness.x - dist * 0.35);
-      spring = max(spring, 0.0) + min(spring, 0.0) * 0.75;
+      spring = max(spring, 0.0) + min(spring, 0.0) * uBounce.z;
       float rim = max(dist - 0.8, 0.0);
       float ripple = (1.0 - pad) * exp(-rim * rim * 1.4) * exp(-t * uFirmness.y * 1.2) * cos(t * uFirmness.x - rim * 2.6) * 0.22;
       float dent = pad * spring + ripple;
-      float wobble = exp(-dist * dist * 0.2) * exp(-t * uFirmness.y * 0.75) * sin(t * uFirmness.x * 0.5) * uFirmness.z;
-      float cheek = cheekBody * exp(-dist * dist * 0.08) * exp(-t * uFirmness.y * 0.38) * sin(t * uFirmness.x * 0.42) * uFirmness.z * 3.2;
+      float wobble = exp(-dist * dist * 0.2) * exp(-t * uFirmness.y * 0.75) * sin(t * uFirmness.x * 0.5 * uBounce.y) * uFirmness.z;
+      float front = dist - t * 3.0;
+      float splash = exp(-front * front * 2.5) * exp(-t * uFirmness.y * 0.8) * sin(t * uFirmness.x - dist * 2.0) * uBounce.x / (1.0 + t * 3.0);
+      float cheek = cheekBody * exp(-dist * dist * 0.08) * exp(-t * uFirmness.y * 0.38) * sin(t * uFirmness.x * 0.42 * uBounce.y) * uFirmness.z * 3.2;
       vec3 stretch = -(q - n * dot(q, n)) / r * dent * length(uHitDirs[i].xyz) * 0.3;
-      hits += (uHitDirs[i].xyz * ((dent + wobble) * mix(0.15, 1.0, sameCheek) + cheek) + stretch * sameCheek) * onset;
+      hits += (uHitDirs[i].xyz * ((dent + wobble + splash) * mix(0.15, 1.0, sameCheek) + cheek) + stretch * sameCheek) * onset;
     }
     float hold = 1.0;
     if (uLingerie.x > 0.5 && uLingerie.z > 0.0) {
@@ -242,9 +261,11 @@ const VERTEX_NORMAL = `
   vec3 objectNormal = vec3(normal);
   vec3 jiggled = position;
   vRestPosition = position;
+  vFabricPush = 0.0;
   if (uJiggleActive > 0.5) {
     float give = 1.0 - stiffness;
     jiggled = position + jiggle(position, normal) * give;
+    vFabricPush = lastFabricPush * uLingerie.z;
     vec3 helper = abs(objectNormal.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     vec3 tangentA = normalize(cross(objectNormal, helper));
     vec3 tangentB = cross(objectNormal, tangentA);
@@ -254,6 +275,12 @@ const VERTEX_NORMAL = `
     vec3 da = pa + jiggle(pa, normal) * give - jiggled;
     vec3 db = pb + jiggle(pb, normal) * give - jiggled;
     objectNormal = normalize(cross(da, db));
+  }
+  vRubTilt = vec4(0.0);
+  if (uGrabPull.w > 0.0) {
+    float k = length(position - uGrab.xyz) / uGrabDent.w;
+    float soften = smoothstep(0.0, uBounds.w * 0.004, length(uGrabDent.xyz)) * exp(-k * k * 1.2);
+    vRubTilt = vec4(normalMatrix * (objectNormal - normal) * soften * 0.9, soften);
   }
   #ifdef USE_TANGENT
     vec3 objectTangent = vec3(tangent.xyz);
@@ -273,6 +300,7 @@ const FRAGMENT_HEADER = `
   uniform float uCutSide;
   uniform float uStemY;
   uniform float uEnvSpecular;
+  varying vec4 vRubTilt;
 
   vec3 ringSparkle(vec3 viewPosition, vec3 n, float rough) {
     vec3 r = reflect(normalize(viewPosition), n);
@@ -305,6 +333,7 @@ const FRAGMENT_HEADER = `
   uniform sampler2D uPrintTexture;
   uniform float uPrintInk;
   varying vec3 vRestPosition;
+  varying float vFabricPush;
 
   float handprintMask() {
     float m = 0.0;
@@ -525,8 +554,12 @@ const FRAGMENT_COLOR = `
     float cutSide = (dot(vRestPosition, uCutPlane.xyz) - uCutPlane.w) * uCutSide;
     if (attached ? uCutSide < 0.0 : cutSide < 0.0) discard;
   }
-  if (uLingerie.x > 0.5 && uLingerie.z > 0.0)
+  if (uLingerie.x > 0.5 && uLingerie.z > 0.0) {
     diffuseColor.rgb *= 1.0 - fabricShadow(vRestPosition, uCutPlane) * uLingerie.z * (1.0 - leaf);
+    float squeeze = smoothstep(0.0, 0.6, -vFabricPush) * (1.0 - leaf);
+    float swell = smoothstep(0.2, 1.4, vFabricPush) * (1.0 - leaf);
+    diffuseColor.rgb *= mix(vec3(1.0), vec3(1.03, 0.72, 0.75), squeeze * 0.8) * mix(vec3(1.0), vec3(1.05, 0.95, 0.94), swell * 0.5);
+  }
 `;
 
 const PRINT_SHAPES = {
@@ -889,6 +922,7 @@ export class Peach {
       uTime: { value: 0 },
       uJiggleActive: { value: 0 },
       uFirmness: { value: new Vector4(19, 3.2, 0.45, 1) },
+      uBounce: { value: new Vector3(0, 1, 0.75) },
       uCrease: { value: new Vector4(1, 0, 0, 0) },
       uHeat: { value: 0 },
       uHits: { value: this.emptySlots(PEACH_CONFIG.MAX_HITS) },
@@ -914,6 +948,8 @@ export class Peach {
           FABRIC.width,
         ),
       },
+      uFabricWobble: { value: 0 },
+      uFabricDepth: { value: FABRIC.depth },
       uFabricColor: { value: new Color(NOIR[0]) },
       uFabricAccent: { value: new Color(NOIR[1]) },
       uCreaseSide: { value: new Vector3(1, 0, 0) },
@@ -1008,7 +1044,11 @@ export class Peach {
         )
         .replace(
           "#include <opaque_fragment>",
-          `if (uRingShine > 0.001) outgoingLight += ringSparkle(-vViewPosition, normal, 0.15);\n#include <opaque_fragment>`,
+          `if (uRingShine > 0.001) {
+            vec3 ringNormal = normalize(normal - vRubTilt.xyz * faceDirection);
+            outgoingLight += ringSparkle(-vViewPosition, ringNormal, 0.15 + vRubTilt.w * 0.2);
+          }
+          #include <opaque_fragment>`,
         );
       /* eslint-enable no-param-reassign */
     };
@@ -1050,7 +1090,7 @@ export class Peach {
       shader.vertexShader = shader.vertexShader
         .replace(
           "#include <common>",
-          `#include <common>\nuniform vec3 uAnchor;\nuniform vec3 uAnchorNormal;\nuniform mat3 uBowInverse;\nuniform mat4 uBowMatrix;\n${VERTEX_HEADER}`,
+          `#include <common>\nuniform vec3 uAnchorNormal;\nuniform mat3 uBowInverse;\nuniform mat4 uBowMatrix;\n${VERTEX_HEADER}`,
         )
         .replace(
           "#include <begin_vertex>",
@@ -1669,6 +1709,44 @@ export class Peach {
       tier.wobble,
       tier.jiggle,
     );
+    this.uniforms.uBounce.value.set(tier.splash, tier.sway, tier.rebound);
+    const target = {
+      bulge: FABRIC.bulge * tier.bulge,
+      depth: FABRIC.depth * tier.depth,
+    };
+    const s = this.fabricSpring;
+    if (s) {
+      s.bulgeVelocity += (target.bulge - s.bulge) * 9;
+      s.depthVelocity += (target.depth - s.depth) * 9;
+      s.target = target;
+    } else {
+      this.fabricSpring = {
+        ...target,
+        target,
+        bulgeVelocity: 0,
+        depthVelocity: 0,
+      };
+    }
+    this.applyFabricSpring();
+  }
+
+  updateFabricSpring(delta) {
+    const s = this.fabricSpring;
+    if (!s) return;
+    [
+      ["bulge", "bulgeVelocity"],
+      ["depth", "depthVelocity"],
+    ].forEach(([key, velocity]) => {
+      s[velocity] +=
+        ((s.target[key] - s[key]) * 130 - s[velocity] * 3.5) * delta;
+      s[key] += s[velocity] * delta;
+    });
+    this.applyFabricSpring();
+  }
+
+  applyFabricSpring() {
+    this.uniforms.uFabric.value.z = this.fabricSpring.bulge;
+    this.uniforms.uFabricDepth.value = this.fabricSpring.depth;
   }
 
   addJiggle(worldPoint, worldDirection, baseAmplitude, baseRadius) {
@@ -1777,10 +1855,6 @@ export class Peach {
     return (local.y - b.y) / b.w + 0.5;
   }
 
-  setFabric({ rest, press, bulge, width }) {
-    this.uniforms.uFabric.value.set(rest, press, bulge, width);
-  }
-
   setOil(oil, immediate = false) {
     this.oilTarget = oil;
     if (immediate && this.material) {
@@ -1822,5 +1896,19 @@ export class Peach {
         this.uniforms.uLingerie.value.z > 0)
         ? 1
         : 0;
+    this.updateFabricWobble(delta);
+    this.updateFabricSpring(delta);
+  }
+
+  updateFabricWobble(delta) {
+    if (delta <= 0) return;
+    const pull = this.uniforms.uLingerie.value.y;
+    const speed = (pull - (this.lastPull ?? pull)) / delta;
+    this.lastPull = pull;
+    this.wobble = this.wobble || { x: 0, v: 0 };
+    const w = this.wobble;
+    w.v += (speed * 6 - w.x * 260 - w.v * 9) * delta;
+    w.x += w.v * delta;
+    this.uniforms.uFabricWobble.value = Math.max(-0.6, Math.min(0.8, w.x));
   }
 }

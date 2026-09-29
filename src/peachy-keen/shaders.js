@@ -1,6 +1,5 @@
 import { ShaderMaterial, Vector2 } from "three";
 
-// Shared vertex shader (used by both materials)
 const VERTEX_SHADER = `
     varying vec2 vUv;
     void main() {
@@ -9,45 +8,6 @@ const VERTEX_SHADER = `
     }
 `;
 
-// Gradient colors
-const COLOR_TOP = "vec3(0.42, 0.25, 0.45)"; // Violet
-const COLOR_BOTTOM = "vec3(0.50, 0.30, 0.45)"; // Pink-violet
-
-/**
- * Create a simple gradient background material (fallback when shader is disabled)
- * @returns {THREE.ShaderMaterial} The gradient background material
- */
-export function createGradientBackgroundMaterial() {
-  return new ShaderMaterial({
-    uniforms: {
-      resolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
-    },
-    vertexShader: VERTEX_SHADER,
-    fragmentShader: `
-            varying vec2 vUv;
-            
-            void main() {
-                vec2 center = vec2(0.5);
-                float distFromCenter = length(vUv - center);
-                
-                // Vertical gradient
-                vec3 gradientColor = mix(${COLOR_TOP}, ${COLOR_BOTTOM}, vUv.y);
-                
-                // Subtle radial variation
-                gradientColor -= smoothstep(0.0, 1.0, distFromCenter) * 0.15;
-                
-                gl_FragColor = vec4(gradientColor, 1.0);
-            }
-        `,
-    depthTest: false,
-    depthWrite: false,
-  });
-}
-
-/**
- * Create the animated background shader material
- * @returns {THREE.ShaderMaterial} The background shader material
- */
 export function createBackgroundMaterial() {
   return new ShaderMaterial({
     uniforms: {

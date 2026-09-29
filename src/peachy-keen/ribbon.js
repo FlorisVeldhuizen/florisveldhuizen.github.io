@@ -11,8 +11,6 @@ import {
 } from "three";
 import { satinMaterial } from "./band";
 
-const SAMPLES = 24;
-
 function strip(
   points,
   { width, across = null, segments = 48, notch = 0, twist = () => 0 },
@@ -118,21 +116,22 @@ export class RibbonBows {
       bow.matrixAutoUpdate = false;
       this.group.add(bow);
       const skin = {
-        uAnchor: { value: new Vector3() },
         uAnchorNormal: { value: new Vector3(0, 0, 1) },
         uBowInverse: { value: new Matrix3() },
         uBowMatrix: { value: new Matrix4() },
       };
       const material = satinMaterial();
       followSkin(material, skin);
-      return { bow, anchors: [], material, skin };
+      return { bow, material, skin };
     });
+    this.prepared = false;
     this.pull = null;
     this.basis = new Matrix4();
     this.scale = new Vector3(1, 1, 1);
   }
 
   prepare() {
+    this.prepared = true;
     const { geometry } = this.peach.mesh;
     const u = this.peach.uniforms;
     const bounds = u.uBounds.value;
@@ -141,7 +140,6 @@ export class RibbonBows {
     const creaseSide = u.uCreaseSide.value;
     const height = bounds.w;
     const pos = geometry.attributes.position;
-    const nor = geometry.attributes.normal;
     const offsetAt = (h) => {
       const f = Math.min(1, Math.max(0, h)) * (curve.length - 1);
       const i = Math.floor(f);
@@ -161,11 +159,7 @@ export class RibbonBows {
       const across =
         (x * plane.x + y * plane.y + z * plane.z - plane.w) / height -
         offsetAt(h);
-      const azimuth = Math.atan2(
-        rz * creaseSide.x - rx * creaseSide.z,
-        rx * creaseSide.x + rz * creaseSide.z,
-      );
-      samples.push({ i, h, across, back, azimuth });
+      samples.push({ i, h, across, back });
     }
     const bowSize = height * 0.05;
     this.bows.forEach((entry) => {
@@ -187,33 +181,13 @@ export class RibbonBows {
         pos.getZ(spot.i) - bounds.z,
         pos.getX(spot.i) - bounds.x,
       );
-      entry.anchors = Array.from({ length: SAMPLES }, (_, k) => {
-        const target = 0.15 + (k / (SAMPLES - 1)) * 0.7;
-        let best = spot;
-        let bestScore = Infinity;
-        samples.forEach((sample) => {
-          if (Math.abs(sample.h - target) > 0.02) return;
-          const score =
-            Math.abs(sample.azimuth - spot.azimuth) +
-            Math.abs(sample.h - target);
-          if (score < bestScore) {
-            bestScore = score;
-            best = sample;
-          }
-        });
-        return {
-          h: target,
-          position: new Vector3().fromBufferAttribute(pos, best.i),
-          normal: new Vector3().fromBufferAttribute(nor, best.i).normalize(),
-        };
-      });
     });
   }
 
   update(visible, pull, fade = 1) {
     this.group.visible = visible;
     if (!visible || !this.peach.mesh) return;
-    if (this.bows[0].anchors.length === 0) this.prepare();
+    if (!this.prepared) this.prepare();
     if (pull === this.pull && fade === this.fade) return;
     this.pull = pull;
     this.fade = fade;
@@ -243,7 +217,6 @@ export class RibbonBows {
         .normalize();
       const z = x.clone().cross(y).normalize();
       this.basis.makeBasis(x, y, z);
-      skin.uAnchor.value.copy(position);
       skin.uAnchorNormal.value.copy(z);
       position
         .addScaledVector(z, b.w * 0.0035)

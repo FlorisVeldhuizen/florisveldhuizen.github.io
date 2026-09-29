@@ -502,6 +502,52 @@ button:focus-visible {
     right: calc(var(--gutter) + 80px);
     font-size: 15px;
   }
+
+  .settings-dock {
+    left: var(--gutter);
+  }
+
+  .settings {
+    width: 100%;
+    gap: 10px;
+    padding: 14px 16px;
+    font-size: 15px;
+  }
+
+  .settings-row > span:first-child {
+    white-space: nowrap;
+  }
+
+  .segmented {
+    flex-wrap: nowrap;
+  }
+}
+
+@media (pointer: coarse) {
+  .switch,
+  .segmented button {
+    min-height: 34px;
+  }
+
+  .settings-toggle {
+    padding: 10px 0;
+  }
+}
+
+@media (max-height: 500px) {
+  .settings {
+    gap: 6px;
+    padding: 10px 16px;
+    font-size: 15px;
+  }
+
+  .settings-lab > .settings-row {
+    margin-top: 6px;
+  }
+
+  .hints {
+    font-size: 14px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -514,12 +560,11 @@ button:focus-visible {
 
 .bottle {
   position: fixed;
-  top: 50%;
+  top: calc(var(--gutter) + env(safe-area-inset-top));
   left: var(--gutter);
   z-index: 4;
   width: 60px;
   height: 120px;
-  margin-top: -60px;
   cursor: grab;
   touch-action: none;
 }

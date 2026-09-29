@@ -3,7 +3,7 @@ import {
   playSlap,
   playBurst,
   setRub,
-  playStretch,
+  setSlide,
   playSlice,
   playKiss,
   playHeartbeat,
@@ -25,7 +25,9 @@ import { Bottle } from "./bottle";
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const buzz = (ms) => navigator.vibrate?.(ms);
-const SLICE_HOLD = 0.32;
+const SLICE_HOLD = 0.42;
+const TEARS = [0.22, 0.42, 0.6];
+const WINDUP_FROM = 0.72;
 const BEAT_LENGTH = 0.32;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -126,6 +128,7 @@ export class Interaction {
     this.screen = new Vector3();
 
     this.carrying = false;
+    this.carryLatched = false;
     this.bottle = new Bottle(scene, camera);
     this.grab = null;
     this.recoil = null;
@@ -180,8 +183,15 @@ export class Interaction {
   }
 
   setFirmness(name) {
+    const before = this.firmness;
     this.firmness = FIRMNESS[name] || FIRMNESS.ripe;
     this.peach.setFirmness(this.firmness);
+    if (!before || before === this.firmness || !this.garment.shown) return;
+    const change = Math.abs(this.firmness.bulge - before.bulge);
+    this.wobbleAll(0.04 + change * 0.05);
+    this.squashVelocity.x += 0.5 + change * 0.6;
+    this.squashAxis.set(0, 1);
+    playSquish(0.25 + change * 0.3);
   }
 
   bindPointer() {
@@ -218,13 +228,14 @@ export class Interaction {
       p.onWaistband = this.onWaistband(e.clientX, e.clientY);
     });
     const release = (e) => {
-      if (
-        !this.carrying &&
-        p.pressed &&
+      const tapped =
         e.type === "pointerup" &&
         e.timeStamp - p.downAt < 220 &&
-        p.travel < 14
-      ) {
+        p.travel < 14;
+      if (this.carrying && e.type === "pointerup") {
+        this.carryLatched = !this.carryLatched && tapped;
+      }
+      if (!this.carrying && p.pressed && tapped) {
         this.tap();
       }
       p.pressed = false;
@@ -241,6 +252,7 @@ export class Interaction {
       p.inside = false;
       p.armed = true;
       p.pressed = false;
+      this.carryLatched = false;
     });
   }
 
@@ -325,10 +337,9 @@ export class Interaction {
       dressing: null,
     });
     if (!this.settings.lingerie || !animate) return;
-    g.dressing = { time: 0 };
+    g.dressing = { time: 0, landed: false };
     g.pull = 1.5;
     g.target = 1.5;
-    playSlide(0.55, 900, 3200);
   }
 
   undress() {
@@ -348,12 +359,15 @@ export class Interaction {
     const g = this.garment;
     g.dressing.time += delta;
     const t = Math.min(1, g.dressing.time / 0.55);
-    g.target = 1.5 - 1.64 * t * t * (3 - 2 * t);
-    if (t >= 1) this.snapOn();
+    g.target = t < 1 ? 1.5 - 1.64 * t * t * (3 - 2 * t) : 0;
+    if (!g.dressing.landed && (g.pull <= 0 || t >= 1)) {
+      g.dressing.landed = true;
+      this.snapOn();
+    }
+    if (g.dressing.time > 0.9) g.dressing = null;
   }
 
   snapOn() {
-    this.garment.dressing = null;
     this.wobbleAll(0.08);
     this.squashVelocity.x += 1.24;
     this.squashAxis.set(0, 1);
@@ -905,6 +919,10 @@ export class Interaction {
       if (g.pull > 1.55) g.visible = Math.max(0, g.visible - delta * 5);
     }
     g.pull += g.velocity * delta;
+    setSlide(
+      g.dressing ? Math.abs(g.velocity) / 5 : 0,
+      clamp(1 - g.pull / 1.5, 0, 1),
+    );
     this.peach.setLingerie(true, g.pull, g.visible);
     g.shown = true;
   }
@@ -1011,6 +1029,8 @@ export class Interaction {
     this.phase = "charging";
     this.phaseTime = 0;
     this.chargeTime = CFG.CHARGE_TIME;
+    this.chargeStrip = this.garment.shown && this.garment.worn;
+    if (this.chargeStrip) this.chargeTime += CFG.CHARGE_STRIP_TIME;
     this.chargePulse = 0;
     this.twerk = null;
     setRub(0, 0);
@@ -1026,13 +1046,19 @@ export class Interaction {
     playHeartbeat(1.3);
     buzz([25, 40, 60]);
     this.ui.onCharge();
-    playStretch(this.chargeTime);
     this.talk.say("charge");
   }
 
   updateCharge(delta) {
     const k = clamp(this.phaseTime / this.chargeTime, 0, 1);
     this.heat = 100;
+    if (
+      this.chargeStrip &&
+      this.phaseTime >= this.chargeTime - CFG.CHARGE_PEEL_TIME
+    ) {
+      this.chargeStrip = false;
+      this.undress();
+    }
     this.chargePulse -= delta;
     if (this.chargePulse <= 0) {
       this.chargePulse = 0.05;
@@ -1128,6 +1154,7 @@ export class Interaction {
       h.landed = false;
     });
     this.halvesAge = 0;
+    this.tearCount = 0;
     this.slicing = true;
     this.snapped = false;
     this.strandTimer = 0;
@@ -1135,7 +1162,26 @@ export class Interaction {
     this.sliceCenter = center;
     this.sliceNormal = normal;
     playSlice();
-    playTear(SLICE_HOLD);
+    playTear(SLICE_HOLD * WINDUP_FROM);
+    buzz(15);
+  }
+
+  tearFibre(index) {
+    playSnap(0.15 + index * 0.1);
+    buzz(10 + index * 6);
+    if (!reducedMotion.matches) {
+      this.trauma = Math.max(this.trauma, 0.15 + index * 0.08);
+      this.kickVelocity.y -= 0.15 + index * 0.05;
+    }
+    for (let n = 0; n < 3 + index * 2; n += 1) {
+      const p = this.tempA
+        .copy(this.sliceCenter)
+        .add(this.tempB.set(0, (Math.random() - 0.5) * 1.8, 0.9));
+      this.juice.emit(
+        p,
+        this.tempB.set((Math.random() - 0.5) * 1.5, 0.5 + Math.random(), 1.5),
+      );
+    }
   }
 
   snapHalves() {
@@ -1153,7 +1199,7 @@ export class Interaction {
     });
     this.sprayCut();
     this.juice.update(1 / 30);
-    this.freeze = 0.05;
+    this.freeze = 0.08;
     if (!reducedMotion.matches) {
       this.slowmo = Math.min(0.5, 0.35 * power);
       this.trauma = Math.max(this.trauma, 0.8);
@@ -1204,17 +1250,36 @@ export class Interaction {
     if (!this.snapped) {
       const k = t / SLICE_HOLD;
       const strain = k * k;
-      const w = clamp((k - 0.7) / 0.3, 0, 1);
+      while (this.tearCount < TEARS.length && k >= TEARS[this.tearCount]) {
+        this.tearFibre(this.tearCount);
+        this.tearCount += 1;
+      }
+      let gap = 0.015 + k * 0.02;
+      let settle = 1;
+      TEARS.forEach((at) => {
+        const d = t - at * SLICE_HOLD;
+        if (d < 0) return;
+        gap += 0.03 * (1 - Math.exp(-d * 30) * Math.cos(d * 50));
+        settle = Math.min(settle, 1 - Math.exp(-d * 12));
+      });
+      const w = clamp((k - WINDUP_FROM) / (1 - WINDUP_FROM), 0, 1);
       const windup = w * w * (3 - 2 * w);
+      gap -= (gap - 0.005) * windup;
       const tremble =
-        Math.sin(t * 90) * (0.012 + 0.02 * strain) * (1 - windup * 0.8);
-      const gap = 0.02 + strain * 0.1 - windup * 0.09 + tremble;
+        Math.sin(t * 90) *
+        (0.004 + 0.014 * strain) *
+        settle *
+        (1 + windup * 0.5);
       this.halves.forEach((h) => {
         h.holder.position
           .copy(this.sliceCenter)
-          .addScaledVector(h.normal, h.side * gap);
+          .addScaledVector(h.normal, h.side * (gap + tremble));
         h.holder.rotation.set(0, h.yaw * 0.12 * strain, h.side * 0.05 * strain);
-        h.holder.scale.set(1 - 0.04 * strain, 1 + 0.03 * strain, 1);
+        h.holder.scale.set(
+          1 - 0.04 * strain - 0.05 * windup,
+          1 + 0.03 * strain + 0.04 * windup,
+          1,
+        );
       });
       this.strandTimer -= delta;
       if (this.strandTimer <= 0) {
@@ -1262,9 +1327,9 @@ export class Interaction {
         h.yaw * (0.12 + 0.88 * open),
         h.side * (0.05 + tilt * 2.4),
       );
-      const release = Math.exp(-s * 9);
-      const bounce = release * Math.cos(s * 30) * 0.1;
-      const pop = 1 + 0.04 * (s / 0.03) * Math.exp(1 - s / 0.03);
+      const release = Math.exp(-s * 7);
+      const bounce = release * Math.cos(s * 26) * 0.13;
+      const pop = 1 + 0.06 * (s / 0.03) * Math.exp(1 - s / 0.03);
       h.holder.scale.set(
         (1 - 0.04 * release + bounce) * pop,
         (1 + 0.03 * release - bounce) * pop,
@@ -1293,7 +1358,7 @@ export class Interaction {
   }
 
   pickBottle(e) {
-    if (this.phase !== "live") return;
+    if (this.phase !== "live" || this.carrying) return;
     if (this.bottle.el.hasPointerCapture(e.pointerId))
       this.bottle.el.releasePointerCapture(e.pointerId);
     const p = this.pointer;
@@ -1342,7 +1407,7 @@ export class Interaction {
     this.rubbing = 0;
 
     if (this.carrying) {
-      if (p.pressed && this.phase === "live") {
+      if ((p.pressed || this.carryLatched) && this.phase === "live") {
         const hit = this.raycastAt(p.x, p.y);
         const peach = {
           x: this.toScreen(this.group.position).x,
@@ -1356,6 +1421,7 @@ export class Interaction {
         return;
       }
       this.carrying = false;
+      this.carryLatched = false;
       this.bottle.drop();
     }
     if (this.grab) {

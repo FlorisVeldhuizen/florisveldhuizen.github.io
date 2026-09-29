@@ -7,6 +7,7 @@ const slaps = [];
 let burst = null;
 let noise = null;
 let rub = null;
+let slide = null;
 
 function context() {
   if (!ctx) {
@@ -181,6 +182,27 @@ export function playSlide(duration, from, to) {
   src.start(now, Math.random() * 0.5, duration + 0.05);
 }
 
+export function setSlide(speed, height) {
+  if (!ctx || ctx.state !== "running") return;
+  if (!slide) {
+    if (speed <= 0) return;
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer();
+    src.loop = true;
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.Q.value = 1.2;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    src.connect(band).connect(gain).connect(master);
+    src.start();
+    slide = { band, gain };
+  }
+  const now = ctx.currentTime;
+  slide.gain.gain.setTargetAtTime(Math.min(1, speed) * 0.22, now, 0.02);
+  slide.band.frequency.setTargetAtTime(900 + height * 2300, now, 0.02);
+}
+
 export function playSettle() {
   noiseHit(500, 180, 0.12, 0.14, "lowpass");
 }
@@ -245,45 +267,9 @@ export function playSplash() {
   }
 }
 
-export function playStretch(duration) {
-  if (!ctx || ctx.state !== "running") return;
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(260, now);
-  osc.frequency.exponentialRampToValueAtTime(820, now + duration);
-  const wobble = ctx.createOscillator();
-  wobble.frequency.value = 14;
-  const wobbleDepth = ctx.createGain();
-  wobbleDepth.gain.value = 18;
-  wobble.connect(wobbleDepth).connect(osc.frequency);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.001, now);
-  gain.gain.exponentialRampToValueAtTime(0.08, now + duration * 0.8);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-  osc.connect(gain).connect(master);
-  osc.start(now);
-  wobble.start(now);
-  osc.stop(now + duration);
-  wobble.stop(now + duration);
-}
-
 export function playSquish(amount) {
   noiseHit(1100, 260, 0.13, 0.25 + amount * 0.3);
   noiseHit(2200, 700, 0.06, 0.12 + amount * 0.1);
-}
-
-export function playSnap(amount) {
-  noiseHit(5200, 1400, 0.05, 0.5 + amount * 0.4, "highpass");
-  if (slaps.length && ctx.state === "running") {
-    const src = ctx.createBufferSource();
-    src.buffer = slaps[Math.floor(Math.random() * slaps.length)];
-    src.playbackRate.value = 1.35 + Math.random() * 0.15;
-    const gain = ctx.createGain();
-    gain.gain.value = 0.35 + amount * 0.35;
-    src.connect(gain).connect(master);
-    src.start(ctx.currentTime, AUDIO_CONFIG.silentOffset);
-  }
 }
 
 export function playKiss() {
@@ -378,6 +364,29 @@ function tone(at, { type = "sine", from, to, length, volume, filter }) {
   osc.start(at);
   osc.stop(at + length + 0.02);
   return osc;
+}
+
+export function playSnap(amount) {
+  if (!running()) return;
+  const now = ctx.currentTime;
+  noiseHit(
+    2600 + amount * 1800,
+    700,
+    0.03 + amount * 0.03,
+    0.12 + amount * 0.4,
+  );
+  if (slaps.length) {
+    const src = ctx.createBufferSource();
+    src.buffer = slaps[Math.floor(Math.random() * slaps.length)];
+    src.playbackRate.value = 1.1 + amount * 0.25 + Math.random() * 0.12;
+    const soften = ctx.createBiquadFilter();
+    soften.type = "lowpass";
+    soften.frequency.value = 2500 + amount * 7000;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.12 + amount * 0.55;
+    src.connect(soften).connect(gain).connect(master);
+    src.start(now, AUDIO_CONFIG.silentOffset);
+  }
 }
 
 export function playDing() {

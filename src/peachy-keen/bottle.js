@@ -3,7 +3,11 @@ import { playCork } from "./audio";
 import { BottleModel } from "./bottle3d";
 import OilStream from "./stream";
 
-const HEIGHT_PX = 116;
+const PEACH_BASE = 1.6;
+const PEACH_HEIGHT = 3.2;
+const HEIGHT_TO_PEACH = 0.28;
+const WIDTH_TO_HEIGHT = 0.52;
+const HINT_GAP_PX = 12;
 const DEPTH = 2.4;
 const POUR_ANGLE = 118;
 const LEAN_ANGLE = 12;
@@ -20,7 +24,7 @@ class ModelView {
   constructor(scene, camera) {
     this.scene = scene;
     this.camera = camera;
-    this.model = new BottleModel("apothecary");
+    this.model = new BottleModel();
     this.group = this.model.group;
     scene.add(this.group);
     this.spout = this.model.spec.spout;
@@ -55,6 +59,20 @@ class ModelView {
     };
   }
 
+  floorScreenY() {
+    const distance = this.camera.userData.baseZ - DEPTH;
+    const halfHeight = distance * Math.tan((this.camera.fov * Math.PI) / 360);
+    return window.innerHeight * 0.5 * (1 + PEACH_BASE / halfHeight);
+  }
+
+  heightPx() {
+    const halfFov = (this.camera.fov * Math.PI) / 360;
+    const peachPx =
+      (PEACH_HEIGHT * window.innerHeight) /
+      (2 * this.camera.userData.baseZ * Math.tan(halfFov));
+    return peachPx * HEIGHT_TO_PEACH;
+  }
+
   pixelSize() {
     const distance = this.camera.position.z - DEPTH;
     const height = 2 * distance * Math.tan((this.camera.fov * Math.PI) / 360);
@@ -62,7 +80,8 @@ class ModelView {
   }
 
   place(b, delta) {
-    const scale = HEIGHT_PX * this.pixelSize() * b.size();
+    this.camera.updateMatrixWorld();
+    const scale = b.heightPx * this.pixelSize() * b.size();
     const radians = (b.screen.angle * Math.PI) / 180;
     const up = this.up.set(Math.sin(radians), Math.cos(radians), 0);
     if (b.carried)
@@ -74,11 +93,15 @@ class ModelView {
     this.basis.makeBasis(side, up, front);
     this.group.quaternion
       .setFromRotationMatrix(this.basis)
+      .premultiply(this.camera.quaternion)
       .multiply(this.yaw.setFromAxisAngle(AXIS, b.yaw));
     this.group.scale.setScalar(scale);
     if (b.carried) {
       this.toWorld(b.spoutPoint.x, b.spoutPoint.y, this.group.position);
-      this.group.position.addScaledVector(up, -this.spout * scale);
+      this.group.position.addScaledVector(
+        up.applyQuaternion(this.camera.quaternion),
+        -this.spout * scale,
+      );
     } else {
       this.toWorld(b.screen.x, b.screen.y - b.raise, this.group.position);
     }
@@ -189,9 +212,27 @@ export class Bottle {
   }
 
   resize() {
-    const rect = this.el.getBoundingClientRect();
-    this.homeX = rect.left + rect.width / 2;
-    this.homeY = rect.top + rect.height / 2;
+    this.hintsTop = document.querySelector(".hints").offsetTop;
+    this.updateHome();
+  }
+
+  updateHome() {
+    const height = this.view.heightPx();
+    const bottom = Math.min(
+      this.view.floorScreenY(),
+      this.hintsTop - HINT_GAP_PX,
+    );
+    const homeY = bottom - height / 2;
+    if (homeY === this.homeY && height === this.heightPx) return;
+    this.heightPx = height;
+    this.homeY = homeY;
+    const width = height * WIDTH_TO_HEIGHT;
+    Object.assign(this.el.style, {
+      top: `${bottom - height}px`,
+      width: `${width}px`,
+      height: `${height}px`,
+    });
+    this.homeX = this.el.offsetLeft + width / 2;
   }
 
   size() {
@@ -214,7 +255,7 @@ export class Bottle {
     const target = lean + (pourAngle - lean) * this.flow;
     const angle = this.screen.angle + wrap(target - this.screen.angle);
     const radians = (angle * Math.PI) / 180;
-    const spout = this.view.spout * HEIGHT_PX * this.size();
+    const spout = this.view.spout * this.heightPx * this.size();
     const spoutY = y - STREAM_PX * this.flow;
     this.spoutPoint.x = x;
     this.spoutPoint.y = spoutY;
@@ -279,6 +320,7 @@ export class Bottle {
     if (this.carried) return;
     if (this.stream.active) this.stream.update(null, 0, undefined, 0, delta);
     this.time += delta;
+    this.updateHome();
     const v = this.velocity;
     v.x += ((this.homeX - this.screen.x) * 170 - v.x * 20) * delta;
     v.y += ((this.homeY - this.screen.y) * 170 - v.y * 20) * delta;

@@ -2,7 +2,6 @@ import {
   Group,
   Mesh,
   LatheGeometry,
-  SphereGeometry,
   CylinderGeometry,
   MeshPhysicalMaterial,
   Vector2,
@@ -238,18 +237,6 @@ const lathe = (points, segments) =>
     segments,
   );
 
-function vialProfile(shrink = 0) {
-  const radius = 0.28 - shrink;
-  const neck = 0.05 - shrink * 0.4;
-  const body = arc(0, -0.2, radius, -90, 20, 14);
-  const [r, y] = body[body.length - 1];
-  return [
-    ...body,
-    ...cubic([r, y], [r * 0.8, 0.05], [neck + 0.01, 0.14], [neck, 0.26], 12),
-    [neck, 0.4 - shrink],
-  ];
-}
-
 function roundProfile(shrink = 0) {
   const r = 0.212 - shrink;
   const bottom = -0.5 + shrink * 1.6;
@@ -277,27 +264,6 @@ const collar = (neck) => [
   [neck + 0.014, 0.376],
   [neck + 0.01, 0.386],
   [neck, 0.39],
-];
-
-function decanterProfile(shrink = 0) {
-  return [
-    [0, -0.5 + shrink],
-    [0.12 - shrink, -0.5 + shrink],
-    [0.26 - shrink, -0.36],
-    [0.28 - shrink, -0.2],
-    [0.2 - shrink, 0.05],
-    [0.07 - shrink * 0.4, 0.18],
-    [0.06 - shrink * 0.4, 0.22],
-    [0.06 - shrink * 0.4, 0.3 - shrink],
-  ];
-}
-
-const lip = (neck, top) => [
-  [neck, top - 0.03],
-  [neck + 0.02, top - 0.025],
-  [neck + 0.022, top - 0.005],
-  [neck + 0.008, top],
-  [0, top],
 ];
 
 function glass(tint, extra = {}) {
@@ -346,160 +312,74 @@ function oil(color, glow) {
   });
 }
 
-export const BOTTLE_STYLES = {
-  vial: {
-    name: "Vial",
-    spout: 0.445,
-    build() {
-      const outer = [...vialProfile(), ...lip(0.05, 0.445)];
-      const body = new Mesh(
-        lathe(outer, 72),
-        glass(0xffc4dc, {
-          iridescence: 0.7,
-          iridescenceIOR: 1.35,
-          iridescenceThicknessRange: [180, 520],
-        }),
-      );
-      const liquid = new Mesh(
-        lathe([...vialProfile(0.03), [0, 0.37]], 64),
-        oil(0xf2b04e, 0x7a2a10),
-      );
-      const stopper = new Group();
-      const pearl = new Mesh(
-        new SphereGeometry(0.075, 48, 24),
-        new MeshPhysicalMaterial({
-          color: 0xfff2f6,
-          roughness: 0.22,
-          sheen: 1,
-          sheenColor: new Color(0xffc2d8),
-          iridescence: 1,
-          iridescenceIOR: 1.6,
-          clearcoat: 1,
-          envMapIntensity: 1.4,
-        }),
-      );
-      pearl.position.y = 0.52;
-      const plug = new Mesh(
-        new CylinderGeometry(0.038, 0.034, 0.08, 24),
-        pearl.material,
-      );
-      plug.position.y = 0.44;
-      stopper.add(pearl, plug);
-      return { body, liquid, stopper, level: -0.08 };
-    },
-  },
-  apothecary: {
-    name: "Apothecary",
-    spout: 0.43,
-    build() {
-      const outer = [
-        ...roundProfile(),
-        ...collar(0.064),
-        [0.064, 0.4],
-        [0.082, 0.406],
-        [0.084, 0.424],
-        [0.072, 0.43],
-        [0.05, 0.428],
-        [0.048, 0.36],
-      ];
-      const body = new Mesh(lathe(outer, 72), glass(0xfff4ec));
-      body.material.side = DoubleSide;
-      const liquid = new Mesh(
-        lathe([...roundProfile(0.022), [0, 0.35]], 64),
-        oil(0xe8922c, 0x6a2608),
-      );
-      const cork = corkTexture();
-      const stopper = new Mesh(
-        lathe(
-          [
-            [0, -0.075],
-            [0.044, -0.075],
-            [0.05, -0.068],
-            [0.056, 0.02],
-            [0.074, 0.028],
-            [0.08, 0.04],
-            [0.078, 0.062],
-            [0.07, 0.07],
-            [0, 0.072],
-          ],
-          40,
-        ),
-        new MeshPhysicalMaterial({
-          map: cork,
-          bumpMap: cork,
-          bumpScale: 2,
-          roughness: 0.9,
-          sheen: 0.4,
-          sheenColor: new Color(0xffe0c0),
-        }),
-      );
-      stopper.position.y = 0.43;
-      const label = new Mesh(
-        new CylinderGeometry(0.2145, 0.2145, 0.27, 96, 1, true, -2.2, 4.4),
-        new MeshPhysicalMaterial({
-          map: labelTexture(),
-          roughness: 0.7,
-          sheen: 0.35,
-          sheenColor: new Color(0xfff2e6),
-        }),
-      );
-      label.position.y = -0.17;
-      const ribbon = new Mesh(
-        new CylinderGeometry(0.0685, 0.0685, 0.022, 48, 1, true),
-        new MeshPhysicalMaterial({
-          color: 0x8a2f45,
-          roughness: 0.35,
-          sheen: 1,
-          sheenColor: new Color(0xff9ab4),
-          side: DoubleSide,
-        }),
-      );
-      ribbon.position.y = 0.325;
-      body.add(label, ribbon);
-      return { body, liquid, stopper, level: 0.02 };
-    },
-  },
-  decanter: {
-    name: "Decanter",
-    spout: 0.34,
-    build() {
-      const outer = [...decanterProfile(), ...lip(0.06, 0.34)];
-      const body = new Mesh(
-        lathe(outer, 9),
-        glass(0xff8fb0, {
-          flatShading: true,
-          ior: 1.9,
-          attenuationDistance: 1.4,
-        }),
-      );
-      const liquid = new Mesh(
-        lathe([...decanterProfile(0.025), [0, 0.27]], 9),
-        oil(0xf5b456, 0x7a2a10),
-      );
-      liquid.material.flatShading = true;
-      const stopper = new Mesh(
-        lathe(
-          [
-            [0, 0.3],
-            [0.035, 0.31],
-            [0.035, 0.35],
-            [0.1, 0.44],
-            [0.075, 0.53],
-            [0, 0.57],
-          ],
-          8,
-        ),
-        new MeshPhysicalMaterial({
-          color: 0xffa6c0,
-          roughness: 0.04,
-          flatShading: true,
-          clearcoat: 1,
-          iridescence: 0.6,
-          envMapIntensity: 2.2,
-        }),
-      );
-      return { body, liquid, stopper, level: -0.12 };
-    },
+const APOTHECARY = {
+  spout: 0.43,
+  build() {
+    const outer = [
+      ...roundProfile(),
+      ...collar(0.064),
+      [0.064, 0.4],
+      [0.082, 0.406],
+      [0.084, 0.424],
+      [0.072, 0.43],
+      [0.05, 0.428],
+      [0.048, 0.36],
+    ];
+    const body = new Mesh(lathe(outer, 72), glass(0xfff4ec));
+    body.material.side = DoubleSide;
+    const liquid = new Mesh(
+      lathe([...roundProfile(0.022), [0, 0.35]], 64),
+      oil(0xe8922c, 0x6a2608),
+    );
+    const cork = corkTexture();
+    const stopper = new Mesh(
+      lathe(
+        [
+          [0, -0.075],
+          [0.044, -0.075],
+          [0.05, -0.068],
+          [0.056, 0.02],
+          [0.074, 0.028],
+          [0.08, 0.04],
+          [0.078, 0.062],
+          [0.07, 0.07],
+          [0, 0.072],
+        ],
+        40,
+      ),
+      new MeshPhysicalMaterial({
+        map: cork,
+        bumpMap: cork,
+        bumpScale: 2,
+        roughness: 0.9,
+        sheen: 0.4,
+        sheenColor: new Color(0xffe0c0),
+      }),
+    );
+    stopper.position.y = 0.43;
+    const label = new Mesh(
+      new CylinderGeometry(0.2145, 0.2145, 0.27, 96, 1, true, -2.2, 4.4),
+      new MeshPhysicalMaterial({
+        map: labelTexture(),
+        roughness: 0.7,
+        sheen: 0.35,
+        sheenColor: new Color(0xfff2e6),
+      }),
+    );
+    label.position.y = -0.17;
+    const ribbon = new Mesh(
+      new CylinderGeometry(0.0685, 0.0685, 0.022, 48, 1, true),
+      new MeshPhysicalMaterial({
+        color: 0x8a2f45,
+        roughness: 0.35,
+        sheen: 1,
+        sheenColor: new Color(0xff9ab4),
+        side: DoubleSide,
+      }),
+    );
+    ribbon.position.y = 0.325;
+    body.add(label, ribbon);
+    return { body, liquid, stopper, level: 0.02 };
   },
 };
 
@@ -507,13 +387,10 @@ const worldCenter = new Vector3();
 const normal = new Vector3();
 
 export class BottleModel {
-  constructor(style = "vial") {
-    const spec = BOTTLE_STYLES[style] || BOTTLE_STYLES.vial;
-    this.spec = spec;
+  constructor() {
+    this.spec = APOTHECARY;
     this.group = new Group();
-    const { body, liquid, stopper, level } = spec.build();
-    this.body = body;
-    this.liquid = liquid;
+    const { body, liquid, stopper, level } = APOTHECARY.build();
     this.stopper = stopper;
     this.level = level;
     this.fill = 1;
