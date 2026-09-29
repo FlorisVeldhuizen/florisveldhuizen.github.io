@@ -79,7 +79,7 @@ export function initScene() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.6;
+  renderer.toneMappingExposure = 1.5;
   renderer.localClippingEnabled = true;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFSoftShadowMap;
@@ -95,11 +95,11 @@ export function initScene() {
     o.material?.dispose();
   });
 
-  const hemi = new HemisphereLight(0xffe4ea, 0x7a3060, 1.1);
+  const hemi = new HemisphereLight(0xffe4ea, 0x7a3060, 0.95);
   scene.add(hemi);
 
-  const key = new DirectionalLight(0xffe2d4, 0.8);
-  key.position.set(-4, 5, 6);
+  const key = new DirectionalLight(0xffd6b8, 1.1);
+  key.position.set(4, 4.5, 5);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, {
@@ -113,11 +113,11 @@ export function initScene() {
   key.shadow.normalBias = 0.02;
   scene.add(key);
 
-  const rose = new PointLight(0xff4f9a, 70, 30);
+  const rose = new PointLight(0xff4f9a, 80, 30);
   rose.position.set(-4, 2.5, -3.5);
   scene.add(rose);
 
-  const peachRim = new PointLight(0xff9a6a, 45, 30);
+  const peachRim = new PointLight(0xffb070, 70, 30);
   peachRim.position.set(4, -1, -3);
   scene.add(peachRim);
 

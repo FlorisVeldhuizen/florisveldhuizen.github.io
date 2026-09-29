@@ -2,17 +2,18 @@ import { Color, PointLight } from "three";
 import { reducedMotion } from "./util";
 
 const DIM = {
-  hemi: 0.3,
-  key: 0.3,
-  exposure: 0.92,
-  rose: 2.6,
-  rim: 1.8,
+  hemi: 0.35,
+  key: 0.35,
+  exposure: 0.95,
+  rose: 2.2,
+  rim: 2.6,
   env: 0.5,
 };
 const MATTE = { specular: 0.25, sheen: 0.45 };
-const DEEP_ROSE = new Color(0xff1f5c);
-const EMBER = new Color(0xff5a2a);
-const WINE = new Color(0x2a0414);
+const VIOLET = new Color(0xd040ff);
+const SUNSET = new Color(0xff6a3a);
+const EMBER = new Color(0xff7a2a);
+const DUSK = new Color(0x24082e);
 
 export class MoodLight {
   constructor(scene, renderer, { hemi, key, rose, peachRim }) {
@@ -31,7 +32,7 @@ export class MoodLight {
     this.candle = new PointLight(0xffa060, 0, 14);
     this.candle.position.set(-3.6, -0.6, 1.8);
     scene.add(this.candle);
-    this.halo = new PointLight(0xff3d8b, 0, 16);
+    this.halo = new PointLight(0xa04dff, 0, 16);
     this.halo.position.set(2.8, 3.2, -2.2);
     scene.add(this.halo);
     this.amount = 0;
@@ -91,18 +92,18 @@ export class MoodLight {
     const lerp = (from, to) => from + (to - from) * k;
 
     this.hemi.intensity = lerp(base.hemi, base.hemi * DIM.hemi);
-    this.hemi.color.copy(base.hemiSky).lerp(EMBER, k * 0.35);
-    this.hemi.groundColor.copy(base.hemiGround).lerp(WINE, k);
+    this.hemi.color.copy(base.hemiSky).lerp(SUNSET, k * 0.3);
+    this.hemi.groundColor.copy(base.hemiGround).lerp(DUSK, k);
     this.key.intensity = lerp(base.key, base.key * DIM.key);
     this.rose.intensity = lerp(
       base.rose,
       base.rose * DIM.rose * (1 + heat * 0.4),
     );
-    this.rose.color.copy(base.roseColor).lerp(DEEP_ROSE, k);
+    this.rose.color.copy(base.roseColor).lerp(VIOLET, k);
     this.rim.intensity = lerp(base.rim, base.rim * DIM.rim);
     this.rim.color.copy(base.rimColor).lerp(EMBER, k);
-    this.candle.intensity = k * 26 * this.flicker();
-    this.halo.intensity = k * (130 + heat * 70);
+    this.candle.intensity = k * 28 * this.flicker();
+    this.halo.intensity = k * (150 + heat * 70);
     this.redim -= delta;
     // Also re-runs every second so materials created while mood is on get dimmed.
     if (k !== this.dimmed || this.redim <= 0) {
