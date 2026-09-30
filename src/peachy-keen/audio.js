@@ -4,6 +4,7 @@ let ctx = null;
 let master = null;
 let loading = null;
 const slaps = [];
+const rubs = [];
 let burst = null;
 let noise = null;
 let rub = null;
@@ -48,6 +49,9 @@ export function loadSounds() {
       decode(AUDIO_CONFIG.burstSound).then((buffer) => {
         burst = buffer;
       }),
+      Promise.all(AUDIO_CONFIG.rubSounds.map(decode)).then((buffers) =>
+        rubs.push(...buffers),
+      ),
     ]).catch((error) => {
       // eslint-disable-next-line no-console
       console.error("Could not load sounds:", error);
@@ -319,6 +323,24 @@ export function playLensHit(amount) {
 export function playSquish(amount) {
   noiseHit(1100, 260, 0.13, 0.25 + amount * 0.3);
   noiseHit(2200, 700, 0.06, 0.12 + amount * 0.1);
+}
+
+let lastRub = -1;
+
+export function playKnead(oil, amount) {
+  if (!running() || !rubs.length) return;
+  lastRub =
+    (lastRub + 1 + Math.floor(Math.random() * (rubs.length - 1))) % rubs.length;
+  const src = ctx.createBufferSource();
+  src.buffer = rubs[lastRub];
+  src.playbackRate.value = (0.94 + Math.random() * 0.12) * (1.06 - oil * 0.12);
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = 9000 - oil * 5000;
+  const gain = ctx.createGain();
+  gain.gain.value = 0.13 * amount;
+  src.connect(soften).connect(gain).connect(master);
+  src.start();
 }
 
 export function playKiss() {

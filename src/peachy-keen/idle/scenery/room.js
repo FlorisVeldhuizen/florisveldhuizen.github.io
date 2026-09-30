@@ -46,6 +46,7 @@ import {
   playThump,
   playWhoosh,
   playKiss,
+  playKnead,
   discoBeat,
 } from "../../audio";
 import { reducedMotion, ease } from "../../util";
@@ -805,6 +806,12 @@ export class Room {
       .copy(this.kneadNormal)
       .multiplyScalar((-0.15 * amount * press) / scale);
     peach.setGrab(this.kneadLocal, this.kneadPull, 0.9, this.kneadDent, 0.6);
+    const stroke = Math.floor(Math.abs(a) / Math.PI);
+    if (stroke !== k.stroke) {
+      k.stroke = stroke;
+      if (this.game.state.options.castSound)
+        playKnead(i.oil, Math.max(0.4, amount));
+    }
     k.pulse = (k.pulse ?? 0) - delta;
     if (k.pulse <= 0) {
       k.pulse = 0.35;

@@ -18,7 +18,7 @@ export const TOUCH = {
     knock: 0.35,
     blush: 1.8,
   },
-  masseuse: { every: 3.2, jiggle: 0.06, radius: 0.9, sound: "squish" },
+  masseuse: { every: 3.2, jiggle: 0.06, radius: 0.9 },
   baron: { every: 3.6, jiggle: 0.03, radius: 0.6, sound: "glug", oil: 0.04 },
   coach: { every: 3.4, jiggle: 0.09, radius: 1, lift: 0.9 },
   choir: { every: 3.8, jiggle: 0.12, radius: 1, sound: "slap", clap: true },

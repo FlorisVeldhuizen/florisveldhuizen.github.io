@@ -2,6 +2,12 @@ import ass2Sound from "./assets/ass2.m4a?url";
 import ass3Sound from "./assets/ass3.m4a?url";
 import ass5Sound from "./assets/ass5.m4a?url";
 import uhSound from "./assets/uh.m4a?url";
+import rub1Sound from "./assets/rub1.m4a?url";
+import rub2Sound from "./assets/rub2.m4a?url";
+import rub3Sound from "./assets/rub3.m4a?url";
+import rub4Sound from "./assets/rub4.m4a?url";
+import rub5Sound from "./assets/rub5.m4a?url";
+import rub6Sound from "./assets/rub6.m4a?url";
 
 export const PEACH_CONFIG = {
   TARGET_MODEL_HEIGHT: 3,
@@ -130,6 +136,7 @@ export const INTERACTION_CONFIG = {
 export const AUDIO_CONFIG = {
   slapSounds: [ass2Sound, ass3Sound, ass5Sound],
   burstSound: uhSound,
+  rubSounds: [rub1Sound, rub2Sound, rub3Sound, rub4Sound, rub5Sound, rub6Sound],
   pitchVariationMin: 0.88,
   pitchVariationMax: 1.12,
   silentOffset: 0.08,
