@@ -15,11 +15,11 @@ export class Modal {
     this.card.setAttribute("aria-describedby", this.text.id);
     this.actions = el("div", "modal-actions", this.card);
     this.root.addEventListener("click", (e) => {
-      if (e.target === this.root) this.close();
+      if (e.target === this.root) this.leave();
     });
     document.addEventListener("keydown", (e) => {
       if (this.root.hidden) return;
-      if (e.key === "Escape") this.close();
+      if (e.key === "Escape") this.leave();
       if (e.key === "Tab") this.trap(e);
     });
     this.queue = [];
@@ -44,8 +44,12 @@ export class Modal {
       b.type = "button";
       b.textContent = label;
       b.addEventListener("click", () => {
-        this.close();
-        onClick?.();
+        animate(
+          b,
+          [{ scale: 1 }, { scale: 0.9 }, { scale: 1.06 }, { scale: 1 }],
+          { duration: 280, easing: "ease-out" },
+        );
+        this.leave(onClick, 110);
       });
       if (primary) first = b;
     });
@@ -67,6 +71,31 @@ export class Modal {
     const step = e.shiftKey ? -1 : 1;
     e.preventDefault();
     buttons[(at + step + buttons.length) % buttons.length]?.focus();
+  }
+
+  leave(then, delay = 0) {
+    if (this.root.hidden || this.leaving) return;
+    this.leaving = true;
+    const timing = {
+      duration: 200,
+      delay,
+      easing: "ease-in",
+      fill: "forwards",
+    };
+    const fades = [
+      animate(this.root, [{ opacity: 1 }, { opacity: 0 }], timing),
+      animate(
+        this.card,
+        [{ transform: "none" }, { transform: "translateY(-10px) scale(0.96)" }],
+        timing,
+      ),
+    ];
+    fades[0].finished.then(() => {
+      this.leaving = false;
+      this.close();
+      fades.forEach((fade) => fade.cancel());
+      then?.();
+    });
   }
 
   close() {

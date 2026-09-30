@@ -104,19 +104,6 @@ body.is-storm::after {
   );
 }
 
-.ticker {
-  position: fixed;
-  top: calc(var(--gutter) + 6px);
-  left: calc(var(--gutter) + 90px);
-  right: calc(var(--panel-side, 0px) + var(--gutter) + 190px);
-  z-index: 3;
-  color: var(--blush-dim);
-  font-size: 15px;
-  font-style: italic;
-  text-align: center;
-  pointer-events: none;
-}
-
 .panel {
   position: fixed;
   top: 0;
@@ -1538,6 +1525,32 @@ body.is-storm::after {
   border: 1px solid var(--blush-faint);
   border-radius: 999px;
   background: none;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    translate 0.15s ease;
+}
+
+@media (hover: hover) {
+  .modal-button:hover {
+    border-color: var(--blush-dim);
+    background: rgba(246, 201, 187, 0.08);
+    translate: 0 -1px;
+  }
+
+  .modal-button.is-primary:hover {
+    border-color: var(--peach);
+    background: var(--peach);
+  }
+
+  .modal-button.is-danger:hover {
+    border-color: #f06a77;
+    background: #f06a77;
+  }
+}
+
+.modal-button:active {
+  translate: 0 1px;
 }
 
 .modal-button.is-primary {
@@ -1672,8 +1685,7 @@ body.is-storm::after {
     height: min(60dvh, 600px);
   }
 
-  .is-shopping .hints,
-  .is-shopping .ticker {
+  .is-shopping .hints {
     opacity: 0;
   }
 
@@ -1723,14 +1735,6 @@ body.is-storm::after {
 
   .panel:not(.is-open) .tab[aria-selected="true"] {
     border-bottom-color: transparent;
-  }
-
-  .ticker {
-    top: auto;
-    right: var(--gutter);
-    bottom: calc(var(--panel-bottom, 0px) + 10px);
-    left: var(--gutter);
-    font-size: 13.5px;
   }
 
   .hints {

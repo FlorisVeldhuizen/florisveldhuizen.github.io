@@ -11,7 +11,6 @@ export function preparePage() {
     <p id="dare" class="score-dare" hidden></p>`,
   );
   score.insertAdjacentHTML("beforeend", '<div id="buffs" class="buffs"></div>');
-  score.insertAdjacentHTML("afterend", '<p id="ticker" class="ticker"></p>');
 
   const settings = document.getElementById("settings");
   const dock = document.querySelector(".settings-dock");

@@ -6,7 +6,6 @@ import { Popups } from "./popups";
 import { Modal } from "./modal";
 import { GoldenPeach } from "./golden";
 import { Room } from "./scenery/room";
-import { Ticker } from "./ticker";
 import { renders } from "./renders";
 import { showHarvests } from "./harvest";
 import { Layout } from "./layout";
@@ -71,7 +70,6 @@ export function createIdle({
     style = wanted;
     room.setActive(wanted === "room");
   };
-  const ticker = new Ticker(game);
   const toys = new Toys(game, settings);
   showHarvests(game);
   let started = false;
@@ -248,7 +246,6 @@ export function createIdle({
       if (!started) return;
       golden.update(realDelta);
       room.update(realDelta);
-      ticker.update(realDelta);
     },
   };
 }

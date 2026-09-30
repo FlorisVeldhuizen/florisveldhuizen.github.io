@@ -60,7 +60,6 @@ export function freshState() {
       skin: "classic",
       cast: true,
       castSound: true,
-      ticker: true,
       helperStyle: "room",
     },
     seen: {},

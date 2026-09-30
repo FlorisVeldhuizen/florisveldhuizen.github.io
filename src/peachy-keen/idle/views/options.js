@@ -90,7 +90,6 @@ export class OptionsView {
       ),
       switchRow(box, "Helpers on screen", () => opts().cast, set("cast")),
       switchRow(box, "Helper sounds", () => opts().castSound, set("castSound")),
-      switchRow(box, "News ticker", () => opts().ticker, set("ticker")),
     ];
     this.skinBox = el("div", "", box);
     this.skinCount = 0;
