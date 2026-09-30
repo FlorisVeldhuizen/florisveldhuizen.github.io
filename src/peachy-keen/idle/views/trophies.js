@@ -1,5 +1,5 @@
 import { TROPHIES } from "../data/trophies";
-import { el, setText, setDetail, clearOnLeave } from "../dom";
+import { el, setText, setDetail, clearOnLeave, floatBeside } from "../dom";
 import { iconSvg } from "../icons";
 
 export class TrophiesView {
@@ -7,13 +7,13 @@ export class TrophiesView {
     this.game = game;
     this.summary = el("p", "shop-note", root);
     this.grid = el("div", "trophies", root);
-    this.detail = el("p", "shop-detail", root);
+    this.detail = el("p", "shop-detail is-floating", root);
     this.detail.setAttribute("aria-live", "polite");
     clearOnLeave(this.grid, this.detail);
     this.cells = TROPHIES.map((t) => {
       const b = el("button", "trophy", this.grid, iconSvg(t.icon || "trophy"));
       b.type = "button";
-      const show = () => this.show(t);
+      const show = () => this.show(t, b);
       b.addEventListener("pointerenter", show);
       b.addEventListener("focus", show);
       b.addEventListener("click", show);
@@ -22,9 +22,10 @@ export class TrophiesView {
     this.shown = -1;
   }
 
-  show(t) {
+  show(t, anchor) {
     const got = this.game.state.achievements.includes(t.id);
     setDetail(this.detail, got ? t.name : "Locked", [t.about]);
+    floatBeside(this.detail, anchor);
   }
 
   update() {

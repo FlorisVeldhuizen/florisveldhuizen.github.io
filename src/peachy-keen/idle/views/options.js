@@ -1,14 +1,8 @@
 import { el, setText } from "../dom";
 import { HELPERS } from "../data/helpers";
+import { SKIN_NAMES } from "../skins";
 
 const ENDLESS_KEY = "peachy-keen-dev-endless";
-
-const SKIN_NAMES = {
-  classic: "Classic",
-  gold: "Gold leaf",
-  midnight: "Midnight",
-  chrome: "Chrome",
-};
 
 function segmented(parent, label, choices, read, write) {
   const row = el("div", "settings-row", parent);
@@ -202,6 +196,7 @@ export class OptionsView {
         this.sync();
       },
     );
+    this.skinControl.row.classList.add("skin-row");
   }
 
   sync() {

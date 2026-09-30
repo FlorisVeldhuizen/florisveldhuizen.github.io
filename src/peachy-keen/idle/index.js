@@ -9,10 +9,11 @@ import { Room } from "./scenery/room";
 import { renders } from "./renders";
 import { showHarvests } from "./harvest";
 import { Layout } from "./layout";
-import { applySkin } from "./skins";
+import { applySkin, switchSkin, SKIN_NAMES } from "./skins";
 import { Toys } from "./toys";
 import { preparePage } from "./page";
 import { HELPERS } from "./data/helpers";
+import { TREE_BY_ID } from "./data/tree";
 import { format, formatTime } from "./numbers";
 import { playDing, playBuy, playNotes } from "../audio";
 
@@ -80,8 +81,17 @@ export function createIdle({
       ? game.state.options.skin
       : "classic";
     if (wanted === skin || !peach.material) return;
+    const first = !skin;
     skin = wanted;
-    applySkin(peach, wanted);
+    if (first) {
+      applySkin(peach, wanted);
+      return;
+    }
+    playNotes([784, 1047, 1319], { gap: 0.06, volume: 0.05 });
+    switchSkin(peach, wanted, [
+      { at: 0.3, run: () => interaction.skinSquash() },
+      { at: 0.4, run: () => interaction.skinPop() },
+    ]);
   };
 
   const showAway = (away) => {
@@ -145,6 +155,18 @@ export function createIdle({
     if (kind === "helper")
       playBuy(1 + HELPERS.findIndex((h) => h.id === id) * 0.06);
     else playBuy(1.5);
+  });
+  game.on("bought", ({ kind, id }) => {
+    const unlock =
+      kind === "tree" && TREE_BY_ID[id].effects.find((e) => e.kind === "skin");
+    if (!unlock) return;
+    game.setOption("skin", unlock.skin);
+    popups.toast(
+      "New skin",
+      SKIN_NAMES[unlock.skin],
+      "Wearing it now. Switch skins in Options.",
+      "seed",
+    );
   });
   game.on("golden", () => talk.say("golden", 0.8));
   game.on("toy", (toy) =>

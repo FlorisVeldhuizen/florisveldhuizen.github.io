@@ -376,6 +376,18 @@ export class Interaction {
     if (g.dressing.time > 0.9) g.dressing = null;
   }
 
+  skinSquash() {
+    this.squashVelocity.x -= 0.6;
+    this.squashAxis.set(0, 1);
+  }
+
+  skinPop() {
+    this.wobbleAll(0.06);
+    this.squashVelocity.x += 1.3;
+    this.squashAxis.set(0, 1);
+    buzz(14);
+  }
+
   snapOn() {
     this.wobbleAll(0.08);
     this.squashVelocity.x += 1.24;

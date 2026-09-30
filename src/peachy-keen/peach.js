@@ -48,6 +48,16 @@ const CURVE_SLOTS = 16;
 const BRIDGE_BINS = 25;
 const BRIDGE_SPAN = "0.25";
 
+const SKIN_FADE_SECONDS = 2.4;
+const SKIN_UNIFORMS = ["uSkinLook", "uSkinGlint", "uSkinPattern", "uSkinDeep"];
+const SKIN_PROPS = [
+  "metalness",
+  "roughness",
+  "envMapIntensity",
+  "sheen",
+  "clearcoat",
+  "clearcoatRoughness",
+];
 const NOIR = [0x0d0508, 0x3a1a24];
 const FABRIC_SPRINGS = [
   ["bulge", "bulgeVelocity"],
@@ -561,6 +571,80 @@ const FRAGMENT_HEADER = `
     alpha = max(alpha, max(max(cord, picot) * 0.9, header * 0.9 * panel));
     return vec4(uFabricColor, alpha * uLingerie.z);
   }
+
+  uniform vec4 uSkinLook;
+  uniform vec3 uSkinGlint;
+  uniform vec4 uSkinPattern;
+  uniform vec3 uSkinDeep;
+  #ifdef SKIN_FADE
+    uniform float uSkinFade;
+    uniform vec3 uSkinFadeGlow;
+  #endif
+
+  float skinHash(vec3 p) {
+    return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+  }
+
+  float skinNoise(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    vec2 e = vec2(1.0, 0.0);
+    return mix(
+      mix(mix(skinHash(i), skinHash(i + e.xyy), f.x), mix(skinHash(i + e.yxy), skinHash(i + e.xxy), f.x), f.y),
+      mix(mix(skinHash(i + e.yyx), skinHash(i + e.xyx), f.x), mix(skinHash(i + e.yxx), skinHash(i + e.xxx), f.x), f.y),
+      f.z);
+  }
+
+  float skinFbm(vec3 p) {
+    return skinNoise(p) * 0.55 + skinNoise(p * 2.1 + 3.1) * 0.3 + skinNoise(p * 4.3 + 7.7) * 0.15;
+  }
+
+
+  float skinGlitter(vec3 p, vec3 n, vec3 toEye) {
+    vec3 q = p / uBounds.w * 70.0;
+    vec3 cell = floor(q);
+    float h = skinHash(cell);
+    if (h < 0.55) return 0.0;
+    vec3 jitter = vec3(skinHash(cell + 1.7), skinHash(cell + 4.3), skinHash(cell + 9.1)) - 0.5;
+    float spot = smoothstep(0.3, 0.0, length(fract(q) - 0.5 - jitter * 0.5));
+    float glint = pow(max(dot(normalize(n + jitter * 1.6), toEye), 0.0), 40.0);
+    float twinkle = 0.6 + 0.4 * sin(uTime * (1.5 + h * 4.0) + h * 60.0);
+    return spot * glint * twinkle * 3.0;
+  }
+
+  float skinDrips(vec3 p) {
+    float y = (p.y - uBounds.y) / uBounds.w + 0.5;
+    vec2 around = p.xz - uBounds.xz;
+    float a = atan(around.y, around.x) / 6.28318530718 + 0.5;
+    vec2 ring = vec2(cos(a * 6.28318530718), sin(a * 6.28318530718));
+    float rim = 0.68 + (skinFbm(vec3(ring * 2.2, 0.0)) - 0.5) * 0.14 + (skinNoise(vec3(ring * 7.0, 1.0)) - 0.5) * 0.03;
+    float coat = y - rim;
+    float slot = floor(a * 14.0);
+    float h = skinHash(vec3(slot, 3.7, 1.3));
+    if (h < 0.2) return coat;
+    float dx = (fract(a * 14.0) - 0.5 - (h - 0.5) * 0.3) / 14.0 * 6.28318530718 * length(around) / uBounds.w;
+    dx += sin(y * 30.0 + h * 17.0) * 0.004;
+    float width = 0.014 + fract(h * 3.7) * 0.02;
+    float bulbY = rim - (0.05 + fract(h * 7.31) * 0.3) * (0.92 + 0.08 * sin(uTime * 0.4 + h * 20.0));
+    float t = clamp((rim - y) / max(rim - bulbY, 0.001), 0.0, 1.0);
+    float stream = length(vec2(dx, y - mix(rim, bulbY, t))) - width * mix(0.85, 0.55, t);
+    float bulb = length(vec2(dx, (y - bulbY - width * 0.3) * 0.6)) - width * 0.72;
+    float join = clamp(0.5 + 0.5 * (bulb - stream) / 0.02, 0.0, 1.0);
+    float drip = -(mix(bulb, stream, join) - 0.02 * join * (1.0 - join));
+    float k = 0.03;
+    float blend = clamp(0.5 + 0.5 * (drip - coat) / k, 0.0, 1.0);
+    return mix(coat, drip, blend) + k * blend * (1.0 - blend);
+  }
+
+  vec3 skinFinish(vec3 n, float leaf, float honey) {
+    vec3 light = vec3(0.0);
+    vec3 toEye = normalize(vViewPosition);
+    light += uSkinDeep * honey * pow(1.0 - clamp(dot(n, toEye), 0.0, 1.0), 3.0) * 0.4;
+    if (uSkinLook.y > 0.0)
+      light += uSkinGlint * skinGlitter(vRestPosition, n, toEye) * uSkinLook.y;
+    return light * (1.0 - leaf);
+  }
 `;
 
 const FABRIC_FRAGMENT = `
@@ -588,6 +672,27 @@ const CUT_TEST = `
 
 const FRAGMENT_COLOR = `
   ${CUT_TEST}
+  #ifdef SKIN_FADE
+    float fadeFacing = clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0);
+    float fadeAt = mix(skinFbm(vRestPosition / uBounds.w * 5.0), 1.0 - fadeFacing, 0.55);
+    if (fadeAt < uSkinFade) discard;
+    float fadeLine = 1.0 - smoothstep(0.0, 0.012, fadeAt - uSkinFade);
+    float fadeTint = 1.0 - smoothstep(0.0, 0.06, fadeAt - uSkinFade);
+  #endif
+  float skinLum = dot(sampledDiffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuse * (0.55 + skinLum * 1.2), uSkinLook.x * (1.0 - leaf));
+  diffuseColor.rgb = mix(diffuseColor.rgb, sampledDiffuseColor.rgb, leaf * uSkinPattern.z);
+  float skinHoney = 0.0;
+  float skinHoneyHeight = 0.0;
+  if (uSkinPattern.x > 1.5) {
+    float field = skinDrips(vRestPosition);
+    float keep = uSkinPattern.y * (1.0 - leaf);
+    float thick = smoothstep(0.0, 0.07, field);
+    skinHoney = smoothstep(-0.003, 0.003, field) * keep;
+    skinHoneyHeight = skinHoney * (0.35 + 0.65 * thick);
+    vec3 glaze = diffuseColor.rgb * mix(vec3(1.0, 0.8, 0.45), uSkinDeep * 1.5, thick) + uSkinDeep * 0.06 * thick;
+    diffuseColor.rgb = mix(diffuseColor.rgb, glaze, skinHoney);
+  }
   float welt = handprintMask() * (1.0 - leaf);
   vec3 ink = mix(diffuseColor.rgb * vec3(1.02, 0.42, 0.46), vec3(0.62, 0.0, 0.08), uPrintInk);
   diffuseColor.rgb = mix(diffuseColor.rgb, ink, welt * mix(0.55, 0.95, uPrintInk));
@@ -949,6 +1054,8 @@ export class Peach {
     this.skinTint = new Color(PEACH_CONFIG.SKIN_TINT);
     this.wetTint = new Color(0xe07f86);
     this.skinRoughness = 1;
+    this.skinCoat = 0;
+    this.skinGloss = false;
     this.uniforms = {
       uRingCenter: { value: new Vector3() },
       uRingAxisX: { value: new Vector3() },
@@ -1003,6 +1110,10 @@ export class Peach {
       },
       uOilCount: { value: 0 },
       uOilDepth: { value: 0.045 },
+      uSkinLook: { value: new Vector4() },
+      uSkinGlint: { value: new Color() },
+      uSkinPattern: { value: new Vector4() },
+      uSkinDeep: { value: new Color() },
     };
     this.printTextures = {};
     this.setTool("hand");
@@ -1104,23 +1215,31 @@ export class Peach {
         .replace("#include <map_fragment>", FRAGMENT_COLOR)
         .replace(
           "#include <roughnessmap_fragment>",
-          "#include <roughnessmap_fragment>\nfloat oilF = oilField();\nfloat oilSpot = smoothstep(0.19, 0.22, oilF);\nfloat oilHeight = sqrt(clamp((oilF - 0.2) / 0.3, 0.0, 1.0));\nroughnessFactor = mix(roughnessFactor, 0.12, oilSpot);\nvec3 oilWet = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.15)) * 0.88;\noilWet *= 1.0 - (1.0 - smoothstep(0.0, 0.35, oilHeight)) * 0.14;\ndiffuseColor.rgb = mix(diffuseColor.rgb, oilWet, oilSpot * 0.65);",
+          "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.08, skinHoney);\nfloat oilF = oilField();\nfloat oilSpot = smoothstep(0.19, 0.22, oilF);\nfloat oilHeight = sqrt(clamp((oilF - 0.2) / 0.3, 0.0, 1.0));\nroughnessFactor = mix(roughnessFactor, 0.12, oilSpot);\nvec3 oilWet = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.15)) * 0.88;\noilWet *= 1.0 - (1.0 - smoothstep(0.0, 0.35, oilHeight)) * 0.14;\ndiffuseColor.rgb = mix(diffuseColor.rgb, oilWet, oilSpot * 0.65 * (1.0 - metalness));",
+        )
+        .replace(
+          "#include <metalnessmap_fragment>",
+          "#include <metalnessmap_fragment>\nmetalnessFactor *= 1.0 - leaf * uSkinPattern.z;",
         )
         .replace(
           "#include <lights_physical_fragment>",
-          "#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat = max(material.clearcoat, oilSpot);\nmaterial.clearcoatRoughness = mix(material.clearcoatRoughness, 0.1, oilSpot);\n#endif\n#ifdef USE_IRIDESCENCE\nmaterial.iridescence = oilSpot * 0.7;\n#endif",
+          "#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat = max(material.clearcoat, oilSpot * (1.0 - uSkinPattern.w));\nmaterial.clearcoatRoughness = mix(material.clearcoatRoughness, 0.1, oilSpot);\nmaterial.clearcoat = max(material.clearcoat, skinHoney);\nmaterial.clearcoatRoughness = mix(material.clearcoatRoughness, 0.04, skinHoney);\n#endif\n#ifdef USE_IRIDESCENCE\nmaterial.iridescence = max(oilSpot * 0.7 * (1.0 - uSkinPattern.w), uSkinLook.z);\n#endif",
         )
         .replace(
           "#include <lights_fragment_maps>",
-          "#include <lights_fragment_maps>\nradiance *= mix(uEnvSpecular, 2.2, oilSpot);\n#ifdef USE_CLEARCOAT\nclearcoatRadiance *= mix(uEnvSpecular, 3.0, oilSpot);\n#endif",
+          "#include <lights_fragment_maps>\nradiance *= mix(uEnvSpecular, 2.2, max(oilSpot, skinHoney * 0.4));\n#ifdef USE_CLEARCOAT\nclearcoatRadiance *= mix(uEnvSpecular, 3.0, max(oilSpot, skinHoney * 0.4));\n#endif",
         )
         .replace(
           "#include <normal_fragment_maps>",
-          "vec3 oilBase = normal;\n#include <normal_fragment_maps>\nif (oilSpot > 0.0) {\n  vec3 oilNormal = oilBump(-vViewPosition, oilBase, oilHeight * uOilDepth, faceDirection);\n  normal = normalize(mix(normal, oilNormal, oilSpot));\n}",
+          "vec3 oilBase = normal;\n#include <normal_fragment_maps>\nif (uSkinPattern.x > 0.5 && uSkinPattern.x < 1.5) {\n  float facing = clamp(dot(oilBase, normalize(vViewPosition)), 0.0, 1.0);\n  diffuseColor.rgb = mix(diffuseColor.rgb, uSkinDeep, smoothstep(0.05, 1.0, facing) * uSkinPattern.y * (1.0 - leaf));\n}\nif (uSkinPattern.x > 1.5) {\n  vec3 honeyNormal = oilBump(-vViewPosition, oilBase, skinHoneyHeight * uOilDepth * 0.6, faceDirection);\n  normal = normalize(mix(normal, honeyNormal, skinHoney));\n}\nif (oilSpot > 0.0) {\n  vec3 oilNormal = oilBump(-vViewPosition, oilBase, oilHeight * uOilDepth, faceDirection);\n  normal = normalize(mix(normal, oilNormal, oilSpot));\n}",
         )
         .replace(
           "#include <opaque_fragment>",
-          `if (uRingShine > 0.001) {
+          `outgoingLight += skinFinish(normal, leaf, skinHoney);
+          #ifdef SKIN_FADE
+            outgoingLight = mix(outgoingLight, outgoingLight * 0.4 + uSkinFadeGlow * 0.5, fadeTint * 0.7) + uSkinFadeGlow * fadeLine * 0.9;
+          #endif
+          if (uRingShine > 0.001) {
             vec3 ringNormal = normalize(normal - vRubTilt.xyz * faceDirection);
             outgoingLight += ringSparkle(-vViewPosition, ringNormal, 0.15 + vRubTilt.w * 0.2);
           }
@@ -1440,6 +1559,7 @@ export class Peach {
   }
 
   refreshHalves() {
+    this.cutMaterials?.forEach((material) => this.matchSkin(material));
     (this.frozenSets || []).forEach((frozen) => {
       Object.entries(this.uniforms).forEach(([key, u]) => {
         if (key === "uCutSide" || key === "uJiggleActive") return;
@@ -1472,8 +1592,21 @@ export class Peach {
     this.frozenSets?.forEach((frozen) => frozen.uLingerie.value.setZ(visible));
   }
 
+  matchSkin(material) {
+    const m = this.material;
+    SKIN_PROPS.forEach((key) => {
+      // eslint-disable-next-line no-param-reassign
+      material[key] = m[key];
+    });
+    material.color.copy(m.color);
+    material.sheenColor.copy(m.sheenColor);
+    // eslint-disable-next-line no-param-reassign
+    material.userData.moodBase = m.userData.moodBase;
+  }
+
   cutMaterial(frozen, extra) {
     const material = this.material.clone();
+    this.cutMaterials = [...(this.cutMaterials || []), material];
     Object.assign(material, extra);
     material.defines = { ...material.defines, PEACH_CUT: "" };
     material.onBeforeCompile = (shader) => {
@@ -2021,16 +2154,67 @@ export class Peach {
     const m = this.material;
     const shine = oil * oil * (3 - 2 * oil);
     this.shine = shine;
-    m.roughness = (1 - 0.55 * shine) * this.skinRoughness;
-    m.clearcoat = 0.001 + shine * 0.6;
-    m.clearcoatRoughness = 1 - 0.85 * shine;
-    m.clearcoatNormalScale.setScalar(0.04 + 0.4 * shine);
-    this.uniforms.uEnvSpecular.value = 1 - 0.7 * shine;
-    m.color.copy(this.skinTint).lerp(this.wetTint, shine * 0.12);
+    const gloss = this.skinGloss;
+    m.roughness = (1 - (gloss ? 0.2 : 0.55) * shine) * this.skinRoughness;
+    m.clearcoat = Math.max(this.skinCoat, 0.001 + (gloss ? 0 : shine * 0.6));
+    m.clearcoatRoughness = this.skinCoat
+      ? Math.min(0.2, 1 - 0.85 * shine)
+      : 1 - 0.85 * shine;
+    m.clearcoatNormalScale.setScalar(0.04 + (gloss ? 0 : 0.4) * shine);
+    this.uniforms.uEnvSpecular.value = gloss
+      ? 1 + 0.8 * shine
+      : 1 - 0.7 * shine;
+    m.color.copy(this.skinTint).lerp(this.wetTint, gloss ? 0 : shine * 0.12);
+  }
+
+  fadeSkin(glow, beats) {
+    if (!this.mesh) return;
+    if (!this.fade) {
+      const uniforms = { ...this.uniforms };
+      SKIN_UNIFORMS.forEach((key) => {
+        uniforms[key] = { value: this.uniforms[key].value.clone() };
+      });
+      uniforms.uSkinFade = { value: 0 };
+      uniforms.uSkinFadeGlow = { value: new Color() };
+      const material = this.material.clone();
+      material.defines = { ...material.defines, SKIN_FADE: "" };
+      material.onBeforeCompile = (shader) => {
+        this.material.onBeforeCompile(shader);
+        Object.assign(shader.uniforms, uniforms);
+      };
+      const mesh = new Mesh(this.mesh.geometry, material);
+      mesh.renderOrder = 0.5;
+      mesh.raycast = () => {};
+      mesh.visible = false;
+      this.mesh.add(mesh);
+      this.fade = { mesh, uniforms, time: 0 };
+    }
+    const { fade } = this;
+    this.matchSkin(fade.mesh.material);
+    SKIN_UNIFORMS.forEach((key) =>
+      fade.uniforms[key].value.copy(this.uniforms[key].value),
+    );
+    fade.uniforms.uSkinFadeGlow.value.set(glow);
+    fade.uniforms.uSkinFade.value = 0;
+    fade.mesh.visible = true;
+    fade.time = 0;
+    fade.beats = [...beats];
+  }
+
+  updateFade(delta) {
+    const { fade } = this;
+    if (!fade?.mesh.visible) return;
+    fade.time += delta / SKIN_FADE_SECONDS;
+    while (fade.beats.length && fade.time >= fade.beats[0].at)
+      fade.beats.shift().run();
+    const t = Math.min(1, fade.time);
+    fade.uniforms.uSkinFade.value = 1 - (1 - t) ** 2;
+    if (fade.time >= 1) fade.mesh.visible = false;
   }
 
   update(delta, heat) {
     this.applyOil(delta);
+    this.updateFade(delta);
     this.uniforms.uTime.value += delta;
     this.uniforms.uHeat.value = heat;
     this.uniforms.uJiggleActive.value =

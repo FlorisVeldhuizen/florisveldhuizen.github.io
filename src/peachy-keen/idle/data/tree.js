@@ -3,7 +3,8 @@ export const TREE = [
     id: "root",
     icon: "nectar",
     name: "First blush",
-    about: "Golden peaches show up 10% more often. Lights the way to the other stars.",
+    about:
+      "Golden peaches show up 10% more often. Lights the way to the other stars.",
     cost: 1,
     at: [3, 0],
     effects: [{ kind: "goldenRate", mult: 1.1 }],
@@ -129,8 +130,8 @@ export const TREE = [
   {
     id: "gilded",
     icon: "peachverse",
-    name: "Gold leaf",
-    about: "Unlocks the golden peach skin.",
+    name: "Honey glaze",
+    about: "Unlocks the honey glaze skin. Sticky.",
     cost: 12,
     at: [4, 3],
     parent: "golden",

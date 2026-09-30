@@ -884,13 +884,9 @@ body.is-storm::after {
   display: grid;
   gap: 12px;
   padding: 16px;
-  border: 1px solid rgba(212, 162, 76, 0.5);
+  border: 1px solid var(--blush-faint);
   border-radius: 18px;
-  background: linear-gradient(
-    160deg,
-    rgba(212, 162, 76, 0.14),
-    transparent 70%
-  );
+  background: var(--velvet-deep);
 }
 
 .ripen-summary,
@@ -924,18 +920,7 @@ body.is-storm::after {
   overflow: hidden;
   border: 1px solid rgba(246, 201, 187, 0.08);
   border-radius: 18px;
-  background:
-    radial-gradient(
-      ellipse at 30% 25%,
-      rgba(180, 90, 170, 0.16),
-      transparent 55%
-    ),
-    radial-gradient(
-      ellipse at 75% 80%,
-      rgba(255, 120, 150, 0.1),
-      transparent 55%
-    ),
-    #12030b;
+  background: #12030b;
 }
 
 .tree-sky {
@@ -1107,15 +1092,18 @@ body.is-storm::after {
   content: "";
   position: absolute;
   inset: -7px;
-  border: 1px dashed rgba(246, 201, 187, 0.6);
+  border: 1px solid rgba(246, 201, 187, 0.4);
   border-radius: 50%;
   opacity: 0;
-  scale: 1.5;
+  scale: 0.8;
   pointer-events: none;
   transition:
-    opacity 0.3s ease,
-    scale 0.45s cubic-bezier(0.3, 0.7, 0.3, 1.4);
-  animation: orbit 16s linear infinite;
+    opacity 0.2s ease,
+    scale 0.3s cubic-bezier(0.3, 0.7, 0.3, 1.3);
+}
+
+.node[data-state="ready"]::after {
+  border-color: rgba(255, 210, 122, 0.55);
 }
 
 .node[data-state="locked"]::after {
@@ -1146,12 +1134,6 @@ body.is-storm::after {
   scale: 0.94;
 }
 
-@keyframes orbit {
-  to {
-    rotate: 360deg;
-  }
-}
-
 @keyframes ready-star {
   from {
     box-shadow: 0 0 6px rgba(255, 210, 122, 0.3);
@@ -1159,37 +1141,6 @@ body.is-storm::after {
   to {
     box-shadow: 0 0 16px rgba(255, 210, 122, 0.7);
   }
-}
-
-.tree-card {
-  display: grid;
-  gap: 4px;
-  margin-top: 18px;
-}
-
-.tree-card-name {
-  color: var(--blush);
-  font-size: 17px;
-  font-style: italic;
-}
-
-.tree-card-name:empty {
-  display: none;
-}
-
-.tree-card-buy {
-  justify-self: start;
-  margin-top: 6px;
-  padding: 7px 16px;
-  border: 0;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--gold), var(--peach));
-  color: var(--velvet);
-  font-weight: 700;
-}
-
-.tree-card-buy[hidden] {
-  display: none;
 }
 
 .dares {
@@ -1255,6 +1206,20 @@ body.is-storm::after {
   overflow: visible;
   border: 0;
   background: none;
+}
+
+.skin-row {
+  gap: 10px;
+}
+
+.skin-row .segmented {
+  flex-wrap: nowrap;
+  gap: 3px;
+}
+
+.skin-row .segmented button {
+  padding: 3px 8px;
+  white-space: nowrap;
 }
 
 .save-row {

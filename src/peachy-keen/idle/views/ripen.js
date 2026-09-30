@@ -1,6 +1,14 @@
 import { TREE, TREE_BY_ID } from "../data/tree";
 import { DARES } from "../data/dares";
-import { el, setText, toggle, animate } from "../dom";
+import {
+  el,
+  setText,
+  toggle,
+  animate,
+  setDetail,
+  clearOnLeave,
+  floatBeside,
+} from "../dom";
 import { iconSvg } from "../icons";
 import { format, formatTime } from "../numbers";
 
@@ -9,6 +17,7 @@ const ROWS = 7;
 const STRETCH = 1.2;
 const HEIGHT = ROWS * STRETCH;
 const STARS = 46;
+const canHover = window.matchMedia("(hover: hover)");
 
 const hash = (text) =>
   [...text].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 9973, 7) / 9973;
@@ -99,13 +108,9 @@ export class RipenView {
       b.addEventListener("focus", () => this.select(node.id));
       this.nodes.set(node.id, b);
     });
-    this.card = el("div", "shop-detail tree-card", root);
+    this.card = el("p", "shop-detail is-floating", root);
     this.card.setAttribute("aria-live", "polite");
-    this.cardName = el("strong", "tree-card-name", this.card);
-    this.cardText = el("span", "tree-card-text", this.card);
-    this.cardBuy = el("button", "tree-card-buy", this.card);
-    this.cardBuy.type = "button";
-    this.cardBuy.addEventListener("click", () => this.buy(this.selected));
+    clearOnLeave(this.tree, this.card, () => this.select(null));
 
     this.daresTitle = el("h3", "shop-title", root, "Dares");
     this.daresNote = el(
@@ -176,21 +181,12 @@ export class RipenView {
       toggle(thread, "is-trail", trail.has(key)),
     );
     this.describe();
-    if (changed)
-      animate(
-        this.card,
-        [
-          { opacity: 0.35, translate: "0 5px" },
-          { opacity: 1, translate: "0 0" },
-        ],
-        { duration: 260, easing: "cubic-bezier(.2,.8,.3,1)" },
-      );
+    if (changed && id) floatBeside(this.card, this.nodes.get(id));
   }
 
   buy(id) {
     if (!this.game.buyTree(id)) return;
     const node = this.nodes.get(id);
-    if (document.activeElement === this.cardBuy) node.focus();
     animate(
       node,
       [
@@ -215,23 +211,15 @@ export class RipenView {
 
   describe() {
     const node = TREE_BY_ID[this.selected];
-    if (!node) {
-      setText(this.cardName, "");
-      setText(this.cardText, "Pick a star to see what it does.");
-      this.cardBuy.hidden = true;
-      return;
-    }
+    if (!node) return;
     const state = this.game.treeState(node.id);
     const status = {
       owned: "This star is lit.",
       locked: `Light ${TREE_BY_ID[node.parent]?.name} first.`,
-      ready: "",
+      ready: `${canHover.matches ? "Click" : "Tap again"} to light it for ${node.cost} nectar.`,
       open: `You need ${node.cost - this.game.state.nectar} more nectar.`,
     }[state];
-    setText(this.cardName, node.name);
-    setText(this.cardText, `${node.about} ${status}`);
-    this.cardBuy.hidden = state !== "ready";
-    setText(this.cardBuy, `Light it for ${node.cost} nectar`);
+    setDetail(this.card, node.name, [node.about, status]);
   }
 
   update() {
