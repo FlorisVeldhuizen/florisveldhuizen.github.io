@@ -12,17 +12,11 @@ import { Layout } from "./layout";
 import { applySkin, switchSkin, SKIN_NAMES } from "./skins";
 import { Toys } from "./toys";
 import { preparePage } from "./page";
+import { awayMessage } from "./away";
 import { HELPERS } from "./data/helpers";
 import { TREE_BY_ID } from "./data/tree";
-import { format, formatTime } from "./numbers";
+import { format } from "./numbers";
 import { playDing, playBuy, playNotes } from "../audio";
-
-const AWAY_LINES = [
-  "Your peach missed you. The helpers didn't stop.",
-  "While you were gone, the helpers kept their hands busy.",
-  "The peach waited by the window. The Feathers kept tickling.",
-  "Welcome back. Everyone kept working. Mostly.",
-];
 
 export function createIdle({
   interaction,
@@ -95,13 +89,10 @@ export function createIdle({
   };
 
   const showAway = (away) => {
-    const capped = away.capped < away.seconds;
-    const rate = Math.round(away.rate * 100);
-    modal.info(
-      `Away for ${formatTime(away.seconds)}`,
-      `${AWAY_LINES[Math.floor(Math.random() * AWAY_LINES.length)]} You earned ${format(away.value)} juice at ${rate}% speed${capped ? `, for the first ${formatTime(away.capped)}` : ""}.`,
-      "Thanks, helpers",
-    );
+    modal.show({
+      ...awayMessage(away, game.state.helpers),
+      buttons: [{ label: "Thanks, helpers", primary: true }],
+    });
   };
 
   game.on("pop", ({ x, y, value, kind }) => {

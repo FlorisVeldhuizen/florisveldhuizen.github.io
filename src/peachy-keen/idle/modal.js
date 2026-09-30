@@ -13,6 +13,7 @@ export class Modal {
     this.text = el("p", "modal-text", this.card);
     this.text.id = "modal-text";
     this.card.setAttribute("aria-describedby", this.text.id);
+    this.body = el("div", "modal-body", this.card);
     this.actions = el("div", "modal-actions", this.card);
     this.root.addEventListener("click", (e) => {
       if (e.target === this.root) this.leave();
@@ -25,14 +26,19 @@ export class Modal {
     this.queue = [];
   }
 
-  show({ title, text, buttons }) {
+  show(options) {
     if (!this.root.hidden) {
-      this.queue.push({ title, text, buttons });
+      this.queue.push(options);
       return;
     }
+    const { title, text, body, variant, buttons, onShow } = options;
     this.returnFocus = document.activeElement;
+    this.card.className = `modal-card${variant ? ` is-${variant}` : ""}`;
     this.title.textContent = title;
-    this.text.textContent = text;
+    this.text.textContent = text || "";
+    this.text.hidden = !text;
+    this.body.replaceChildren(...(body ? [body] : []));
+    this.body.hidden = !body;
     this.actions.replaceChildren();
     let first = null;
     buttons.forEach(({ label, primary, danger, onClick }) => {
@@ -63,6 +69,7 @@ export class Modal {
       { duration: 260, easing: "cubic-bezier(.2,.9,.3,1.2)" },
     );
     (first || this.actions.firstElementChild)?.focus();
+    onShow?.();
   }
 
   trap(e) {
