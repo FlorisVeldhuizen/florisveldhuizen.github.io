@@ -76,7 +76,7 @@ export const HELPERS = [
     rate: 94,
     about: "Deep tissue. Very deep. Eyes closed.",
     touch: "knead",
-    icon: "M7 11V6a1.5 1.5 0 0 1 3 0v4M10 10V4.5a1.5 1.5 0 0 1 3 0V10M13 10V5.5a1.5 1.5 0 0 1 3 0V12M16 12v-2a1.5 1.5 0 0 1 3 0v4a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-3l-2-4a1.5 1.5 0 0 1 2.5-1.5L7 14",
+    icon: "M7 11V6a1.5 1.5 0 0 1 3 0v4M10 10V4.5a1.5 1.5 0 0 1 3 0V10M13 10V5.5a1.5 1.5 0 0 1 3 0V12M16 12V7.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-3l-2-4a1.5 1.5 0 0 1 2.5-1.5L7 14",
     tiers: [
       ["Warm towels", "Masseuses are twice as soothing."],
       ["Hot stones", "Placed with intent. Masseuses ×2."],
@@ -118,7 +118,7 @@ export const HELPERS = [
     rate: 2800,
     about: "Counts to eight. Loudly. Forever.",
     touch: "bounce",
-    icon: "M4 9h9l4-4 3 3-4 4v1a6 6 0 1 1-12 0V9zm6 5h.01",
+    icon: "M9.5 9H20.5v3.8h-5.6A5.5 5.5 0 1 1 9.5 9zM9.5 13.2a1.3 1.3 0 1 0 .01 0M17.6 6.2l1.2-2M20.6 7l1.8-1.2",
     tiers: [
       ["Whistle", "Twerk Coaches are twice as motivating."],
       ["Headset mic", "Now with reverb. Twerk Coaches ×2."],

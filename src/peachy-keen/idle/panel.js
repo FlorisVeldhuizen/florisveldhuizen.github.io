@@ -26,7 +26,6 @@ const swing = (origin, ...turns) =>
 
 const MOTIONS = {
   hand: swing("50% 90%", -16, 12, -8, 4),
-  trophy: swing("50% 95%", 10, -8, 4),
   recipe: [
     { transform: "none" },
     { transform: "translateY(-5px) scale(0.94, 1.08)" },
@@ -68,7 +67,7 @@ function unfurl(path, origin, turn, delay) {
   );
 }
 
-function growPlant(icon) {
+function strokes(icon) {
   if (!icon.dataset.split) {
     const d = icon.querySelector("path").getAttribute("d");
     // eslint-disable-next-line no-param-reassign
@@ -79,12 +78,57 @@ function growPlant(icon) {
     // eslint-disable-next-line no-param-reassign
     icon.dataset.split = "1";
   }
-  const [stem, top, side] = icon.querySelectorAll("path");
+  return [...icon.querySelectorAll("path")];
+}
+
+function growPlant(icon) {
+  const [stem, top, side] = strokes(icon);
   draw(stem, 800);
   draw(side, 700, 480);
   unfurl(side, "12px 14px", 25, 480);
   draw(top, 700, 720);
   unfurl(top, "12px 11px", -25, 720);
+}
+
+const TILTS = [0, 14, -11, 7, -3, 0];
+const SLOSH = [0, -3, 4, -2.5, 1, 0];
+
+function sloshFlask(icon) {
+  const liquid = strokes(icon).at(-1);
+  const timing = { duration: 950 };
+  animate(
+    icon,
+    TILTS.map((deg) => ({
+      transform: `rotate(${deg}deg)`,
+      transformOrigin: "50% 88%",
+      easing: "ease-in-out",
+    })),
+    timing,
+  );
+  animate(
+    liquid,
+    TILTS.map((deg, n) => ({
+      transform: `rotate(${SLOSH[n] - deg}deg)`,
+      transformOrigin: "12px 13px",
+      easing: "ease-in-out",
+    })),
+    timing,
+  );
+}
+
+const SHINE = `<defs><clipPath id="trophy-cup"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/></clipPath></defs><g clip-path="url(#trophy-cup)"><g class="shine" opacity="0"><path d="M3 15L15 3" stroke-width="2.4"/><path d="M6.4 15.6L18.4 3.6" stroke-width="1"/></g></g>`;
+
+function shineTrophy(icon) {
+  if (!icon.querySelector(".shine"))
+    icon.insertAdjacentHTML("beforeend", SHINE);
+  animate(
+    icon.querySelector(".shine"),
+    [
+      { opacity: 1, transform: "translateX(-9px)" },
+      { opacity: 1, transform: "translateX(11px)" },
+    ],
+    { duration: 620, delay: 80, easing: "cubic-bezier(0.5, 0, 0.3, 1)" },
+  );
 }
 
 const REFRESH = 0.2;
@@ -222,7 +266,7 @@ export class Panel {
 
   show(id, fromTap = false) {
     if (this.current) this.scrolls[this.current] = this.body.scrollTop;
-    if (this.current && id !== this.current) this.celebrate(id);
+    if (this.current && (id !== this.current || fromTap)) this.celebrate(id);
     this.current = id;
     Object.entries(this.sections).forEach(([key, section]) => {
       // eslint-disable-next-line no-param-reassign
@@ -244,6 +288,7 @@ export class Panel {
 
   celebrate(id) {
     const icon = this.buttons[id].querySelector(".icon");
+    icon.getAnimations({ subtree: true }).forEach((a) => a.cancel());
     const name = TABS.find(([key]) => key === id)[2];
     const motion = MOTIONS[name];
     if (motion) {
@@ -254,6 +299,8 @@ export class Panel {
       return;
     }
     if (name === "seed") growPlant(icon);
+    else if (name === "nectar") sloshFlask(icon);
+    else if (name === "trophy") shineTrophy(icon);
     else draw(icon.querySelector("path"), 720);
   }
 
