@@ -185,6 +185,7 @@ export class OptionsView {
       game.refresh();
     });
     actionRow(box, "Golden peach", "Spawn", () => game.emit("summon"));
+    actionRow(box, "Fresh save", "Restart", () => game.hardReset());
   }
 
   buildSkins() {
