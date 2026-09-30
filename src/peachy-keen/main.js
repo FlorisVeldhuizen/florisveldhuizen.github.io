@@ -100,8 +100,7 @@ const juice = new Juice(scene);
 const droplets = new Droplets(scene);
 const lens = new Lens(renderer, scene, camera);
 juice.onSplat = (position, velocity) => lens.splat(position, velocity);
-lens.onHit = (radius, kind) =>
-  playLensHit(kind === "burst" ? 1 : Math.min(1, radius / 10));
+lens.onHit = () => playLensHit(1);
 const ui = new UI();
 const talk = new Talk();
 const mood = new MoodLight(scene, renderer, lights);

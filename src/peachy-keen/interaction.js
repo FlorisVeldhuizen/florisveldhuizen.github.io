@@ -136,6 +136,7 @@ export class Interaction {
     this.bottle = new Bottle(scene, camera);
     this.marker = new SurfaceMarker(peach, camera);
     this.markerSpot = null;
+    this.stripSpot = { local: new Vector3(), normal: new Vector3() };
     this.markerStyle = MARKERS.hand;
     this.bottle.stream.onLens = (x, y, r) => this.lens.oilSplat(x, y, r);
     this.grab = null;
@@ -234,10 +235,7 @@ export class Interaction {
       p.grabbed = false;
       const hit = this.raycastAt(e.clientX, e.clientY);
       p.downOnPeach = !!hit;
-      p.onWaistband =
-        !!hit &&
-        this.canStrip() &&
-        this.peach.heightAt(hit.point) > CFG.WAISTBAND_FROM;
+      p.onWaistband = this.onWaistband(hit);
     });
     const release = (e) => {
       const tapped =
@@ -792,6 +790,14 @@ export class Interaction {
     );
   }
 
+  onWaistband(hit) {
+    return (
+      !!hit &&
+      this.canStrip() &&
+      this.peach.heightAt(hit.point) > CFG.WAISTBAND_FROM
+    );
+  }
+
   isStripPull() {
     const p = this.pointer;
     const vertical = Math.abs(p.y - p.downY);
@@ -801,6 +807,12 @@ export class Interaction {
       Math.abs(p.x - p.downX) < vertical * 0.6 &&
       p.travel < vertical * 1.4
     );
+  }
+
+  holdStripSpot(hit) {
+    const spot = this.marker.fromHit(hit);
+    this.stripSpot.local.copy(spot.local);
+    this.stripSpot.normal.copy(spot.normal);
   }
 
   startStrip() {
@@ -1510,11 +1522,10 @@ export class Interaction {
       if (p.pressed && this.phase === "live" && this.garment.worn) {
         this.updateStrip(delta);
         const hit = this.raycastAt(p.x, p.y);
-        if (hit) {
-          this.markerSpot = this.marker.fromHit(hit);
-          this.markerStyle = MARKERS.grab;
-        }
-        this.ui.setCursorState(hit ? "hold" : "grab");
+        if (hit) this.holdStripSpot(hit);
+        this.markerSpot = this.stripSpot;
+        this.markerStyle = MARKERS.grab;
+        this.ui.setCursorState("hold");
         return;
       }
       this.endStrip();
@@ -1542,6 +1553,7 @@ export class Interaction {
       );
     } else if (p.pressed) {
       if (this.canStrip() && this.isStripPull()) {
+        this.holdStripSpot(hit);
         this.startStrip();
       } else if (this.canGrab()) {
         this.startGrab(hit);
@@ -1555,7 +1567,9 @@ export class Interaction {
         this.massageAt(hit, motion, delta);
     }
     this.markerSpot = hit && this.marker.fromHit(hit);
-    this.markerStyle = MARKERS[this.toolName];
+    this.markerStyle = this.onWaistband(hit)
+      ? MARKERS.band
+      : MARKERS[this.toolName];
     this.ui.setCursorState(p.inside ? "over" : null);
   }
 
