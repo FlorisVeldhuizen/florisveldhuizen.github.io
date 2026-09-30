@@ -274,8 +274,8 @@ const SPECIAL = [
   },
   {
     id: "tree-all",
-    name: "Tree hugger",
-    about: "Grow every branch of the Nectar tree.",
+    name: "Starstruck",
+    about: "Light every star in the Peachy Way.",
     test: (s) => s.tree.length >= TREE.length,
   },
   {

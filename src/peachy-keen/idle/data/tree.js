@@ -1,14 +1,16 @@
 export const TREE = [
   {
     id: "root",
+    icon: "nectar",
     name: "First blush",
-    about: "Golden peaches show up 10% more often. The tree opens up.",
+    about: "Golden peaches show up 10% more often. Lights the way to the other stars.",
     cost: 1,
     at: [3, 0],
     effects: [{ kind: "goldenRate", mult: 1.1 }],
   },
   {
     id: "sleep",
+    icon: "moon",
     name: "Sleep talking",
     about: "Earn 50% of your juice per second while the game is closed.",
     cost: 3,
@@ -18,6 +20,7 @@ export const TREE = [
   },
   {
     id: "start",
+    icon: "feather",
     name: "Head start",
     about: "Every run starts with 10 Feathers and 5 Admirers.",
     cost: 5,
@@ -27,6 +30,7 @@ export const TREE = [
   },
   {
     id: "heat",
+    icon: "heat",
     name: "Hot blooded",
     about: "Heat builds 25% faster and cools 25% slower.",
     cost: 9,
@@ -36,6 +40,7 @@ export const TREE = [
   },
   {
     id: "dares",
+    icon: "trophy",
     name: "Dare devil",
     about: "Unlocks Dares: restricted runs with permanent rewards.",
     cost: 10,
@@ -45,6 +50,7 @@ export const TREE = [
   },
   {
     id: "golden",
+    icon: "golden",
     name: "Golden hour",
     about: "Golden peach effects last 25% longer.",
     cost: 21,
@@ -54,6 +60,7 @@ export const TREE = [
   },
   {
     id: "dream",
+    icon: "moon",
     name: "Sweet dreams",
     about: "Earn 100% while away, for up to 24 hours instead of 8.",
     cost: 27,
@@ -66,6 +73,7 @@ export const TREE = [
   },
   {
     id: "muscle",
+    icon: "play",
     name: "Muscle memory",
     about:
       "The idle twerk starts after 10 seconds and earns three times as much.",
@@ -79,6 +87,7 @@ export const TREE = [
   },
   {
     id: "aftershock",
+    icon: "juice",
     name: "Aftershock",
     about: "Bursts pay out three times as much.",
     cost: 33,
@@ -88,6 +97,7 @@ export const TREE = [
   },
   {
     id: "luckypit",
+    icon: "pit",
     name: "Lucky pit",
     about: "Every burst has a 20% chance to drop triple pits.",
     cost: 44,
@@ -97,6 +107,7 @@ export const TREE = [
   },
   {
     id: "haggle",
+    icon: "tag",
     name: "Haggler",
     about: "Helpers cost 5% less.",
     cost: 30,
@@ -106,6 +117,7 @@ export const TREE = [
   },
   {
     id: "butler",
+    icon: "bell",
     name: "Butler",
     about:
       "A butler buys the best-value helper for you. Switch it on in the Helpers tab.",
@@ -116,6 +128,7 @@ export const TREE = [
   },
   {
     id: "gilded",
+    icon: "peachverse",
     name: "Gold leaf",
     about: "Unlocks the golden peach skin.",
     cost: 12,
@@ -125,6 +138,7 @@ export const TREE = [
   },
   {
     id: "running",
+    icon: "hand",
     name: "Running start",
     about: "Every run starts with 50 Feathers, 25 Admirers and 10 Paddles.",
     cost: 50,
@@ -136,6 +150,7 @@ export const TREE = [
   },
   {
     id: "midnight",
+    icon: "peachverse",
     name: "Midnight plum",
     about: "Unlocks the midnight skin.",
     cost: 40,
@@ -145,6 +160,7 @@ export const TREE = [
   },
   {
     id: "midas",
+    icon: "golden",
     name: "Midas touch",
     about: "Golden peaches come 25% more often and Lucky pays double.",
     cost: 111,
@@ -157,6 +173,7 @@ export const TREE = [
   },
   {
     id: "overripe",
+    icon: "nectar",
     name: "Overripe",
     about: "Every nectar you have earned gives +3% juice instead of +2%.",
     cost: 66,
@@ -166,6 +183,7 @@ export const TREE = [
   },
   {
     id: "valet",
+    icon: "bell",
     name: "Valet",
     about: "A valet buys upgrades for you. Switch it on in the Upgrades tab.",
     cost: 100,
@@ -175,6 +193,7 @@ export const TREE = [
   },
   {
     id: "greenhouse",
+    icon: "seed",
     name: "Greenhouse",
     about: "The Orchard grows to 4 × 4 and trees grow 25% faster.",
     cost: 25,
@@ -187,6 +206,7 @@ export const TREE = [
   },
   {
     id: "botanist",
+    icon: "seed",
     name: "Botanist",
     about: "The Orchard grows to 5 × 5 and cross-breeding is twice as likely.",
     cost: 250,
@@ -199,6 +219,7 @@ export const TREE = [
   },
   {
     id: "chrome",
+    icon: "peachverse",
     name: "Chrome job",
     about: "Unlocks the chrome skin. Very reflective.",
     cost: 77,
@@ -208,15 +229,17 @@ export const TREE = [
   },
   {
     id: "sticky",
+    icon: "tag",
     name: "Sticky fingers",
     about: "Upgrades cost 10% less.",
     cost: 200,
-    at: [2, 6],
+    at: [3, 6],
     parent: "running",
     effects: [{ kind: "upgradeDiscount", mult: 0.9 }],
   },
   {
     id: "gods",
+    icon: "nectar",
     name: "Nectar of the gods",
     about: "Earn 50% more nectar when you ripen.",
     cost: 500,

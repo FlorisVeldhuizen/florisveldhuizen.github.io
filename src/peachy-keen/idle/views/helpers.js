@@ -1,6 +1,15 @@
 import { TIER_AT } from "../data/helpers";
-import { el, setText, toggle } from "../dom";
-import { iconSvg, rowIcon, iconKey } from "../icons";
+import {
+  el,
+  setText,
+  setDetail,
+  floatBeside,
+  clearOnLeave,
+  toggle,
+  keepFocus,
+  nudge,
+} from "../dom";
+import { iconSvg } from "../icons";
 import { format } from "../numbers";
 
 const AMOUNTS = [1, 10, 100, "max"];
@@ -32,9 +41,12 @@ export class HelpersView {
       this.syncAmounts();
     });
     this.list = el("ol", "rows", root);
-    this.detail = el("p", "shop-detail", root);
+    this.detail = el("p", "shop-detail is-floating", root);
     this.detail.setAttribute("aria-live", "polite");
     this.focused = null;
+    clearOnLeave(this.list, this.detail, () => {
+      this.focused = null;
+    });
     this.syncAmounts();
   }
 
@@ -58,8 +70,9 @@ export class HelpersView {
       const li = el("li", "", this.list);
       const b = el("button", `row helper-row${known ? "" : " is-mystery"}`, li);
       b.type = "button";
+      b.disabled = !known;
       b.innerHTML = `
-        <span class="row-icon">${known ? rowIcon(helper.id) : iconSvg("lock")}</span>
+        <span class="row-icon">${iconSvg(known ? helper.id : "lock")}</span>
         <span class="row-main">
           <span class="row-name">${known ? helper.name : "???"}</span>
           <span class="row-meta"><span class="row-cost"></span><span class="row-each"></span></span>
@@ -79,6 +92,7 @@ export class HelpersView {
         b.addEventListener("click", () => {
           this.focused = helper.id;
           if (this.game.buyHelper(helper.id)) this.flash(b);
+          else nudge(b.querySelector(".row-meta"));
         });
         const show = () => {
           this.focused = helper.id;
@@ -119,17 +133,19 @@ export class HelpersView {
         `${owned} ${owned === 1 ? helper.name : helper.plural} make ${format(each * owned)} juice per second (${share}% of your helpers).`,
       );
     else lines.push(`Each one makes ${format(each)} juice per second.`);
-    setText(this.detail, lines.join(" "));
+    setDetail(this.detail, helper.name, lines);
+    floatBeside(this.detail, parts.button);
   }
 
   update() {
     const game = this.game;
     const shown = game.visibleHelpers();
-    const signature =
-      iconKey() + shown.map((s) => `${s.helper.id}${s.known ? 1 : 0}`).join();
+    const signature = shown
+      .map((s) => `${s.helper.id}${s.known ? 1 : 0}`)
+      .join();
     if (signature !== this.signature) {
       this.signature = signature;
-      this.build(shown);
+      keepFocus(this.list, () => this.build(shown));
       this.syncAmounts();
     }
     const s = game.state;

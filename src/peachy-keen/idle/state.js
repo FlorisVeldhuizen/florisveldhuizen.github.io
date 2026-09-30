@@ -1,5 +1,5 @@
 const STORAGE_KEY = "peachy-keen-idle";
-const VERSION = 1;
+const VERSION = 2;
 
 const freshStats = () => ({
   smacks: 0,
@@ -94,6 +94,8 @@ export function decode(text) {
   if (!saved || typeof saved !== "object" || typeof saved.juice !== "number")
     throw new Error("Not a Peachy Keen save");
   const state = merge(freshState(), saved);
+  if (state.version < 2 && state.toys.includes("talk")) state.toys.push("shy");
+  if (state.options.helperStyle === "props") state.options.helperStyle = "room";
   state.version = VERSION;
   return state;
 }

@@ -1,11 +1,29 @@
 import { UPGRADE_BY_ID } from "../data/upgrades";
 import { TOYS, TOY_BY_ID } from "../data/toys";
 
-const TOOLS = [
-  ["hand", "Hand"],
-  ["lips", "Lips"],
-  ["buzz", "Buzz"],
+const PICKERS = [
+  {
+    key: "tool",
+    label: "Tool",
+    off: "hand",
+    options: [
+      ["hand", "Hand"],
+      ["lips", "Lips"],
+      ["buzz", "Buzz"],
+    ],
+  },
+  {
+    key: "talk",
+    label: "Voice",
+    off: "off",
+    options: [
+      ["off", "Off"],
+      ["talk", "Cheeky"],
+      ["shy", "Shy"],
+    ],
+  },
 ];
+const PICKED = PICKERS.map((p) => p.key);
 const TRAY_KEY = "peachy-keen-toy-tray";
 
 function readTray() {
@@ -23,8 +41,8 @@ function saveTray(open) {
     // The tray then remembers its state for this visit only.
   }
 }
-import { el, setText, toggle } from "../dom";
-import { iconSvg, rowIcon, iconKey } from "../icons";
+import { el, setText, toggle, keepFocus, nudge } from "../dom";
+import { iconSvg } from "../icons";
 import { format } from "../numbers";
 
 export class UpgradesView {
@@ -55,16 +73,19 @@ export class UpgradesView {
       this.tray,
       "Toys are yours for good, even after you ripen. Tap a toy you own to switch it on or off.",
     );
-    const tools = el("div", "tool-row", this.tray);
-    el("span", "tool-label", tools, "Tool");
-    this.toolGroup = el("span", "segmented", tools);
-    this.toolGroup.setAttribute("role", "group");
-    this.toolGroup.setAttribute("aria-label", "Tool");
-    this.tools = TOOLS.map(([id, label]) => {
-      const b = el("button", "", this.toolGroup);
-      b.type = "button";
-      b.addEventListener("click", () => this.pickTool(id));
-      return { id, label, button: b, toy: TOY_BY_ID[id] };
+    this.pickers = PICKERS.map((picker) => {
+      const row = el("div", "tool-row", this.tray);
+      el("span", "tool-label", row, picker.label);
+      const group = el("span", "segmented", row);
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", picker.label);
+      const buttons = picker.options.map(([id, label]) => {
+        const b = el("button", "", group);
+        b.type = "button";
+        b.addEventListener("click", () => this.pick(picker, id));
+        return { id, label, button: b, toy: TOY_BY_ID[id] };
+      });
+      return { ...picker, row, buttons };
     });
     this.toyList = el("ol", "rows", this.tray);
     this.toyRows = new Map();
@@ -92,13 +113,15 @@ export class UpgradesView {
       const b = el("button", "row upgrade-row", li);
       b.type = "button";
       b.innerHTML = `
-        <span class="row-icon">${rowIcon(u.icon)}</span>
+        <span class="row-icon">${iconSvg(u.icon)}</span>
         <span class="row-main">
           <span class="row-name">${u.name}</span>
           <span class="row-about">${u.about}</span>
         </span>
         <span class="row-price"></span>`;
-      b.addEventListener("click", () => this.game.buyUpgrade(u.id));
+      b.addEventListener("click", () => {
+        if (!this.game.buyUpgrade(u.id)) nudge(b.querySelector(".row-price"));
+      });
       this.rows.set(u.id, {
         button: b,
         price: b.querySelector(".row-price"),
@@ -115,7 +138,7 @@ export class UpgradesView {
       const b = el("button", "row upgrade-row toy-row", li);
       b.type = "button";
       b.innerHTML = `
-        <span class="row-icon">${iconSvg("play")}</span>
+        <span class="row-icon">${iconSvg(toy.id)}</span>
         <span class="row-main">
           <span class="row-name">${toy.name}</span>
           <span class="row-about">${toy.about}</span>
@@ -124,7 +147,8 @@ export class UpgradesView {
       b.addEventListener("click", () => {
         if (this.game.state.toys.includes(toy.id))
           this.game.emit("toy-toggle", toy);
-        else this.game.buyToy(toy.id);
+        else if (!this.game.buyToy(toy.id))
+          nudge(b.querySelector(".row-price"));
       });
       this.toyRows.set(toy.id, {
         button: b,
@@ -134,44 +158,46 @@ export class UpgradesView {
     });
   }
 
-  pickTool(id) {
+  pick(picker, id) {
     const { game } = this;
     const toy = TOY_BY_ID[id];
-    if (!toy) game.emit("toy-set", { key: "tool", value: "hand" });
-    else if (game.state.toys.includes(id))
-      game.emit("toy-set", { key: "tool", value: toy.on });
-    else game.buyToy(id);
+    game.emit("toy-set", { key: picker.key, value: toy ? toy.on : picker.off });
   }
 
-  updateTools() {
+  updatePickers() {
     const { game } = this;
     const s = game.state;
-    const active = this.tools.find((t) => game.activeToys.includes(t.id));
-    this.tools.forEach(({ id, label, button, toy }) => {
-      const owned = !toy || s.toys.includes(id);
-      const visible = owned || toy.unlock(s);
+    this.pickers.forEach((picker) => {
+      const active = picker.buttons.find((t) => game.activeToys.includes(t.id));
+      let owns = false;
+      picker.buttons.forEach(({ id, label, button, toy }) => {
+        const owned = !toy || s.toys.includes(id);
+        if (toy && owned) owns = true;
+        // eslint-disable-next-line no-param-reassign
+        button.hidden = !owned;
+        setText(button, label);
+        button.setAttribute(
+          "aria-pressed",
+          String(active ? active.id === id : id === picker.off),
+        );
+      });
       // eslint-disable-next-line no-param-reassign
-      button.hidden = !visible;
-      setText(button, owned ? label : `${label} · ${format(toy.cost)}`);
-      // eslint-disable-next-line no-param-reassign
-      button.disabled = !owned && toy.cost > s.juice;
-      button.setAttribute(
-        "aria-pressed",
-        String(active ? active.id === id : id === "hand"),
-      );
+      picker.row.hidden = !owns;
     });
   }
 
   updateToys() {
     const s = this.game.state;
-    this.updateTools();
-    const list = TOYS.filter(
-      (t) => t.setting !== "tool" && (s.toys.includes(t.id) || t.unlock(s)),
-    );
+    this.updatePickers();
+    const list = TOYS.filter((t) => {
+      const owned = s.toys.includes(t.id);
+      if (PICKED.includes(t.setting)) return !owned && t.unlock(s);
+      return owned || t.unlock(s);
+    });
     const signature = list.map((t) => `${t.id}${s.toys.includes(t.id)}`).join();
     if (signature !== this.toySignature) {
       this.toySignature = signature;
-      this.buildToys(list);
+      keepFocus(this.toyList, () => this.buildToys(list));
     }
     const shown = TOYS.some((t) => s.toys.includes(t.id) || t.unlock(s));
     this.tray.hidden = !shown;
@@ -235,10 +261,10 @@ export class UpgradesView {
     const game = this.game;
     this.updateToys();
     const list = game.availableUpgrades();
-    const signature = iconKey() + list.map((u) => u.id).join();
+    const signature = list.map((u) => u.id).join();
     if (signature !== this.signature) {
       this.signature = signature;
-      this.build(list);
+      keepFocus(this.list, () => this.build(list));
     }
     if (this.ownedCount !== game.state.upgrades.length) this.buildOwned();
     const locked = game.model.noUpgrades;

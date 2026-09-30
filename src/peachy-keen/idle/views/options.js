@@ -1,4 +1,7 @@
 import { el, setText } from "../dom";
+import { HELPERS } from "../data/helpers";
+
+const ENDLESS_KEY = "peachy-keen-dev-endless";
 
 const SKIN_NAMES = {
   classic: "Classic",
@@ -28,6 +31,15 @@ function segmented(parent, label, choices, read, write) {
       );
     },
   };
+}
+
+function actionRow(parent, label, text, onClick) {
+  const row = el("p", "settings-row", parent);
+  el("span", "", row).textContent = label;
+  const b = el("button", "switch", row);
+  b.type = "button";
+  b.textContent = text;
+  b.addEventListener("click", onClick);
 }
 
 function switchRow(parent, label, read, write) {
@@ -71,7 +83,6 @@ export class OptionsView {
         "Helper style",
         [
           ["room", "Room"],
-          ["props", "Props"],
           ["minimal", "Minimal"],
         ],
         () => opts().helperStyle,
@@ -131,7 +142,49 @@ export class OptionsView {
         onYes: () => game.hardReset(),
       }),
     );
+    if (import.meta.env.DEV) this.buildDev(root);
     this.sync();
+  }
+
+  buildDev(root) {
+    const { game } = this;
+    el("h3", "shop-title", root, "Dev");
+    const box = el("div", "settings", root);
+    let endless = false;
+    try {
+      endless = localStorage.getItem(ENDLESS_KEY) === "on";
+    } catch {
+      // Endless juice then starts off on every visit.
+    }
+    this.controls.push(
+      switchRow(
+        box,
+        "Endless juice",
+        () => endless,
+        (on) => {
+          endless = on;
+          try {
+            localStorage.setItem(ENDLESS_KEY, on ? "on" : "off");
+          } catch {
+            // The switch then lasts for this visit only.
+          }
+          this.sync();
+        },
+      ),
+    );
+    setInterval(() => {
+      if (!endless) return;
+      const s = game.state;
+      s.juice = Math.max(s.juice, 1e30);
+      s.juiceTotal = Math.max(s.juiceTotal, 1e30);
+    }, 250);
+    actionRow(box, "Every helper", "Own one each", () => {
+      HELPERS.forEach((h) => {
+        game.state.helpers[h.id] ||= 1;
+      });
+      game.refresh();
+    });
+    actionRow(box, "Golden peach", "Spawn", () => game.emit("summon"));
   }
 
   buildSkins() {

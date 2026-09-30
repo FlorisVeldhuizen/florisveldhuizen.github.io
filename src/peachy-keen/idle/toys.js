@@ -10,6 +10,14 @@ export class Toys {
   constructor(game, settings) {
     Object.assign(this, { game, settings });
     this.buttons = settings.buttons.filter(toyFor);
+    this.buttons.forEach((b) => {
+      // eslint-disable-next-line no-param-reassign
+      b.closest(".settings-row").hidden = true;
+    });
+    settings.panel.querySelectorAll(".settings-lab").forEach((lab) => {
+      // eslint-disable-next-line no-param-reassign
+      lab.hidden = !lab.querySelector(".settings-row:not([hidden])");
+    });
     const change = settings.onChange;
     settings.onChange = (key, value) => {
       change(key, value);

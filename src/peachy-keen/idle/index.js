@@ -6,9 +6,9 @@ import { Popups } from "./popups";
 import { Modal } from "./modal";
 import { GoldenPeach } from "./golden";
 import { Room } from "./scenery/room";
-import { Props, renderThumbnails } from "./scenery/props";
-import { setThumbnails, setIconStyle } from "./icons";
 import { Ticker } from "./ticker";
+import { renders } from "./renders";
+import { showHarvests } from "./harvest";
 import { Layout } from "./layout";
 import { applySkin } from "./skins";
 import { Toys } from "./toys";
@@ -60,18 +60,16 @@ export function createIdle({
     backdrop,
     mood,
   );
-  const props = new Props(game, interaction, popups, scene);
   let style = null;
   const syncStyle = () => {
     const wanted = game.state.options.helperStyle;
     if (wanted === style) return;
     style = wanted;
-    setIconStyle(wanted);
     room.setActive(wanted === "room");
-    props.setActive(wanted === "props");
   };
   const ticker = new Ticker(game);
   const toys = new Toys(game, settings);
+  showHarvests(game);
   let started = false;
   let skin = null;
 
@@ -204,12 +202,28 @@ export function createIdle({
   game.on("change", syncStyle);
   game.on("replace", syncSkin);
 
+  if (import.meta.env.DEV)
+    window.peachy = {
+      game,
+      golden: () => golden.spawn(),
+      give(id, count) {
+        game.state.helpers[id] = count;
+        game.refresh();
+      },
+      juice(amount) {
+        game.state.juice += amount;
+        game.state.juiceTotal += amount;
+        game.refresh();
+      },
+    };
+
   return {
+    room,
     warmups() {
-      return [...room.warmups(), ...props.warmups(), golden.warmup(peach)];
+      return [...room.warmups(), golden.warmup(peach)];
     },
     ready() {
-      setThumbnails(renderThumbnails(renderer, scene.environment));
+      renders.setup(renderer, scene.environment);
       syncStyle();
       syncSkin();
       toys.sync();
@@ -226,10 +240,10 @@ export function createIdle({
       layout.update(realDelta);
       hud.update();
       panel.update(realDelta);
+      renders.update();
       if (!started) return;
       golden.update(realDelta);
       room.update(realDelta);
-      props.update(realDelta);
       ticker.update(realDelta);
     },
   };

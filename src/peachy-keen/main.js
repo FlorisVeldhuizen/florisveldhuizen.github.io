@@ -201,6 +201,6 @@ renderer.setAnimationLoop(() => {
   lens.update(delta);
   shock.update(realDelta);
   backdrop.render();
-  lens.render([juice, droplets]);
+  lens.render([juice, droplets, idle.room]);
   shock.render();
 });

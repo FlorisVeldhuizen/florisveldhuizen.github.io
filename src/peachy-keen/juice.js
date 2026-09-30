@@ -56,6 +56,11 @@ const JUICE_FRAGMENT = `
     float spec = pow(max(dot(n, normalize(vec3(-0.45, 0.6, 0.66))), 0.0), 120.0);
     float caustic = pow(max(dot(n, normalize(vec3(0.35, -0.7, 0.6))), 0.0), 8.0);
     col += spec * 1.2 + caustic * 0.18 * juice + juice * 0.05;
+    #ifdef GLOW
+      vec3 glow = vec3(1.0, 0.48, 0.16);
+      col = mix(col, glow * (0.35 + 0.5 * caustic), 0.55);
+      col += glow * pow(1.0 - facing, 2.0) * 0.4 + spec * 1.2;
+    #endif
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -67,6 +72,13 @@ export const juiceMaterial = new ShaderMaterial({
   },
   vertexShader: JUICE_VERTEX,
   fragmentShader: JUICE_FRAGMENT,
+});
+
+export const glowingJuiceMaterial = new ShaderMaterial({
+  uniforms: juiceMaterial.uniforms,
+  vertexShader: JUICE_VERTEX,
+  fragmentShader: JUICE_FRAGMENT,
+  defines: { GLOW: "" },
 });
 
 export class Juice {

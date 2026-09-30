@@ -110,19 +110,6 @@ export function featherMaterial() {
   });
 }
 
-export function dropGeometry() {
-  const points = [];
-  for (let n = 0; n <= 24; n += 1) {
-    const y = -1 + (n / 24) * 2.2;
-    const r =
-      y <= 0
-        ? Math.sqrt(Math.max(0, 1 - y * y))
-        : Math.max(0, 1 - y / 1.2) ** 1.6;
-    points.push(new Vector2(r, y));
-  }
-  return new LatheGeometry(points, 24);
-}
-
 export function petalGeometry() {
   const g = new PlaneGeometry(1, 1, 8, 8);
   const p = g.attributes.position;
@@ -231,19 +218,45 @@ export function fogTexture() {
 
 export function flameTexture() {
   const canvas = document.createElement("canvas");
-  canvas.width = 64;
+  canvas.width = 128;
   canvas.height = 128;
   const ctx = canvas.getContext("2d");
-  const glow = ctx.createRadialGradient(32, 84, 2, 32, 76, 40);
-  glow.addColorStop(0, "rgba(255,240,200,1)");
-  glow.addColorStop(0.25, "rgba(255,190,90,0.9)");
-  glow.addColorStop(0.6, "rgba(255,110,40,0.35)");
-  glow.addColorStop(1, "rgba(255,80,20,0)");
-  ctx.fillStyle = glow;
+  const halo = ctx.createRadialGradient(64, 60, 0, 64, 60, 20);
+  halo.addColorStop(0, "rgba(255,170,80,0.45)");
+  halo.addColorStop(1, "rgba(255,120,40,0)");
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, 128, 128);
+  const tongue = (tip, base, width, fill) => {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(64, tip);
+    ctx.bezierCurveTo(
+      64 + width * 0.6,
+      tip + 10,
+      64 + width,
+      base - 8,
+      64,
+      base,
+    );
+    ctx.bezierCurveTo(
+      64 - width,
+      base - 8,
+      64 - width * 0.6,
+      tip + 10,
+      64,
+      tip,
+    );
+    ctx.fill();
+  };
+  const outer = ctx.createLinearGradient(0, 38, 0, 74);
+  outer.addColorStop(0, "rgba(255,90,40,0.9)");
+  outer.addColorStop(0.5, "rgba(255,150,50,1)");
+  outer.addColorStop(1, "rgba(255,190,90,1)");
+  tongue(38, 74, 6, outer);
+  tongue(52, 73, 3, "rgba(255,248,220,1)");
+  ctx.fillStyle = "rgba(110,140,255,0.7)";
   ctx.beginPath();
-  ctx.moveTo(32, 8);
-  ctx.bezierCurveTo(52, 50, 58, 90, 32, 120);
-  ctx.bezierCurveTo(6, 90, 12, 50, 32, 8);
+  ctx.ellipse(64, 72, 2.5, 1.5, 0, 0, Math.PI * 2);
   ctx.fill();
   const t = new CanvasTexture(canvas);
   t.colorSpace = SRGBColorSpace;
@@ -361,11 +374,21 @@ const MATERIALS = {
     physical({ color: 0xffb8d0, roughness: 0.6, sheen: 1, side: DoubleSide }),
   reamer: () =>
     physical({
-      color: 0xffd9a0,
-      roughness: 0.1,
+      color: 0xffc2d4,
+      roughness: 0.06,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.6,
       clearcoat: 1,
+      sheen: 0.4,
+      sheenColor: new Color(0xff8fb8),
+    }),
+  juice: () =>
+    physical({
+      color: 0xe8541c,
+      roughness: 0.04,
+      clearcoat: 1,
+      emissive: 0x8a2600,
+      emissiveIntensity: 0.6,
     }),
   wax: () => physical({ color: 0xfff0dc, roughness: 0.7, sheen: 0.6 }),
   moon: (map) =>
@@ -534,20 +557,55 @@ const PROPS = {
     return g;
   },
   press: () => {
-    const points = [];
-    for (let n = 0; n <= 16; n += 1) {
-      const t = n / 16;
-      points.push([0.08 + (1 - t) * 0.32 + (n % 2) * 0.02, t * 0.5 - 0.3]);
-    }
-    points.push([0, 0.24]);
     const g = new Group();
-    g.add(
-      lathe(
-        [[0, -0.36], [0.46, -0.36], [0.5, -0.3], ...points],
-        MATERIALS.reamer(),
-        12,
-      ),
+    const dish = lathe(
+      [
+        [0, -0.3],
+        [0.34, -0.3],
+        [0.44, -0.26],
+        [0.5, -0.12],
+        [0.52, -0.06],
+        [0.48, -0.08],
+        [0.42, -0.2],
+        [0.3, -0.25],
+        [0, -0.25],
+      ],
+      MATERIALS.reamer(),
+      48,
     );
+    const pool = new Mesh(
+      new CylinderGeometry(0.43, 0.36, 0.08, 48),
+      MATERIALS.juice(),
+    );
+    pool.position.y = -0.2;
+    const profile = [];
+    for (let n = 0; n <= 20; n += 1) {
+      const t = n / 20;
+      profile.push(
+        new Vector2(0.3 * Math.cos((t * Math.PI) / 2) ** 0.8, -0.18 + t * 0.52),
+      );
+    }
+    const cone = new LatheGeometry(profile, 96);
+    const pos = cone.attributes.position;
+    for (let n = 0; n < pos.count; n += 1) {
+      const x = pos.getX(n);
+      const z = pos.getZ(n);
+      const up = (pos.getY(n) + 0.18) / 0.52;
+      const ridge = Math.abs(Math.cos(Math.atan2(z, x) * 6)) ** 3;
+      const k = 1 + ridge * 0.22 * Math.max(0, Math.sin(up * Math.PI)) ** 0.6;
+      pos.setXYZ(n, x * k, pos.getY(n), z * k);
+    }
+    cone.computeVertexNormals();
+    const ribs = new Mesh(cone, MATERIALS.reamer());
+    ribs.material.opacity = 0.85;
+    const handle = new Mesh(
+      new TorusGeometry(0.1, 0.03, 12, 32, Math.PI * 1.2),
+      MATERIALS.gold(),
+    );
+    handle.position.set(0.54, -0.16, 0);
+    handle.rotation.set(Math.PI / 2, 0, -Math.PI * 0.6);
+    g.add(dish, pool, ribs, handle);
+    g.rotation.x = 0.35;
     return g;
   },
   cult: () => {

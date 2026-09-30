@@ -11,12 +11,16 @@ export class Modal {
     this.title.id = "modal-title";
     this.card.setAttribute("aria-labelledby", this.title.id);
     this.text = el("p", "modal-text", this.card);
+    this.text.id = "modal-text";
+    this.card.setAttribute("aria-describedby", this.text.id);
     this.actions = el("div", "modal-actions", this.card);
     this.root.addEventListener("click", (e) => {
       if (e.target === this.root) this.close();
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !this.root.hidden) this.close();
+      if (this.root.hidden) return;
+      if (e.key === "Escape") this.close();
+      if (e.key === "Tab") this.trap(e);
     });
     this.queue = [];
   }
@@ -30,6 +34,7 @@ export class Modal {
     this.title.textContent = title;
     this.text.textContent = text;
     this.actions.replaceChildren();
+    let first = null;
     buttons.forEach(({ label, primary, danger, onClick }) => {
       const b = el(
         "button",
@@ -42,6 +47,7 @@ export class Modal {
         this.close();
         onClick?.();
       });
+      if (primary) first = b;
     });
     this.root.hidden = false;
     animate(
@@ -52,7 +58,15 @@ export class Modal {
       ],
       { duration: 260, easing: "cubic-bezier(.2,.9,.3,1.2)" },
     );
-    this.actions.lastElementChild?.focus();
+    (first || this.actions.firstElementChild)?.focus();
+  }
+
+  trap(e) {
+    const buttons = [...this.actions.children];
+    const at = buttons.indexOf(document.activeElement);
+    const step = e.shiftKey ? -1 : 1;
+    e.preventDefault();
+    buttons[(at + step + buttons.length) % buttons.length]?.focus();
   }
 
   close() {

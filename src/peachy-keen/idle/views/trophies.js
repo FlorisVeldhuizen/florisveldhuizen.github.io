@@ -1,5 +1,5 @@
 import { TROPHIES } from "../data/trophies";
-import { el, setText } from "../dom";
+import { el, setText, setDetail, clearOnLeave } from "../dom";
 import { iconSvg } from "../icons";
 
 export class TrophiesView {
@@ -9,6 +9,7 @@ export class TrophiesView {
     this.grid = el("div", "trophies", root);
     this.detail = el("p", "shop-detail", root);
     this.detail.setAttribute("aria-live", "polite");
+    clearOnLeave(this.grid, this.detail);
     this.cells = TROPHIES.map((t) => {
       const b = el("button", "trophy", this.grid, iconSvg(t.icon || "trophy"));
       b.type = "button";
@@ -23,7 +24,7 @@ export class TrophiesView {
 
   show(t) {
     const got = this.game.state.achievements.includes(t.id);
-    setText(this.detail, got ? `${t.name}: ${t.about}` : `Locked: ${t.about}`);
+    setDetail(this.detail, got ? t.name : "Locked", [t.about]);
   }
 
   update() {

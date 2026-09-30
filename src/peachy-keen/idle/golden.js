@@ -89,6 +89,25 @@ export class GoldenPeach {
       e.stopPropagation();
       this.claim();
     });
+    this.hovered = false;
+    this.hover = 0;
+    this.press = 0;
+    this.flash = -1;
+    this.bounce = 9;
+    const setHover = (on) => {
+      if (on && !this.hovered && this.live) {
+        playNotes([1568, 2093], { gap: 0.05, length: 0.3, volume: 0.03 });
+        this.bounce = 0;
+      }
+      this.hovered = on;
+    };
+    this.el.addEventListener("pointerenter", () => setHover(true));
+    this.el.addEventListener("pointerleave", () => setHover(false));
+    this.el.addEventListener("focus", () => setHover(true));
+    this.el.addEventListener("blur", () => setHover(false));
+    this.el.addEventListener("pointerdown", () => {
+      this.press = 1;
+    });
     game.on("summon", () => this.spawn());
   }
 
@@ -137,6 +156,13 @@ export class GoldenPeach {
     if (!this.live) return;
     const { x, y } = this.position();
     this.despawn();
+    this.flash = 0;
+    this.holder.visible = true;
+    this.gold.visible = false;
+    this.twinkles.forEach((s) => {
+      // eslint-disable-next-line no-param-reassign
+      s.visible = false;
+    });
     const result = this.game.golden();
     let text = "";
     if (result.effect === "lucky") text = `+${format(result.value)} juice`;
@@ -180,6 +206,9 @@ export class GoldenPeach {
     this.live = null;
     this.el.hidden = true;
     this.holder.visible = false;
+    this.hovered = false;
+    this.hover = 0;
+    this.press = 0;
     const m = this.game.model;
     this.timer = rand(EVERY) / m.goldenRate;
   }
@@ -205,8 +234,27 @@ export class GoldenPeach {
     });
   }
 
+  updateFlash(delta) {
+    this.flash += delta;
+    const k = this.flash / 0.5;
+    if (k >= 1) {
+      this.flash = -1;
+      this.holder.visible = false;
+      this.gold.visible = true;
+      this.twinkles.forEach((s) => {
+        // eslint-disable-next-line no-param-reassign
+        s.visible = true;
+      });
+      this.glow.scale.setScalar(1.3);
+      return;
+    }
+    this.glow.scale.setScalar(3 + k * 9);
+    this.glow.material.opacity = 1 - k;
+  }
+
   update(delta) {
     this.fadeTrail(delta);
+    if (this.flash >= 0) this.updateFlash(delta);
     if (!this.live) {
       if (this.game.model.noGolden) return;
       this.timer -= delta;
@@ -231,14 +279,26 @@ export class GoldenPeach {
     const h = this.holder;
     h.visible = Boolean(this.gold);
     h.position.copy(this.at);
-    const pop = fade * (1 + Math.sin(g.age * 3) * 0.03);
-    h.scale.setScalar(SIZE * Math.max(0.001, pop));
     const motion = reducedMotion.matches ? 0 : 1;
+    this.hover +=
+      ((this.hovered ? 1 : 0) - this.hover) * (1 - Math.exp(-delta * 12));
+    this.press *= Math.exp(-delta * 9);
+    this.bounce += delta;
+    const wobble =
+      Math.sin(this.bounce * 22) * Math.exp(-this.bounce * 5) * 0.14;
+    const pop =
+      fade *
+      (1 + Math.sin(g.age * 3) * 0.03) *
+      (1 + (this.hover * 0.15 + wobble - this.press * 0.2) * motion);
+    h.scale.setScalar(SIZE * Math.max(0.001, pop));
     h.rotation.set(
       Math.sin(g.age * 0.8) * 0.2 * motion,
-      Math.sin(g.age * 0.9) * 0.45 * motion,
+      (Math.sin(g.age * 0.9) * 0.45 + Math.sin(g.age * 7) * 0.2 * this.hover) *
+        motion,
       Math.sin(g.age * 1.6) * 0.15 * motion,
     );
+    this.gold.material.emissiveIntensity =
+      1 + this.hover * 3.5 + this.press * 3;
     this.glow.material.opacity = 0.35 + Math.sin(g.age * 4) * 0.1;
     this.trailTimer -= delta;
     if (this.trailTimer <= 0 && fade > 0.5) {

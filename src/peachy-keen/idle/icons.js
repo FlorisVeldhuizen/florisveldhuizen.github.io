@@ -1,4 +1,5 @@
 import { HELPERS } from "./data/helpers";
+import { TOYS } from "./data/toys";
 
 const PATHS = {
   hand: "M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V5.5a1.5 1.5 0 0 1 3 0V13M17 13v-1.5a1.5 1.5 0 0 1 3 0V15a7 7 0 0 1-7 7h-1a7 7 0 0 1-5.6-2.8L4 16a1.5 1.5 0 0 1 2.4-1.8L8 16",
@@ -19,32 +20,14 @@ const PATHS = {
   lock: "M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z",
   close: "M6 6l12 12M18 6L6 18",
   seed: "M12 21V11M12 11c0-4 3-7 7-7 0 4-3 7-7 7zM12 14c0-3-2.5-5-6-5 0 3 2.5 5 6 5z",
+  tag: "M3 12V4h8l10 10-8 8zM7.5 7.5h.01",
+  bell: "M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4",
+  chevron: "M15 5l-7 7 7 7",
 };
 
-HELPERS.forEach((h) => {
-  PATHS[h.id] = h.icon;
+[...HELPERS, ...TOYS].forEach((item) => {
+  PATHS[item.id] = item.icon;
 });
-
-let thumbs = {};
-let style = "room";
-
-export function setThumbnails(map) {
-  thumbs = map;
-}
-
-export function setIconStyle(name) {
-  style = name;
-}
-
-export function iconKey() {
-  return `${style}${Object.keys(thumbs).length}`;
-}
-
-export function rowIcon(name) {
-  if (style === "props" && thumbs[name])
-    return `<img class="thumb" src="${thumbs[name]}" alt="" width="46" height="46">`;
-  return iconSvg(name);
-}
 
 export function iconSvg(name, className = "icon") {
   const d = PATHS[name] || PATHS.juice;

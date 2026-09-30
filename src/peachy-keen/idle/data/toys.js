@@ -3,13 +3,26 @@ export const TOYS = [
     id: "talk",
     name: "Sweet talk",
     about:
-      "The peach starts talking back. All juice +5% while the peach is chatty.",
+      "The peach starts talking back, cheeky and bold. All juice +5% while the peach is chatty.",
     cost: 500,
     setting: "talk",
     on: "cheeky",
     off: "off",
-    values: ["cheeky", "shy"],
+    values: ["cheeky"],
     unlock: (s) => s.stats.smacks >= 25,
+    effects: [{ kind: "global", mult: 1.05 }],
+  },
+  {
+    id: "shy",
+    name: "Bashful whispers",
+    about:
+      "A softer, blushing voice for the peach. All juice +5% while the peach is chatty.",
+    cost: 5000,
+    setting: "talk",
+    on: "shy",
+    off: "off",
+    values: ["shy"],
+    unlock: (s) => s.toys.includes("talk"),
     effects: [{ kind: "global", mult: 1.05 }],
   },
   {
@@ -27,6 +40,7 @@ export const TOYS = [
   {
     id: "lingerie",
     name: "Lingerie drawer",
+    icon: "M12 12 4 7v10zM12 12l8-5v10zM12 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3",
     about:
       "Dress the peach up, then pull it down. Smacks +25% while it's worn.",
     cost: 2.5e4,
@@ -40,6 +54,7 @@ export const TOYS = [
   {
     id: "mood",
     name: "Candlelight",
+    icon: "M10 11h4v10h-4zM12 11V9M12 3c1.6 2 2 3.4 0 5.4-2-2-1.6-3.4 0-5.4z",
     about: "Dim the lights. The heat bonus is 50% stronger while it's on.",
     cost: 1e5,
     setting: "moodLight",
@@ -64,6 +79,7 @@ export const TOYS = [
   {
     id: "edging",
     name: "Tantric patience",
+    icon: "M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9",
     about:
       "The peach holds back three times before it bursts. Held-back bursts pay three times as much.",
     cost: 1e7,
@@ -77,6 +93,7 @@ export const TOYS = [
   {
     id: "disco",
     name: "Disco ball",
+    icon: "M12 1v3M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zM4 12h16M12 4c-3 3-3 13 0 16M12 4c3 3 3 13 0 16M5.5 8h13M5.5 16h13",
     about: "Put on some music. Your helpers dance and earn 15% more.",
     cost: 1e8,
     setting: "disco",

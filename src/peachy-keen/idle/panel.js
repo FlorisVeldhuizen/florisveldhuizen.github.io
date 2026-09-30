@@ -20,6 +20,8 @@ const TABS = [
 
 const REFRESH = 0.2;
 const TAB_KEY = "peachy-keen-tab";
+const OPEN_KEY = "peachy-keen-shop-open";
+const WIDE = window.matchMedia("(min-width: 900px)");
 
 export class Panel {
   constructor(game, orchard, settings, modal) {
@@ -33,6 +35,8 @@ export class Panel {
     this.body = el("div", "panel-body", this.root);
     this.sections = {};
     this.buttons = {};
+    this.scrolls = {};
+    this.tabs.addEventListener("keydown", (e) => this.moveTab(e));
     TABS.forEach(([id, label, icon]) => {
       const b = el(
         "button",
@@ -42,6 +46,8 @@ export class Panel {
       );
       b.type = "button";
       b.setAttribute("role", "tab");
+      b.setAttribute("aria-label", label);
+      b.title = label;
       b.id = `tab-${id}`;
       b.addEventListener("click", () => this.show(id, true));
       this.buttons[id] = b;
@@ -63,7 +69,16 @@ export class Panel {
     };
     this.settings = settings;
     this.timer = 0;
-    this.open = window.matchMedia("(min-width: 900px)").matches;
+    this.open = WIDE.matches;
+    try {
+      if (this.open) this.open = localStorage.getItem(OPEN_KEY) !== "0";
+    } catch {
+      // The shop then starts open.
+    }
+    this.handle.insertAdjacentHTML(
+      "beforeend",
+      iconSvg("chevron", "icon panel-chevron"),
+    );
     this.handle.addEventListener("click", () => this.setOpen(!this.open));
     let saved = "helpers";
     try {
@@ -90,19 +105,44 @@ export class Panel {
     this.root.classList.toggle("is-open", open);
     document.body.classList.toggle("is-shopping", open);
     this.handle.setAttribute("aria-expanded", String(open));
-    setText(
-      this.handle.querySelector("span"),
-      open ? "Hide the shop" : "Open the shop",
+    const label = open ? "Hide the shop" : "Open the shop";
+    setText(this.handle.querySelector("span"), label);
+    this.handle.title = label;
+    if (!WIDE.matches) return;
+    try {
+      localStorage.setItem(OPEN_KEY, open ? "1" : "0");
+    } catch {
+      // The shop then opens again on the next visit.
+    }
+  }
+
+  moveTab(e) {
+    const shown = TABS.map(([id]) => id).filter(
+      (id) => !this.buttons[id].hidden,
     );
+    const at = shown.indexOf(this.current);
+    const next = {
+      ArrowLeft: shown[(at - 1 + shown.length) % shown.length],
+      ArrowRight: shown[(at + 1) % shown.length],
+      Home: shown[0],
+      End: shown[shown.length - 1],
+    }[e.key];
+    if (!next) return;
+    e.preventDefault();
+    this.show(next, true);
+    this.buttons[next].focus();
   }
 
   show(id, fromTap = false) {
+    if (this.current) this.scrolls[this.current] = this.body.scrollTop;
     this.current = id;
     Object.entries(this.sections).forEach(([key, section]) => {
       // eslint-disable-next-line no-param-reassign
       section.hidden = key !== id;
       this.buttons[key].setAttribute("aria-selected", String(key === id));
+      this.buttons[key].tabIndex = key === id ? 0 : -1;
     });
+    this.body.scrollTop = this.scrolls[id] || 0;
     this.settings.visible = id === "options";
     if (fromTap && !this.open) this.setOpen(true);
     try {
