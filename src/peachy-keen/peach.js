@@ -1952,6 +1952,7 @@ export class Peach {
     m.roughness = 1 - 0.55 * shine;
     m.clearcoat = 0.001 + shine * 0.6;
     m.clearcoatRoughness = 1 - 0.85 * shine;
+    m.clearcoatNormalScale.setScalar(0.04 + 0.4 * shine);
     this.uniforms.uEnvSpecular.value = 1 - 0.7 * shine;
     m.color.copy(this.skinTint).lerp(this.wetTint, shine * 0.12);
   }
