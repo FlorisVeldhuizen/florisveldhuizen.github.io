@@ -120,7 +120,7 @@ export class GoldenPeach {
         roughness: 0.2,
         clearcoat: 0.6,
         envMapIntensity: 1.6,
-        emissive: new Color(0x5a3000),
+        emissive: new Color(0x6b3a1c),
       }),
     );
     mesh.matrixAutoUpdate = false;
@@ -332,8 +332,10 @@ export class GoldenPeach {
         motion,
       Math.sin(g.age * 1.6) * 0.15 * motion,
     );
-    this.gold.material.emissiveIntensity =
-      1 + this.hover * 3.5 + this.press * 3;
+    const { material } = this.gold;
+    material.emissiveIntensity = 0.6 + this.hover * 2.2 + this.press * 2;
+    material.envMapIntensity = 1.6 + this.hover * 0.8;
+    material.roughness = 0.2 - this.hover * 0.08;
     this.glow.material.opacity = 0.35 + Math.sin(g.age * 4) * 0.1;
     this.trailTimer -= delta;
     const s = this.trailTimer <= 0 && fade > 0.5 && this.emit(0.12, 0.9, 0, 0);
