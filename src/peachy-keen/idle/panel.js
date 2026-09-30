@@ -1,4 +1,4 @@
-import { el, setText } from "./dom";
+import { el, setText, animate } from "./dom";
 import { iconSvg } from "./icons";
 import { HelpersView } from "./views/helpers";
 import { UpgradesView } from "./views/upgrades";
@@ -17,6 +17,75 @@ const TABS = [
   ["stats", "Stats", "juice"],
   ["options", "Options", "blush"],
 ];
+
+const swing = (origin, ...turns) =>
+  [0, ...turns, 0].map((deg) => ({
+    transform: `rotate(${deg}deg)`,
+    transformOrigin: origin,
+  }));
+
+const MOTIONS = {
+  hand: swing("50% 90%", -16, 12, -8, 4),
+  trophy: swing("50% 95%", 10, -8, 4),
+  recipe: [
+    { transform: "none" },
+    { transform: "translateY(-5px) scale(0.94, 1.08)" },
+    { transform: "translateY(0) scale(1.1, 0.9)" },
+    { transform: "translateY(-1.5px)" },
+    { transform: "none" },
+  ],
+  blush: [
+    { transform: "none" },
+    { transform: "scale(1.22)" },
+    { transform: "scale(0.96)" },
+    { transform: "scale(1.12)" },
+    { transform: "none" },
+  ],
+};
+
+const GROW = "cubic-bezier(0.33, 0, 0.2, 1)";
+
+function draw(path, duration, delay = 0) {
+  path.setAttribute("pathLength", "1");
+  animate(
+    path,
+    [
+      { strokeDasharray: "1 1", strokeDashoffset: 1 },
+      { strokeDasharray: "1 1", strokeDashoffset: 0 },
+    ],
+    { duration, delay, easing: GROW, fill: "backwards" },
+  );
+}
+
+function unfurl(path, origin, turn, delay) {
+  animate(
+    path,
+    [
+      { transform: `scale(0.2) rotate(${turn}deg)`, transformOrigin: origin },
+      { transform: "none", transformOrigin: origin },
+    ],
+    { duration: 700, delay, easing: GROW, fill: "backwards" },
+  );
+}
+
+function growPlant(icon) {
+  if (!icon.dataset.split) {
+    const d = icon.querySelector("path").getAttribute("d");
+    // eslint-disable-next-line no-param-reassign
+    icon.innerHTML = d
+      .split(/(?=M)/)
+      .map((part) => `<path d="${part}"/>`)
+      .join("");
+    // eslint-disable-next-line no-param-reassign
+    icon.dataset.split = "1";
+  }
+  const [stem, top, side] = icon.querySelectorAll("path");
+  draw(stem, 800);
+  draw(side, 700, 480);
+  unfurl(side, "12px 14px", 25, 480);
+  draw(top, 700, 720);
+  unfurl(top, "12px 11px", -25, 720);
+}
 
 const REFRESH = 0.2;
 const TAB_KEY = "peachy-keen-tab";
@@ -152,11 +221,8 @@ export class Panel {
   }
 
   show(id, fromTap = false) {
-    if (fromTap && WIDE.matches && this.open && id === this.current) {
-      this.setOpen(false);
-      return;
-    }
     if (this.current) this.scrolls[this.current] = this.body.scrollTop;
+    if (this.current && id !== this.current) this.celebrate(id);
     this.current = id;
     Object.entries(this.sections).forEach(([key, section]) => {
       // eslint-disable-next-line no-param-reassign
@@ -174,6 +240,21 @@ export class Panel {
       // Tab choice then lasts for this visit only.
     }
     this.timer = 0;
+  }
+
+  celebrate(id) {
+    const icon = this.buttons[id].querySelector(".icon");
+    const name = TABS.find(([key]) => key === id)[2];
+    const motion = MOTIONS[name];
+    if (motion) {
+      animate(icon, motion, {
+        duration: 560,
+        easing: "cubic-bezier(0.3, 0.7, 0.3, 1)",
+      });
+      return;
+    }
+    if (name === "seed") growPlant(icon);
+    else draw(icon.querySelector("path"), 720);
   }
 
   update(delta) {
