@@ -2,6 +2,7 @@ import {
   AdditiveBlending,
   Color,
   Group,
+  Matrix3,
   Matrix4,
   Mesh,
   MeshPhysicalMaterial,
@@ -12,8 +13,8 @@ import {
   Vector2,
   Vector3,
 } from "three";
-import { el, animate } from "./dom";
-import { softTexture, twinkleTexture } from "./scenery/shapes";
+import { el } from "./dom";
+import { ringTexture, softTexture, twinkleTexture } from "./scenery/shapes";
 import { format } from "./numbers";
 import { playNotes } from "../audio";
 import { reducedMotion } from "../util";
@@ -24,8 +25,18 @@ const PEACH_RADIUS = 1.7;
 const SIZE = 0.2;
 const FIRST = [45, 90];
 const EVERY = [90, 240];
+const FLASH = 0.6;
+const SPARKS = 12;
 
 const rand = ([lo, hi]) => lo + Math.random() * (hi - lo);
+const additive = (map, extra) =>
+  new SpriteMaterial({
+    map,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    ...extra,
+  });
 
 export class GoldenPeach {
   constructor(game, layout, popups, scene, camera, interaction) {
@@ -35,43 +46,29 @@ export class GoldenPeach {
     this.holder = new Group();
     this.holder.visible = false;
     scene.add(this.holder);
+    this.spin = new Group();
+    this.holder.add(this.spin);
     this.glow = new Sprite(
-      new SpriteMaterial({
-        map: softTexture(),
-        color: 0xffc050,
-        blending: AdditiveBlending,
-        depthWrite: false,
-        transparent: true,
-        opacity: 0.45,
-      }),
+      additive(softTexture(), { color: 0xffc050, opacity: 0.45 }),
     );
     this.glow.scale.setScalar(1.3);
     this.holder.add(this.glow);
+    this.ring = new Sprite(additive(ringTexture(), { color: 0xffd27a }));
+    this.ring.visible = false;
+    this.holder.add(this.ring);
     const twinkle = twinkleTexture();
-    this.twinkles = Array.from({ length: 3 }, () => {
-      const s = new Sprite(
-        new SpriteMaterial({
-          map: twinkle,
-          blending: AdditiveBlending,
-          depthWrite: false,
-          transparent: true,
-        }),
-      );
-      this.holder.add(s);
+    this.spots = [];
+    this.glints = Array.from({ length: 3 }, (_, n) => {
+      const s = new Sprite(additive(twinkle, { depthTest: false, opacity: 0 }));
+      s.renderOrder = 2;
+      s.userData = { age: -n * 0.35, life: 0 };
+      this.spin.add(s);
       return s;
     });
-    this.trail = Array.from({ length: 12 }, () => {
-      const s = new Sprite(
-        new SpriteMaterial({
-          map: twinkle,
-          color: 0xffe0a0,
-          blending: AdditiveBlending,
-          depthWrite: false,
-          transparent: true,
-          opacity: 0,
-        }),
-      );
-      s.userData.age = 9;
+    this.dust = Array.from({ length: 12 + SPARKS }, () => {
+      const s = new Sprite(additive(twinkle, { color: 0xffe0a0, opacity: 0 }));
+      s.userData = { age: 9, life: 1, size: 0.12, drag: 0, fall: 0 };
+      s.userData.v = new Vector3();
       scene.add(s);
       return s;
     });
@@ -131,7 +128,20 @@ export class GoldenPeach {
       .copy(new Matrix4().copy(this.i.group.matrixWorld).invert())
       .multiply(source.matrixWorld);
     this.gold = mesh;
-    this.holder.add(mesh);
+    this.spin.add(mesh);
+    const { position, normal } = source.geometry.attributes;
+    const turn = new Matrix3().getNormalMatrix(mesh.matrix);
+    const facing = new Vector3();
+    for (let n = 0; n < 4000 && this.spots.length < 300; n += 1) {
+      const at = Math.floor(Math.random() * position.count);
+      facing.fromBufferAttribute(normal, at).applyMatrix3(turn).normalize();
+      if (facing.z > 0.6)
+        this.spots.push(
+          new Vector3()
+            .fromBufferAttribute(position, at)
+            .applyMatrix4(mesh.matrix),
+        );
+    }
     return this.holder;
   }
 
@@ -155,11 +165,11 @@ export class GoldenPeach {
   claim() {
     if (!this.live) return;
     const { x, y } = this.position();
+    this.burst();
     this.despawn();
     this.flash = 0;
     this.holder.visible = true;
-    this.gold.visible = false;
-    this.twinkles.forEach((s) => {
+    this.glints.forEach((s) => {
       // eslint-disable-next-line no-param-reassign
       s.visible = false;
     });
@@ -174,31 +184,28 @@ export class GoldenPeach {
     else if (result.effect === "showcase") text = "One helper goes wild";
     this.popups.big(x, y, result.title, text);
     playNotes([784, 988, 1175, 1568], { gap: 0.06, length: 0.5, volume: 0.07 });
-    this.sparkle(x, y);
   }
 
-  sparkle(x, y) {
+  emit(size, life, drag, fall) {
+    const s = this.dust.find((item) => item.userData.age > item.userData.life);
+    if (s) Object.assign(s.userData, { age: 0, size, life, drag, fall });
+    return s;
+  }
+
+  burst() {
     if (reducedMotion.matches) return;
-    for (let n = 0; n < 14; n += 1) {
-      const dot = el("i", "sparkle", this.popups.layer);
-      dot.style.left = `${x}px`;
-      dot.style.top = `${y}px`;
-      const a = (n / 14) * Math.PI * 2;
-      const d = 50 + Math.random() * 60;
-      animate(
-        dot,
-        [
-          { opacity: 1, transform: "translate(-50%, -50%) scale(1)" },
-          {
-            opacity: 0,
-            transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(0.3)`,
-          },
-        ],
-        {
-          duration: 700 + Math.random() * 300,
-          easing: "cubic-bezier(.1,.7,.3,1)",
-        },
-      ).finished.then(() => dot.remove());
+    const h = this.holder;
+    for (let n = 0; n < SPARKS; n += 1) {
+      const s = this.emit(0.26, 0.7 + Math.random() * 0.3, 3, 0.8);
+      if (!s) return;
+      const a = ((n + Math.random() * 0.6) / SPARKS) * Math.PI * 2;
+      const speed = 1.4 + Math.random();
+      s.userData.v.set(Math.cos(a) * speed, Math.sin(a) * speed, 0);
+      s.position
+        .copy(s.userData.v)
+        .multiplyScalar(0.12)
+        .add(h.position)
+        .setZ(h.position.z + h.scale.x * PEACH_RADIUS);
     }
   }
 
@@ -222,38 +229,66 @@ export class GoldenPeach {
     };
   }
 
-  fadeTrail(delta) {
-    this.trail.forEach((s) => {
+  fadeDust(delta) {
+    this.dust.forEach((s) => {
+      const d = s.userData;
+      d.age += delta;
+      const k = Math.min(1, d.age / d.life);
       // eslint-disable-next-line no-param-reassign
-      s.userData.age += delta;
-      const k = s.userData.age / 0.9;
+      s.material.opacity = (1 - k) * 0.85;
+      s.scale.setScalar(d.size * (1 - k * 0.5));
+      d.v.multiplyScalar(Math.exp(-delta * d.drag));
+      d.v.y -= delta * d.fall;
+      s.position.addScaledVector(d.v, delta);
+    });
+  }
+
+  updateGlints(delta, fade) {
+    this.glints.forEach((s) => {
+      const d = s.userData;
+      d.age += delta;
+      if (d.age >= d.life) {
+        d.age = 0;
+        d.life = 0.5 + Math.random() * 0.5;
+        s.position.copy(
+          this.spots[Math.floor(Math.random() * this.spots.length)],
+        );
+      }
+      const k = d.age > 0 ? Math.sin((d.age / d.life) * Math.PI) : 0;
+      s.scale.setScalar(0.3 + k * 1.1);
       // eslint-disable-next-line no-param-reassign
-      s.material.opacity = k < 1 ? (1 - k) * 0.8 : 0;
-      s.scale.setScalar(0.12 + (1 - Math.min(1, k)) * 0.12);
-      s.position.y -= delta * 0.15;
+      s.material.opacity = k * fade;
     });
   }
 
   updateFlash(delta) {
     this.flash += delta;
-    const k = this.flash / 0.5;
-    if (k >= 1) {
+    const t = this.flash;
+    if (t >= FLASH) {
       this.flash = -1;
       this.holder.visible = false;
-      this.gold.visible = true;
-      this.twinkles.forEach((s) => {
+      this.ring.visible = false;
+      this.spin.scale.setScalar(1);
+      this.glints.forEach((s) => {
         // eslint-disable-next-line no-param-reassign
         s.visible = true;
       });
       this.glow.scale.setScalar(1.3);
       return;
     }
-    this.glow.scale.setScalar(3 + k * 9);
-    this.glow.material.opacity = 1 - k;
+    const pop = t < 0.08 ? 1 + (t / 0.08) * 0.3 : 1.3 * (1 - (t - 0.08) / 0.18);
+    this.spin.scale.setScalar(Math.max(0.001, pop));
+    this.gold.material.emissiveIntensity = 6;
+    const out = 1 - (1 - t / FLASH) ** 3;
+    this.glow.scale.setScalar(2 + out * 4);
+    this.glow.material.opacity = Math.max(0, 1 - t / 0.3) ** 2;
+    this.ring.visible = true;
+    this.ring.scale.setScalar(2 + out * 12);
+    this.ring.material.opacity = (1 - t / FLASH) ** 1.5 * 0.9;
   }
 
   update(delta) {
-    this.fadeTrail(delta);
+    this.fadeDust(delta);
     if (this.flash >= 0) this.updateFlash(delta);
     if (!this.live) {
       if (this.game.model.noGolden) return;
@@ -291,7 +326,7 @@ export class GoldenPeach {
       (1 + Math.sin(g.age * 3) * 0.03) *
       (1 + (this.hover * 0.15 + wobble - this.press * 0.2) * motion);
     h.scale.setScalar(SIZE * Math.max(0.001, pop));
-    h.rotation.set(
+    this.spin.rotation.set(
       Math.sin(g.age * 0.8) * 0.2 * motion,
       (Math.sin(g.age * 0.9) * 0.45 + Math.sin(g.age * 7) * 0.2 * this.hover) *
         motion,
@@ -301,38 +336,23 @@ export class GoldenPeach {
       1 + this.hover * 3.5 + this.press * 3;
     this.glow.material.opacity = 0.35 + Math.sin(g.age * 4) * 0.1;
     this.trailTimer -= delta;
-    if (this.trailTimer <= 0 && fade > 0.5) {
+    const s = this.trailTimer <= 0 && fade > 0.5 && this.emit(0.2, 0.9, 0, 0);
+    if (s) {
       this.trailTimer = 0.09;
-      const s = this.trail.find((item) => item.userData.age > 0.9);
-      if (s) {
-        s.userData.age = 0;
-        s.position
-          .copy(h.position)
-          .add(
-            this.at.set(
-              (Math.random() - 0.5) * 0.3,
-              (Math.random() - 0.5) * 0.3,
-              -0.1,
-            ),
-          );
-      }
+      const a = Math.random() * Math.PI * 2;
+      const r = h.scale.x * PEACH_RADIUS * (0.6 + Math.random() * 0.4);
+      s.userData.v.set(0, -0.15, 0);
+      s.position.set(
+        h.position.x + Math.cos(a) * r,
+        h.position.y + Math.sin(a) * r,
+        h.position.z + h.scale.x * PEACH_RADIUS,
+      );
     }
     this.chimeTimer -= delta;
     if (this.chimeTimer <= 0) {
       this.chimeTimer = 3.5;
       playNotes([2093, 2637], { gap: 0.09, length: 0.5, volume: 0.018 });
     }
-    this.twinkles.forEach((s, n) => {
-      const a = g.age * (1.2 + n * 0.4) + (n * Math.PI * 2) / 3;
-      s.position.set(
-        Math.cos(a) * 2.4,
-        Math.sin(a * 1.3) * 2.2,
-        Math.sin(a) * 2.4,
-      );
-      const k = Math.abs(Math.sin(g.age * 2.2 + n * 1.7));
-      s.scale.setScalar(0.4 + k * 0.9);
-      // eslint-disable-next-line no-param-reassign
-      s.material.opacity = k;
-    });
+    this.updateGlints(delta, fade);
   }
 }

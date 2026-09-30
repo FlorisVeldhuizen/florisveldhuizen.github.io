@@ -12,6 +12,7 @@ import { showHarvests } from "./harvest";
 import { Layout } from "./layout";
 import { applySkin } from "./skins";
 import { Toys } from "./toys";
+import { preparePage } from "./page";
 import { HELPERS } from "./data/helpers";
 import { format, formatTime } from "./numbers";
 import { playDing, playBuy, playNotes } from "../audio";
@@ -35,6 +36,9 @@ export function createIdle({
   backdrop,
   mood,
 }) {
+  preparePage();
+  interaction.ui.scoreboard = false;
+  settings.useStore("peachy-keen-idle-settings");
   const game = new IdleGame(interaction);
   game.buzzer = buzzer;
   const orchard = new Orchard(game);

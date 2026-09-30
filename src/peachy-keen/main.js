@@ -14,11 +14,73 @@ import { Wild } from "./wild";
 import { Shock } from "./shock";
 import { unlockAudio, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
-import { createIdle } from "./idle";
+
+const MODE_KEY = "peachy-keen-mode";
+const MODES = ["classic", "idle"];
+const SWITCH_KEY = "peachy-keen-switching";
 
 const intro = document.getElementById("intro");
 const introTitle = document.getElementById("intro-title");
 const introStatus = document.getElementById("intro-status");
+const modeButtons = [...document.querySelectorAll("[data-mode]")];
+
+function readMode() {
+  const asked = new URLSearchParams(window.location.search).get("mode");
+  if (MODES.includes(asked)) return asked;
+  try {
+    const saved = localStorage.getItem(MODE_KEY);
+    if (MODES.includes(saved)) return saved;
+  } catch {
+    // Blocked storage falls back to the classic game.
+  }
+  return "classic";
+}
+
+function saveMode(value) {
+  try {
+    localStorage.setItem(MODE_KEY, value);
+  } catch {
+    // The mode is then picked again on the next visit.
+  }
+}
+
+function takeSwitch() {
+  try {
+    const switching = sessionStorage.getItem(SWITCH_KEY) === "1";
+    sessionStorage.removeItem(SWITCH_KEY);
+    return switching;
+  } catch {
+    return false;
+  }
+}
+
+let mode = readMode();
+let started = false;
+const switching = takeSwitch();
+const showMode = () =>
+  modeButtons.forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.mode === mode)),
+  );
+modeButtons.forEach((b) =>
+  b.addEventListener("click", () => {
+    if (!started) {
+      mode = b.dataset.mode;
+      showMode();
+    } else if (b.dataset.mode !== mode) {
+      saveMode(b.dataset.mode);
+      try {
+        sessionStorage.setItem(SWITCH_KEY, "1");
+      } catch {
+        // Without session storage the start screen shows after the switch.
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete("mode");
+      window.history.replaceState(null, "", url);
+      window.location.reload();
+    }
+  }),
+);
+showMode();
 
 const { scene, camera, renderer, lights } = initScene();
 const quality = new QualityGovernor(renderer);
@@ -74,34 +136,13 @@ const naughty = new Naughty(interaction, talk);
 const wild = new Wild({ scene, camera, interaction, talk, backdrop });
 const shock = new Shock(renderer, interaction);
 settings.applyAll();
-naughty.set("achievements", false);
-const idle = createIdle({
-  interaction,
-  peach,
-  camera,
-  settings,
-  talk,
-  buzzer: wild.buzzer,
-  scene,
-  renderer,
-  backdrop,
-  mood,
-});
+let idle = null;
 
 function setProgress(fraction) {
   introTitle.style.setProperty("--progress", `${Math.round(fraction * 100)}%`);
 }
 
-peach.load(setProgress).then(async () => {
-  setProgress(1);
-  group.visible = true;
-  const warmups = [
-    ...interaction.prepareHalves(),
-    ...wild.warmups(),
-    ...idle.warmups(),
-    juice.mesh,
-    droplets.mesh,
-  ];
+async function warm(warmups) {
   const showWarmups = (visible) => {
     group.visible = visible;
     warmups.forEach((h) => {
@@ -130,21 +171,64 @@ peach.load(setProgress).then(async () => {
   renderer.render(scene, camera);
   camera.layers.disable(JUICE_LAYER);
   showWarmups(false);
-  juice.clear();
+}
+
+async function startIdle() {
+  introStatus.textContent = "Opening the shop";
+  const { createIdle } = await import("./idle");
+  idle = createIdle({
+    interaction,
+    peach,
+    camera,
+    settings,
+    talk,
+    buzzer: wild.buzzer,
+    scene,
+    renderer,
+    backdrop,
+    mood,
+  });
+  naughty.set("achievements", false);
+  await warm(idle.warmups());
   idle.ready();
+}
+
+peach.load(setProgress).then(async () => {
+  setProgress(1);
+  await warm([
+    ...interaction.prepareHalves(),
+    ...wild.warmups(),
+    juice.mesh,
+    droplets.mesh,
+  ]);
+  juice.clear();
   loadSounds();
+
+  const start = async () => {
+    started = true;
+    intro.classList.remove("is-ready");
+    saveMode(mode);
+    if (mode === "idle") await startIdle();
+    interaction.requestShake();
+    intro.classList.add("is-leaving");
+    setTimeout(() => intro.remove(), 700);
+    interaction.begin();
+    idle?.begin();
+  };
+
+  if (switching) {
+    // Browsers only allow sound after a gesture, so it waits for the first press.
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
+    start();
+    return;
+  }
   introStatus.textContent = "Click anywhere to begin. Sound on.";
   intro.classList.add("is-ready");
-
   intro.addEventListener(
     "click",
     () => {
       unlockAudio();
-      interaction.requestShake();
-      intro.classList.add("is-leaving");
-      setTimeout(() => intro.remove(), 700);
-      interaction.begin();
-      idle.begin();
+      start();
     },
     { once: true },
   );
@@ -186,7 +270,7 @@ renderer.setAnimationLoop(() => {
   const delta = realDelta * interaction.timeScale(realDelta);
   interaction.update(delta);
   naughty.update(delta);
-  idle.update(realDelta);
+  idle?.update(realDelta);
   wild.update(delta, realDelta);
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);
@@ -201,6 +285,6 @@ renderer.setAnimationLoop(() => {
   lens.update(delta);
   shock.update(realDelta);
   backdrop.render();
-  lens.render([juice, droplets, idle.room]);
+  lens.render(idle ? [juice, droplets, idle.room] : [juice, droplets]);
   shock.render();
 });

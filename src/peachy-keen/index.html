@@ -16,16 +16,13 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1&display=swap"
     />
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="idle/idle.css" />
   </head>
   <body>
     <section class="score">
       <p class="score-count">
-        <span id="count">0</span> <span id="count-unit">juice</span>
+        <span id="count">0</span> <span id="count-unit">smacks</span>
       </p>
-      <p id="rate" class="score-rate">0 per second</p>
-      <p id="pits" class="score-pits" hidden></p>
-      <p id="dare" class="score-dare" hidden></p>
+      <p id="bursts" aria-live="polite" hidden></p>
       <div id="meters" class="meters">
         <div class="meter">
           <span>Heat</span>
@@ -40,10 +37,7 @@
           ></span>
         </div>
       </div>
-      <div id="buffs" class="buffs"></div>
     </section>
-
-    <p id="ticker" class="ticker"></p>
 
     <footer class="hints">
       <p id="hint-swipe">Swipe across the peach to smack it.</p>
@@ -51,11 +45,15 @@
       <p id="hint-rub">Carry the bottle over to oil it up.</p>
     </footer>
 
-    <aside id="panel" class="ui panel" aria-label="Shop">
-      <button id="panel-handle" type="button" class="panel-handle" aria-expanded="false">
-        <span>Open the shop</span>
-      </button>
-      <div id="settings" class="settings">
+    <div class="ui settings-dock">
+      <div id="settings" class="settings" hidden>
+        <div class="settings-row">
+          <span>Game mode</span>
+          <span class="segmented" role="group" aria-label="Game mode">
+            <button type="button" data-mode="classic">Classic</button>
+            <button type="button" data-mode="idle">Idle</button>
+          </span>
+        </div>
         <div class="settings-row">
           <span>Firmness</span>
           <span class="segmented" role="group" aria-label="Firmness">
@@ -89,6 +87,12 @@
         <p class="settings-row">
           <span>Tease when ignored</span>
           <button type="button" class="switch" data-setting="tease">On</button>
+        </p>
+        <p class="settings-row">
+          <span>Achievements</span>
+          <button type="button" class="switch" data-setting="achievements">
+            Off
+          </button>
         </p>
         <p class="settings-row">
           <span>Mood lighting</span>
@@ -170,7 +174,16 @@
         </div>
         <p id="fps" class="settings-fps"></p>
       </div>
-    </aside>
+      <button
+        id="settings-toggle"
+        type="button"
+        class="settings-toggle"
+        aria-expanded="false"
+        aria-controls="settings"
+      >
+        Settings
+      </button>
+    </div>
 
     <div id="vignette" class="vignette" aria-hidden="true"></div>
     <p id="talk" class="talk" aria-live="polite"></p>
@@ -188,6 +201,10 @@
     <div id="intro" class="ui intro">
       <h1 id="intro-title" class="intro-title">Peachy Keen</h1>
       <p id="intro-status" class="intro-status">Loading the peach</p>
+      <p class="segmented intro-modes" role="group" aria-label="Game mode">
+        <button type="button" data-mode="classic">Classic</button>
+        <button type="button" data-mode="idle">Idle</button>
+      </p>
     </div>
 
     <script type="module" src="main.js"></script>

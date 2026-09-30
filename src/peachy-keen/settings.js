@@ -16,9 +16,9 @@ const DEFAULTS = {
   disco: false,
 };
 
-function read() {
+function read(key) {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) };
+    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(key)) };
   } catch {
     return { ...DEFAULTS };
   }
@@ -26,11 +26,23 @@ function read() {
 
 export class Settings {
   constructor(onChange) {
-    Object.assign(this, read());
+    this.key = STORAGE_KEY;
+    Object.assign(this, read(this.key));
     this.onChange = onChange;
     this.panel = document.getElementById("settings");
+    this.toggle = document.getElementById("settings-toggle");
     this.fps = document.getElementById("fps");
     this.visible = false;
+
+    this.toggle.addEventListener("click", () =>
+      this.setOpen(this.panel.hidden),
+    );
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && this.toggle.isConnected && !this.panel.hidden) {
+        this.setOpen(false);
+        this.toggle.focus();
+      }
+    });
 
     this.buttons = [...document.querySelectorAll("[data-setting]")];
     this.buttons.forEach((button) => {
@@ -59,6 +71,19 @@ export class Settings {
     Object.keys(DEFAULTS).forEach((key) => this.onChange(key, this[key]));
   }
 
+  useStore(key) {
+    this.key = key;
+    Object.assign(this, read(key));
+    this.sync();
+    this.applyAll();
+  }
+
+  setOpen(open) {
+    this.panel.hidden = !open;
+    this.visible = open;
+    this.toggle.setAttribute("aria-expanded", String(open));
+  }
+
   showFps(fps) {
     if (!this.visible) return;
     const text = `${Math.round(fps)} frames per second`;
@@ -71,7 +96,7 @@ export class Settings {
       Object.keys(DEFAULTS).forEach((key) => {
         data[key] = this[key];
       });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(this.key, JSON.stringify(data));
     } catch {
       // Storage can be blocked; settings then last for this visit only.
     }

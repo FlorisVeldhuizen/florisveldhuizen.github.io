@@ -183,6 +183,35 @@ button:focus-visible {
   transform: translateY(6px);
 }
 
+.settings-dock {
+  position: fixed;
+  right: var(--gutter);
+  bottom: calc(var(--gutter) + env(safe-area-inset-bottom));
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  cursor: auto;
+}
+
+.settings-toggle {
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--blush-dim);
+  font-style: italic;
+  text-decoration: underline;
+  text-decoration-color: var(--blush-faint);
+  text-underline-offset: 5px;
+  transition: color 0.2s ease;
+}
+
+.settings-toggle:hover,
+.settings-toggle[aria-expanded="true"] {
+  color: var(--blush);
+}
+
 .settings {
   display: grid;
   gap: 12px;
@@ -451,6 +480,22 @@ button:focus-visible {
   font-style: italic;
 }
 
+.intro-modes {
+  justify-content: center;
+  margin: 0;
+  visibility: hidden;
+}
+
+.intro.is-ready .intro-modes {
+  visibility: visible;
+}
+
+.intro-modes button {
+  min-width: 96px;
+  padding: 6px 18px;
+  font-size: 16px;
+}
+
 .intro.is-leaving {
   opacity: 0;
   pointer-events: none;
@@ -474,6 +519,9 @@ button:focus-visible {
     font-size: 15px;
   }
 
+  .settings-dock {
+    left: var(--gutter);
+  }
 
   .settings {
     width: 100%;
@@ -497,6 +545,9 @@ button:focus-visible {
     min-height: 34px;
   }
 
+  .settings-toggle {
+    padding: 10px 0;
+  }
 }
 
 @media (max-height: 500px) {

@@ -29,14 +29,19 @@ export class Panel {
     this.modal = modal;
     this.root = document.getElementById("panel");
     this.handle = document.getElementById("panel-handle");
-    this.tabs = el("nav", "tabs", this.root);
+    const head = el("div", "panel-head", this.root);
+    this.tabs = el("nav", "tabs", head);
     this.tabs.setAttribute("role", "tablist");
     this.tabs.setAttribute("aria-label", "Shop");
     this.body = el("div", "panel-body", this.root);
+    this.title = el("h2", "panel-title", this.body);
     this.sections = {};
     this.buttons = {};
     this.scrolls = {};
     this.tabs.addEventListener("keydown", (e) => this.moveTab(e));
+    this.tabs.addEventListener("wheel", (e) => this.scrollTabs(e), {
+      passive: false,
+    });
     TABS.forEach(([id, label, icon]) => {
       const b = el(
         "button",
@@ -75,11 +80,11 @@ export class Panel {
     } catch {
       // The shop then starts open.
     }
-    this.handle.insertAdjacentHTML(
-      "beforeend",
-      iconSvg("chevron", "icon panel-chevron"),
+    this.collapse = el("button", "panel-collapse", head, iconSvg("chevron"));
+    this.collapse.type = "button";
+    [this.handle, this.collapse].forEach((b) =>
+      b.addEventListener("click", () => this.setOpen(!this.open)),
     );
-    this.handle.addEventListener("click", () => this.setOpen(!this.open));
     let saved = "helpers";
     try {
       saved = localStorage.getItem(TAB_KEY) || saved;
@@ -87,7 +92,10 @@ export class Panel {
       // The first tab is fine when storage is blocked.
     }
     this.show(this.buttons[saved] ? saved : "helpers");
+    this.root.style.transition = "none";
     this.setOpen(this.open);
+    this.root.getBoundingClientRect();
+    this.root.style.transition = "";
     game.on("change", () => {
       this.timer = 0;
     });
@@ -104,16 +112,26 @@ export class Panel {
     this.open = open;
     this.root.classList.toggle("is-open", open);
     document.body.classList.toggle("is-shopping", open);
-    this.handle.setAttribute("aria-expanded", String(open));
     const label = open ? "Hide the shop" : "Open the shop";
+    this.handle.setAttribute("aria-expanded", String(open));
     setText(this.handle.querySelector("span"), label);
-    this.handle.title = label;
+    this.collapse.setAttribute("aria-expanded", String(open));
+    this.collapse.setAttribute("aria-label", label);
+    this.collapse.title = label;
     if (!WIDE.matches) return;
     try {
       localStorage.setItem(OPEN_KEY, open ? "1" : "0");
     } catch {
       // The shop then opens again on the next visit.
     }
+  }
+
+  scrollTabs(e) {
+    const { tabs } = this;
+    if (tabs.scrollWidth <= tabs.clientWidth) return;
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    tabs.scrollLeft += e.deltaY;
   }
 
   moveTab(e) {
@@ -134,6 +152,10 @@ export class Panel {
   }
 
   show(id, fromTap = false) {
+    if (fromTap && WIDE.matches && this.open && id === this.current) {
+      this.setOpen(false);
+      return;
+    }
     if (this.current) this.scrolls[this.current] = this.body.scrollTop;
     this.current = id;
     Object.entries(this.sections).forEach(([key, section]) => {
@@ -143,6 +165,7 @@ export class Panel {
       this.buttons[key].tabIndex = key === id ? 0 : -1;
     });
     this.body.scrollTop = this.scrolls[id] || 0;
+    setText(this.title, TABS.find(([key]) => key === id)[1]);
     this.settings.visible = id === "options";
     if (fromTap && !this.open) this.setOpen(true);
     try {

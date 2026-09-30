@@ -1406,6 +1406,7 @@ export class Interaction {
     this.peach.setOil(0, true);
     this.bursts += 1;
     this.kickVelocity.set(0, 1.6, 0);
+    this.ui.onBurst(this.bursts);
     setRub(0, 0);
   }
 
