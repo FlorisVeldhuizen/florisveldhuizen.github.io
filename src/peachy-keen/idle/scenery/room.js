@@ -780,7 +780,7 @@ export class Room {
       this.kneadUp.copy(this.kneadNormal).cross(this.kneadSide).normalize();
       this.knead = {
         age: 0,
-        length: 2.2 + Math.random(),
+        length: 1.4 + Math.random() * 0.6,
         spin: Math.random() < 0.5 ? -1 : 1,
       };
     }
@@ -795,8 +795,8 @@ export class Room {
     }
     const scale = peach.worldScale();
     const amount = Math.sin(Math.PI * p);
-    const press = 1 + Math.sin(k.age * 7) * 0.2;
-    const a = k.age * 4 * k.spin;
+    const press = 1 + Math.sin(k.age * 5.25) * 0.2;
+    const a = k.age * 3 * k.spin;
     this.kneadPull
       .copy(this.kneadSide)
       .multiplyScalar(Math.cos(a))
@@ -814,7 +814,7 @@ export class Room {
     }
     k.pulse = (k.pulse ?? 0) - delta;
     if (k.pulse <= 0) {
-      k.pulse = 0.35;
+      k.pulse = 0.47;
       this.tmp.copy(this.kneadLocal).applyMatrix4(peach.mesh.matrixWorld);
       peach.addJiggle(
         this.tmp,

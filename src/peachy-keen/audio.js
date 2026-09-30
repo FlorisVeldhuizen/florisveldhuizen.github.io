@@ -333,14 +333,21 @@ export function playKnead(oil, amount) {
     (lastRub + 1 + Math.floor(Math.random() * (rubs.length - 1))) % rubs.length;
   const src = ctx.createBufferSource();
   src.buffer = rubs[lastRub];
-  src.playbackRate.value = (0.94 + Math.random() * 0.12) * (1.06 - oil * 0.12);
+  const rate = (0.94 + Math.random() * 0.12) * (1.06 - oil * 0.12);
+  src.playbackRate.value = rate;
   const soften = ctx.createBiquadFilter();
   soften.type = "lowpass";
   soften.frequency.value = 9000 - oil * 5000;
   const gain = ctx.createGain();
-  gain.gain.value = 0.13 * amount;
+  const swell = Float32Array.from(
+    { length: 32 },
+    (_, n) => Math.min(1, Math.sin((Math.PI * n) / 31) * 1.4) * 0.13 * amount,
+  );
+  const now = ctx.currentTime;
+  const length = (src.buffer.duration / rate) * 0.6;
+  gain.gain.setValueCurveAtTime(swell, now, length);
   src.connect(soften).connect(gain).connect(master);
-  src.start();
+  src.start(now, 0, length * rate);
 }
 
 export function playKiss() {
