@@ -9,6 +9,7 @@ export const MARKERS = {
   lips: { color: 0xe8505f, shape: 1, radius: 17, width: 1.5, fill: 0 },
   buzz: { color: 0xff5fa8, shape: 2, radius: 17, width: 2, fill: 0 },
   oil: { color: 0xf6b35c, shape: 0, radius: 17, width: 1.5, fill: 0 },
+  band: { color: 0xffd2b0, shape: 0, radius: 22, width: 2, fill: 0 },
   grab: { color: 0xffa877, shape: 0, radius: 14, width: 3, fill: 0.3 },
 };
 
