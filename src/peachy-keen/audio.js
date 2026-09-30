@@ -425,6 +425,85 @@ export function playDing() {
   tone(now + 0.12, { from: 2093, to: 2093, length: 0.35, volume: 0.1 });
 }
 
+export function playNotes(notes, { gap = 0.08, length = 0.3, volume = 0.08 } = {}) {
+  if (!running()) return;
+  const now = ctx.currentTime;
+  notes.forEach((hz, n) =>
+    tone(now + n * gap, { from: hz, to: hz, length, volume }),
+  );
+}
+
+function pad(notes, type, cutoff) {
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = cutoff;
+  filter.connect(gain).connect(master);
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 4.8;
+  const depth = ctx.createGain();
+  depth.gain.value = 2.5;
+  lfo.connect(depth);
+  lfo.start();
+  notes.forEach((hz, n) => {
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.value = hz;
+    osc.detune.value = (n % 2 ? 1 : -1) * 6;
+    depth.connect(osc.detune);
+    osc.connect(filter);
+    osc.start();
+  });
+  return gain;
+}
+
+let choir = null;
+
+export function setChoir(amount) {
+  if (!running()) return;
+  if (!choir) {
+    if (amount <= 0) return;
+    choir = pad([220, 277.18, 329.63, 440], "triangle", 1400);
+  }
+  choir.gain.setTargetAtTime(amount * 0.018, ctx.currentTime, 0.8);
+}
+
+let chant = null;
+
+export function setChant(amount) {
+  if (!running()) return;
+  if (!chant) {
+    if (amount <= 0) return;
+    chant = pad([73.42, 110, 146.83], "sawtooth", 320);
+  }
+  const now = ctx.currentTime;
+  const breathe = 0.7 + 0.3 * Math.sin(now * 0.8);
+  chant.gain.setTargetAtTime(amount * 0.02 * breathe, now, 0.4);
+}
+
+export function playThump(amount = 1) {
+  if (!running()) return;
+  tone(ctx.currentTime, { from: 70, to: 38, sweep: 0.16, length: 0.22, volume: 0.1 * amount, attack: 0.005 });
+}
+
+export function playWhoosh(amount = 1) {
+  noiseHit(3000, 600, 0.18, 0.12 * amount);
+}
+
+export function playBuy(pitch = 1) {
+  if (!running()) return;
+  const now = ctx.currentTime;
+  tone(now, {
+    from: 520 * pitch,
+    to: 780 * pitch,
+    sweep: 0.05,
+    length: 0.12,
+    volume: 0.07,
+    attack: 0.004,
+  });
+}
+
 let buzzer = null;
 
 export function setBuzz(amount, contact = 0) {

@@ -3,8 +3,6 @@ import { reducedMotion } from "./util";
 export class UI {
   constructor() {
     this.count = document.getElementById("count");
-    this.countUnit = document.getElementById("count-unit");
-    this.bursts = document.getElementById("bursts");
     this.meters = document.getElementById("meters");
     this.heatFill = document.getElementById("heat-fill");
     this.oilFill = document.getElementById("oil-fill");
@@ -27,8 +25,6 @@ export class UI {
   }
 
   onSmack(total, combo, x, y) {
-    this.count.textContent = total;
-    this.countUnit.textContent = total === 1 ? "smack" : "smacks";
     this.meters.classList.add("is-visible");
     if (total >= 4) this.hintSwipe.classList.add("is-learned");
     if (!reducedMotion.matches) {
@@ -131,11 +127,6 @@ export class UI {
       ],
       { duration: 240, easing: "ease-out" },
     );
-  }
-
-  onBurst(total) {
-    this.bursts.textContent = total === 1 ? "1 burst" : `${total} bursts`;
-    this.bursts.hidden = false;
   }
 
   setVignette(amount) {

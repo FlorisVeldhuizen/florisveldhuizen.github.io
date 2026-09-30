@@ -1,0 +1,61 @@
+export const DARES = [
+  {
+    id: "handsoff",
+    name: "Hands off",
+    rule: "Smacks, rubs and grabs earn nothing. Only helpers work.",
+    goal: 1e9,
+    reward: "Helpers +25% forever.",
+    effects: [{ kind: "helpersAll", mult: 1.25 }],
+  },
+  {
+    id: "dry",
+    name: "Dry spell",
+    rule: "No oil. The bottle stays corked and Oil Barons earn nothing.",
+    goal: 1e9,
+    reward: "Oil boosts smacks +100% more, forever.",
+    effects: [{ kind: "oil", add: 1 }],
+  },
+  {
+    id: "cold",
+    name: "Cold shower",
+    rule: "The peach can't get hotter than 60. No bursts.",
+    goal: 5e8,
+    reward: "The heat bonus is +100% stronger, forever.",
+    effects: [{ kind: "flush", add: 1 }],
+  },
+  {
+    id: "speed",
+    name: "Quickie",
+    rule: "Earn a million juice within five minutes of starting.",
+    goal: 1e6,
+    limit: 300,
+    reward: "Golden peaches show up 20% more often, forever.",
+    effects: [{ kind: "goldenRate", mult: 1.2 }],
+  },
+  {
+    id: "chaste",
+    name: "Chastity",
+    rule: "You can't buy upgrades.",
+    goal: 1e8,
+    reward: "Upgrades cost 15% less, forever.",
+    effects: [{ kind: "upgradeDiscount", mult: 0.85 }],
+  },
+  {
+    id: "unlucky",
+    name: "Black cat",
+    rule: "Golden peaches never show up.",
+    goal: 1e10,
+    reward: "Lucky golden peaches pay twice as much, forever.",
+    effects: [{ kind: "lucky", mult: 2 }],
+  },
+  {
+    id: "minimal",
+    name: "Small circle",
+    rule: "You can own at most 10 of each helper.",
+    goal: 1e8,
+    reward: "Helpers cost 10% less, forever.",
+    effects: [{ kind: "helperDiscount", mult: 0.9 }],
+  },
+];
+
+export const DARE_BY_ID = Object.fromEntries(DARES.map((d) => [d.id, d]));

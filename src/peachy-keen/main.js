@@ -14,6 +14,7 @@ import { Wild } from "./wild";
 import { Shock } from "./shock";
 import { unlockAudio, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
+import { createIdle } from "./idle";
 
 const intro = document.getElementById("intro");
 const introTitle = document.getElementById("intro-title");
@@ -73,6 +74,19 @@ const naughty = new Naughty(interaction, talk);
 const wild = new Wild({ scene, camera, interaction, talk, backdrop });
 const shock = new Shock(renderer, interaction);
 settings.applyAll();
+naughty.set("achievements", false);
+const idle = createIdle({
+  interaction,
+  peach,
+  camera,
+  settings,
+  talk,
+  buzzer: wild.buzzer,
+  scene,
+  renderer,
+  backdrop,
+  mood,
+});
 
 function setProgress(fraction) {
   introTitle.style.setProperty("--progress", `${Math.round(fraction * 100)}%`);
@@ -84,6 +98,7 @@ peach.load(setProgress).then(async () => {
   const warmups = [
     ...interaction.prepareHalves(),
     ...wild.warmups(),
+    ...idle.warmups(),
     juice.mesh,
     droplets.mesh,
   ];
@@ -116,6 +131,7 @@ peach.load(setProgress).then(async () => {
   camera.layers.disable(JUICE_LAYER);
   showWarmups(false);
   juice.clear();
+  idle.ready();
   loadSounds();
   introStatus.textContent = "Click anywhere to begin. Sound on.";
   intro.classList.add("is-ready");
@@ -128,6 +144,7 @@ peach.load(setProgress).then(async () => {
       intro.classList.add("is-leaving");
       setTimeout(() => intro.remove(), 700);
       interaction.begin();
+      idle.begin();
     },
     { once: true },
   );
@@ -169,6 +186,7 @@ renderer.setAnimationLoop(() => {
   const delta = realDelta * interaction.timeScale(realDelta);
   interaction.update(delta);
   naughty.update(delta);
+  idle.update(realDelta);
   wild.update(delta, realDelta);
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);

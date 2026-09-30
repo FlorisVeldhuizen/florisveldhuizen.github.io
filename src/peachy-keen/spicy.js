@@ -130,6 +130,18 @@ const LINES = {
       "Shake it for you.",
       "Bounce with me.",
     ],
+    golden: [
+      "Ooh, shiny. For me?",
+      "Good catch, handsome.",
+      "Gold looks good on us.",
+      "Lucky you. Lucky me.",
+    ],
+    ripen: [
+      "A whole new me. Still yours.",
+      "Fresh and ready.",
+      "Like new. Be rough with me.",
+      "I remember everything.",
+    ],
   },
   shy: {
     smack: [
@@ -265,6 +277,16 @@ const LINES = {
       "I don't dance… usually.",
       "Is everyone watching?",
       "My cheeks have rhythm?",
+    ],
+    golden: [
+      "Was that… gold?",
+      "You caught it! For me?",
+      "So sparkly…",
+    ],
+    ripen: [
+      "I feel… new.",
+      "Do I look different?",
+      "Please be gentle. It's my first time. Again.",
     ],
   },
 };

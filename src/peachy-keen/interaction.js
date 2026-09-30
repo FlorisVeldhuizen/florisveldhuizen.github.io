@@ -86,6 +86,10 @@ export class Interaction {
 
     this.heat = 0;
     this.heatHold = 0;
+    this.heatGain = 1;
+    this.heatCap = 100;
+    this.coolRate = 1;
+    this.twerkAfter = CFG.TWERK_IDLE_SECONDS;
     this.oil = 0;
     this.smacks = 0;
     this.bursts = 0;
@@ -988,6 +992,14 @@ export class Interaction {
     playSlap(1, this.heat / 100, this.oil, this.firmness.pitch * 1.1);
     const at = this.toScreen(g);
     this.ui.onSmack(this.smacks, this.combo, at.x, at.y);
+    this.emit("smack", {
+      strength: 1,
+      x: at.x,
+      y: at.y,
+      combo: this.combo,
+      total: this.smacks,
+      tool: "hand",
+    });
     if (this.heat >= 100) {
       this.claps = null;
       this.charge();
@@ -1060,7 +1072,10 @@ export class Interaction {
   }
 
   addHeat(amount, cap = 100) {
-    this.heat = Math.min(cap, this.heat + amount);
+    this.heat = Math.min(
+      Math.min(cap, this.heatCap),
+      this.heat + amount * this.heatGain,
+    );
     this.heatHold = CFG.HEAT_DECAY_DELAY;
   }
 
@@ -1391,7 +1406,6 @@ export class Interaction {
     this.peach.setOil(0, true);
     this.bursts += 1;
     this.kickVelocity.set(0, 1.6, 0);
-    this.ui.onBurst(this.bursts);
     setRub(0, 0);
   }
 
@@ -1645,6 +1659,7 @@ export class Interaction {
     this.squashVelocity.x += 1.2;
     this.squashAxis.set(0, 1);
     this.twerk.beats += 1;
+    this.emit("twerk", { beat: this.twerk.beats });
   }
 
   updateTwerk(delta) {
@@ -1662,7 +1677,7 @@ export class Interaction {
     }
     this.idle += delta;
     if (
-      this.idle > CFG.TWERK_IDLE_SECONDS &&
+      this.idle > this.twerkAfter &&
       this.settings.tease &&
       !reducedMotion.matches &&
       !this.pointer.pressed
@@ -1838,7 +1853,10 @@ export class Interaction {
 
     this.heatHold -= delta;
     if (this.heatHold <= 0)
-      this.heat = Math.max(0, this.heat - CFG.HEAT_DECAY * delta);
+      this.heat = Math.max(
+        0,
+        this.heat - CFG.HEAT_DECAY * this.coolRate * delta,
+      );
     if (!this.rubbing)
       this.oil = Math.max(0, this.oil - CFG.OIL_DRY_RATE * delta);
     this.peach.setOil(this.oil);

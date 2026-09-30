@@ -29,18 +29,8 @@ export class Settings {
     Object.assign(this, read());
     this.onChange = onChange;
     this.panel = document.getElementById("settings");
-    this.toggle = document.getElementById("settings-toggle");
     this.fps = document.getElementById("fps");
-
-    this.toggle.addEventListener("click", () =>
-      this.setOpen(this.panel.hidden),
-    );
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !this.panel.hidden) {
-        this.setOpen(false);
-        this.toggle.focus();
-      }
-    });
+    this.visible = false;
 
     this.buttons = [...document.querySelectorAll("[data-setting]")];
     this.buttons.forEach((button) => {
@@ -69,13 +59,8 @@ export class Settings {
     Object.keys(DEFAULTS).forEach((key) => this.onChange(key, this[key]));
   }
 
-  setOpen(open) {
-    this.panel.hidden = !open;
-    this.toggle.setAttribute("aria-expanded", String(open));
-  }
-
   showFps(fps) {
-    if (this.panel.hidden) return;
+    if (!this.visible) return;
     const text = `${Math.round(fps)} frames per second`;
     if (text !== this.fps.textContent) this.fps.textContent = text;
   }

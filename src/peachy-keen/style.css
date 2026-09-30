@@ -183,35 +183,6 @@ button:focus-visible {
   transform: translateY(6px);
 }
 
-.settings-dock {
-  position: fixed;
-  right: var(--gutter);
-  bottom: calc(var(--gutter) + env(safe-area-inset-bottom));
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-  cursor: auto;
-}
-
-.settings-toggle {
-  padding: 6px 0;
-  border: 0;
-  background: none;
-  color: var(--blush-dim);
-  font-style: italic;
-  text-decoration: underline;
-  text-decoration-color: var(--blush-faint);
-  text-underline-offset: 5px;
-  transition: color 0.2s ease;
-}
-
-.settings-toggle:hover,
-.settings-toggle[aria-expanded="true"] {
-  color: var(--blush);
-}
-
 .settings {
   display: grid;
   gap: 12px;
@@ -365,7 +336,8 @@ button:focus-visible {
   pointer-events: none;
   opacity: 0;
   background: radial-gradient(
-    ellipse at 50% 55%,
+    ellipse at calc(50% - var(--panel-side, 0px) / 2)
+      calc(55% - var(--panel-bottom, 0px) / 2),
     transparent 38%,
     rgba(90, 0, 20, 0.45) 68%,
     rgba(22, 0, 6, 0.9) 100%
@@ -502,9 +474,6 @@ button:focus-visible {
     font-size: 15px;
   }
 
-  .settings-dock {
-    left: var(--gutter);
-  }
 
   .settings {
     width: 100%;
@@ -528,9 +497,6 @@ button:focus-visible {
     min-height: 34px;
   }
 
-  .settings-toggle {
-    padding: 10px 0;
-  }
 }
 
 @media (max-height: 500px) {
@@ -670,7 +636,8 @@ button:focus-visible {
   pointer-events: none;
   opacity: 0;
   background: radial-gradient(
-    ellipse 60% 65% at 50% 52%,
+    ellipse 60% 65% at calc(50% - var(--panel-side, 0px) / 2)
+      calc(52% - var(--panel-bottom, 0px) / 2),
     transparent 30%,
     rgba(36, 0, 14, 0.6) 70%,
     rgba(8, 0, 4, 0.95) 100%

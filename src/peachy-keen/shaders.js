@@ -191,11 +191,17 @@ export function createBackdropBlitMaterial(smoke) {
     uniforms: {
       tSmoke: { value: smoke },
       time: { value: 0 },
+      lensAt: { value: new Vector2(0.5, 0.5) },
+      lensPower: { value: 0 },
+      aspect: { value: 1 },
     },
     vertexShader: VERTEX_SHADER,
     fragmentShader: `
             uniform sampler2D tSmoke;
             uniform float time;
+            uniform vec2 lensAt;
+            uniform float lensPower;
+            uniform float aspect;
             varying vec2 vUv;
 
             float hash(vec2 p) {
@@ -205,7 +211,20 @@ export function createBackdropBlitMaterial(smoke) {
             }
 
             void main() {
-                vec3 col = texture2D(tSmoke, vUv).rgb;
+                vec2 uv = vUv;
+                float shade = 1.0;
+                if (lensPower > 0.0) {
+                    vec2 d = (vUv - lensAt) * vec2(aspect, 1.0);
+                    float r = length(d);
+                    float bend = lensPower * 0.012 / (r * r + 0.004);
+                    float swirl = lensPower * 0.35 / (r * 6.0 + 0.2);
+                    float c = cos(swirl);
+                    float s = sin(swirl);
+                    d = mat2(c, -s, s, c) * d * (1.0 + bend);
+                    uv = lensAt + d / vec2(aspect, 1.0);
+                    shade = mix(1.0, smoothstep(0.02, 0.07, r), lensPower);
+                }
+                vec3 col = texture2D(tSmoke, uv).rgb * shade;
                 col += (hash(gl_FragCoord.xy + fract(time * 0.37) * 97.0) - 0.5) * 0.025;
                 gl_FragColor = vec4(col, 1.0);
             }

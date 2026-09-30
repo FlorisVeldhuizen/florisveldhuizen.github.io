@@ -332,6 +332,8 @@ const MARKER_HEADER = `
   }
 `;
 
+const OIL_BLOBS = 64;
+
 const FRAGMENT_HEADER = `
   uniform vec3 uRingCenter;
   uniform vec3 uRingAxisX;
@@ -380,6 +382,43 @@ const FRAGMENT_HEADER = `
   varying vec3 vRestPosition;
   varying float vFabricPush;
   ${MARKER_HEADER}
+  uniform vec4 uOilBlobs[${OIL_BLOBS}];
+  uniform float uOilCount;
+  uniform float uOilDepth;
+
+  float oilFalloff(float x) {
+    float f = x * 5.0;
+    if (f < 1.0) return mix(0.5, 0.444, f);
+    if (f < 2.0) return mix(0.444, 0.311, f - 1.0);
+    if (f < 3.0) return mix(0.311, 0.172, f - 2.0);
+    if (f < 4.0) return mix(0.172, 0.075, f - 3.0);
+    return mix(0.075, 0.0, f - 4.0);
+  }
+
+  float oilField() {
+    float f = 0.0;
+    for (int i = 0; i < ${OIL_BLOBS}; i++) {
+      if (float(i) >= uOilCount) break;
+      vec4 blob = uOilBlobs[i];
+      vec3 q = vRestPosition - blob.xyz;
+      float reach = blob.w * 1.8;
+      float d2 = dot(q, q);
+      if (d2 >= reach * reach) continue;
+      f += oilFalloff(sqrt(d2) / reach);
+    }
+    return min(f, 1.0);
+  }
+
+  vec3 oilBump(vec3 position, vec3 n, float height, float face) {
+    vec3 sx = dFdx(position);
+    vec3 sy = dFdy(position);
+    vec3 r1 = cross(sy, n);
+    vec3 r2 = cross(n, sx);
+    float det = dot(sx, r1) * face;
+    vec2 dh = vec2(dFdx(height), dFdy(height));
+    vec3 grad = sign(det) * (dh.x * r1 + dh.y * r2);
+    return normalize(abs(det) * n - grad);
+  }
 
   float handprintMask() {
     float m = 0.0;
@@ -909,6 +948,7 @@ export class Peach {
     this.ringIgnite = 0;
     this.skinTint = new Color(PEACH_CONFIG.SKIN_TINT);
     this.wetTint = new Color(0xe07f86);
+    this.skinRoughness = 1;
     this.uniforms = {
       uRingCenter: { value: new Vector3() },
       uRingAxisX: { value: new Vector3() },
@@ -958,6 +998,11 @@ export class Peach {
       uFabricDepth: { value: FABRIC.depth },
       uFabricColor: { value: new Color(NOIR[0]) },
       uCreaseSide: { value: new Vector3(1, 0, 0) },
+      uOilBlobs: {
+        value: Array.from({ length: OIL_BLOBS }, () => new Vector4()),
+      },
+      uOilCount: { value: 0 },
+      uOilDepth: { value: 0.045 },
     };
     this.printTextures = {};
     this.setTool("hand");
@@ -967,6 +1012,17 @@ export class Peach {
     this.inverseWorld = new Matrix4();
     this.tempA = new Vector3();
     this.tempB = new Vector3();
+  }
+
+  setOilBlobs(blobs) {
+    const scale = this.worldScale();
+    const slots = this.uniforms.uOilBlobs.value;
+    const count = Math.min(OIL_BLOBS, blobs.length);
+    for (let n = 0; n < count; n += 1) {
+      const { at, r } = blobs[n];
+      slots[n].set(at.x, at.y, at.z, r / scale);
+    }
+    this.uniforms.uOilCount.value = count;
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -1026,6 +1082,9 @@ export class Peach {
       clearcoatNormalMap: fuzz,
       clearcoatNormalScale: new Vector2(0.04, 0.04),
       sheen: 0.45,
+      iridescence: 0.001,
+      iridescenceIOR: 1.45,
+      iridescenceThicknessRange: [200, 420],
       sheenRoughness: 0.8,
       sheenColor: new Color(0xffd6d0),
       clearcoat: 0.001,
@@ -1044,8 +1103,20 @@ export class Peach {
         .replace("#include <common>", `#include <common>\n${FRAGMENT_HEADER}`)
         .replace("#include <map_fragment>", FRAGMENT_COLOR)
         .replace(
+          "#include <roughnessmap_fragment>",
+          "#include <roughnessmap_fragment>\nfloat oilF = oilField();\nfloat oilSpot = smoothstep(0.19, 0.22, oilF);\nfloat oilHeight = sqrt(clamp((oilF - 0.2) / 0.3, 0.0, 1.0));\nroughnessFactor = mix(roughnessFactor, 0.12, oilSpot);\nvec3 oilWet = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.15)) * 0.88;\noilWet *= 1.0 - (1.0 - smoothstep(0.0, 0.35, oilHeight)) * 0.14;\ndiffuseColor.rgb = mix(diffuseColor.rgb, oilWet, oilSpot * 0.65);",
+        )
+        .replace(
+          "#include <lights_physical_fragment>",
+          "#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat = max(material.clearcoat, oilSpot);\nmaterial.clearcoatRoughness = mix(material.clearcoatRoughness, 0.1, oilSpot);\n#endif\n#ifdef USE_IRIDESCENCE\nmaterial.iridescence = oilSpot * 0.7;\n#endif",
+        )
+        .replace(
           "#include <lights_fragment_maps>",
-          "#include <lights_fragment_maps>\nradiance *= uEnvSpecular;\n#ifdef USE_CLEARCOAT\nclearcoatRadiance *= uEnvSpecular;\n#endif",
+          "#include <lights_fragment_maps>\nradiance *= mix(uEnvSpecular, 2.2, oilSpot);\n#ifdef USE_CLEARCOAT\nclearcoatRadiance *= mix(uEnvSpecular, 3.0, oilSpot);\n#endif",
+        )
+        .replace(
+          "#include <normal_fragment_maps>",
+          "vec3 oilBase = normal;\n#include <normal_fragment_maps>\nif (oilSpot > 0.0) {\n  vec3 oilNormal = oilBump(-vViewPosition, oilBase, oilHeight * uOilDepth, faceDirection);\n  normal = normalize(mix(normal, oilNormal, oilSpot));\n}",
         )
         .replace(
           "#include <opaque_fragment>",
@@ -1910,6 +1981,7 @@ export class Peach {
     [u.uHits, u.uPrints].forEach((slots) =>
       slots.value.forEach((v) => v.setW(-1e4)),
     );
+    u.uOilCount.value = 0;
   }
 
   setLingerie(on, pull, visible) {
@@ -1949,7 +2021,7 @@ export class Peach {
     const m = this.material;
     const shine = oil * oil * (3 - 2 * oil);
     this.shine = shine;
-    m.roughness = 1 - 0.55 * shine;
+    m.roughness = (1 - 0.55 * shine) * this.skinRoughness;
     m.clearcoat = 0.001 + shine * 0.6;
     m.clearcoatRoughness = 1 - 0.85 * shine;
     this.uniforms.uEnvSpecular.value = 1 - 0.7 * shine;

@@ -57,6 +57,11 @@ export function createBackdrop(scene, renderer) {
       u.kick.value = kick;
       u.beat.value = beat;
     },
+    setLens(x, y, power) {
+      blit.uniforms.lensAt.value.set(x, y);
+      blit.uniforms.lensPower.value = power;
+      blit.uniforms.aspect.value = window.innerWidth / window.innerHeight;
+    },
     setMotion(enabled) {
       speed = enabled ? 1 : 0.15;
     },
