@@ -155,9 +155,9 @@ function canvasTexture(width, height, draw) {
 export function ringTexture() {
   return canvasTexture(128, 128, (ctx, w) => {
     const c = w / 2;
-    const ring = ctx.createRadialGradient(c, c, c * 0.6, c, c, c);
-    ring.addColorStop(0, "rgba(255,255,255,0)");
-    ring.addColorStop(0.7, "rgba(255,255,255,1)");
+    const ring = ctx.createRadialGradient(c, c, 0, c, c, c);
+    ring.addColorStop(0.8, "rgba(255,255,255,0)");
+    ring.addColorStop(0.92, "rgba(255,255,255,1)");
     ring.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = ring;
     ctx.fillRect(0, 0, w, w);

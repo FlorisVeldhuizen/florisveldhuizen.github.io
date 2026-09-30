@@ -26,7 +26,7 @@ const SIZE = 0.2;
 const FIRST = [45, 90];
 const EVERY = [90, 240];
 const FLASH = 0.6;
-const SPARKS = 12;
+const SPARKS = 6;
 
 const rand = ([lo, hi]) => lo + Math.random() * (hi - lo);
 const additive = (map, extra) =>
@@ -58,10 +58,10 @@ export class GoldenPeach {
     this.holder.add(this.ring);
     const twinkle = twinkleTexture();
     this.spots = [];
-    this.glints = Array.from({ length: 3 }, (_, n) => {
+    this.glints = Array.from({ length: 2 }, (_, n) => {
       const s = new Sprite(additive(twinkle, { depthTest: false, opacity: 0 }));
       s.renderOrder = 2;
-      s.userData = { age: -n * 0.35, life: 0 };
+      s.userData = { age: -n * 0.5, life: 0 };
       this.spin.add(s);
       return s;
     });
@@ -196,10 +196,10 @@ export class GoldenPeach {
     if (reducedMotion.matches) return;
     const h = this.holder;
     for (let n = 0; n < SPARKS; n += 1) {
-      const s = this.emit(0.26, 0.7 + Math.random() * 0.3, 3, 0.8);
+      const s = this.emit(0.16, 0.6 + Math.random() * 0.2, 3, 0.5);
       if (!s) return;
       const a = ((n + Math.random() * 0.6) / SPARKS) * Math.PI * 2;
-      const speed = 1.4 + Math.random();
+      const speed = 0.8 + Math.random() * 0.5;
       s.userData.v.set(Math.cos(a) * speed, Math.sin(a) * speed, 0);
       s.position
         .copy(s.userData.v)
@@ -235,7 +235,7 @@ export class GoldenPeach {
       d.age += delta;
       const k = Math.min(1, d.age / d.life);
       // eslint-disable-next-line no-param-reassign
-      s.material.opacity = (1 - k) * 0.85;
+      s.material.opacity = (1 - k) * 0.6;
       s.scale.setScalar(d.size * (1 - k * 0.5));
       d.v.multiplyScalar(Math.exp(-delta * d.drag));
       d.v.y -= delta * d.fall;
@@ -243,21 +243,21 @@ export class GoldenPeach {
     });
   }
 
-  updateGlints(delta, fade) {
+  updateGlints(delta) {
     this.glints.forEach((s) => {
       const d = s.userData;
       d.age += delta;
       if (d.age >= d.life) {
         d.age = 0;
-        d.life = 0.5 + Math.random() * 0.5;
+        d.life = 0.9 + Math.random() * 0.5;
         s.position.copy(
           this.spots[Math.floor(Math.random() * this.spots.length)],
         );
       }
       const k = d.age > 0 ? Math.sin((d.age / d.life) * Math.PI) : 0;
-      s.scale.setScalar(0.3 + k * 1.1);
+      s.scale.setScalar(0.3 + k * 0.8);
       // eslint-disable-next-line no-param-reassign
-      s.material.opacity = k * fade;
+      s.material.opacity = k * this.hover;
     });
   }
 
@@ -283,8 +283,8 @@ export class GoldenPeach {
     this.glow.scale.setScalar(2 + out * 4);
     this.glow.material.opacity = Math.max(0, 1 - t / 0.3) ** 2;
     this.ring.visible = true;
-    this.ring.scale.setScalar(2 + out * 12);
-    this.ring.material.opacity = (1 - t / FLASH) ** 1.5 * 0.9;
+    this.ring.scale.setScalar(2 + out * 8);
+    this.ring.material.opacity = (1 - t / FLASH) ** 1.5 * 0.5;
   }
 
   update(delta) {
@@ -336,9 +336,9 @@ export class GoldenPeach {
       1 + this.hover * 3.5 + this.press * 3;
     this.glow.material.opacity = 0.35 + Math.sin(g.age * 4) * 0.1;
     this.trailTimer -= delta;
-    const s = this.trailTimer <= 0 && fade > 0.5 && this.emit(0.2, 0.9, 0, 0);
+    const s = this.trailTimer <= 0 && fade > 0.5 && this.emit(0.12, 0.9, 0, 0);
     if (s) {
-      this.trailTimer = 0.09;
+      this.trailTimer = 0.16;
       const a = Math.random() * Math.PI * 2;
       const r = h.scale.x * PEACH_RADIUS * (0.6 + Math.random() * 0.4);
       s.userData.v.set(0, -0.15, 0);
@@ -353,6 +353,6 @@ export class GoldenPeach {
       this.chimeTimer = 3.5;
       playNotes([2093, 2637], { gap: 0.09, length: 0.5, volume: 0.018 });
     }
-    this.updateGlints(delta, fade);
+    this.updateGlints(delta);
   }
 }
