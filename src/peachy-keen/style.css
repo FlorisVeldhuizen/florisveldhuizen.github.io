@@ -14,6 +14,9 @@
   --welt: #e8505f;
   --oil: #f2c46b;
   --gutter: clamp(16px, 3vw, 32px);
+  --edge-top: max(var(--gutter), env(safe-area-inset-top));
+  --edge-right: max(var(--gutter), env(safe-area-inset-right));
+  --edge-left: max(var(--gutter), env(safe-area-inset-left));
   --display: "Fraunces", "Iowan Old Style", Georgia, serif;
 }
 
@@ -26,7 +29,9 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--velvet-deep);
+  overscroll-behavior: none;
+  /* matches the manifest background and the iOS launch splashes */
+  background: #362c3f;
 }
 
 body {
@@ -73,8 +78,8 @@ button:focus-visible {
 
 .score {
   position: fixed;
-  top: var(--gutter);
-  right: var(--gutter);
+  top: var(--edge-top);
+  right: var(--edge-right);
   z-index: 3;
   width: 168px;
   text-align: right;
@@ -163,7 +168,7 @@ button:focus-visible {
 
 .hints {
   position: fixed;
-  left: var(--gutter);
+  left: var(--edge-left);
   bottom: calc(var(--gutter) + env(safe-area-inset-bottom));
   z-index: 3;
   max-width: 34ch;
@@ -185,7 +190,7 @@ button:focus-visible {
 
 .settings-dock {
   position: fixed;
-  right: var(--gutter);
+  right: var(--edge-right);
   bottom: calc(var(--gutter) + env(safe-area-inset-bottom));
   z-index: 4;
   display: flex;
@@ -222,7 +227,10 @@ button:focus-visible {
   border-radius: 18px;
   background: rgba(30, 5, 12, 0.94);
   font-size: 16px;
-  max-height: calc(100dvh - 2 * var(--gutter) - 60px);
+  max-height: calc(
+    100dvh - var(--edge-top) - var(--gutter) - env(safe-area-inset-bottom) -
+      60px
+  );
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -438,7 +446,8 @@ button:focus-visible {
   place-content: center;
   justify-items: center;
   gap: 18px;
-  padding: var(--gutter);
+  padding: var(--edge-top) var(--edge-right)
+    calc(var(--gutter) + env(safe-area-inset-bottom)) var(--edge-left);
   background: rgba(22, 4, 10, 0.45);
   text-align: center;
   cursor: progress;
@@ -515,12 +524,12 @@ button:focus-visible {
   }
 
   .hints {
-    right: calc(var(--gutter) + 80px);
+    right: calc(var(--edge-right) + 80px);
     font-size: 15px;
   }
 
   .settings-dock {
-    left: var(--gutter);
+    left: var(--edge-left);
   }
 
   .settings {
@@ -568,8 +577,8 @@ button:focus-visible {
 
 .bottle {
   position: fixed;
-  top: calc(var(--gutter) + env(safe-area-inset-top));
-  left: var(--gutter);
+  top: var(--edge-top);
+  left: var(--edge-left);
   z-index: 4;
   width: 60px;
   height: 120px;

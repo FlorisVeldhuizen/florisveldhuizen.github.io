@@ -16,7 +16,7 @@
 }
 
 .score {
-  right: calc(var(--panel-side, 0px) + var(--gutter));
+  right: calc(var(--panel-side, 0px) + var(--edge-right));
 }
 
 .score-rate,
@@ -112,7 +112,9 @@ body.is-storm::after {
   z-index: 4;
   display: flex;
   flex-direction: column;
-  width: var(--panel-w);
+  width: calc(var(--panel-w) + env(safe-area-inset-right));
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) 0;
   border-left: 1px solid var(--blush-faint);
   background: rgba(24, 4, 10, 0.95);
   cursor: auto;
@@ -1434,8 +1436,11 @@ body.is-storm::after {
   z-index: 20;
   display: grid;
   place-items: center;
-  padding: var(--gutter) calc(var(--gutter) + var(--panel-side, 0px))
-    calc(var(--gutter) + var(--panel-bottom, 0px)) var(--gutter);
+  padding: var(--edge-top) calc(var(--panel-side, 0px) + var(--edge-right))
+    calc(
+      var(--gutter) + max(var(--panel-bottom, 0px), env(safe-area-inset-bottom))
+    )
+    var(--edge-left);
   background: rgba(10, 0, 4, 0.62);
   cursor: auto;
 }
@@ -1637,7 +1642,7 @@ body.is-storm::after {
   }
 
   .panel:not(.is-open) {
-    width: 60px;
+    width: calc(60px + env(safe-area-inset-right));
   }
 
   .panel-head,
@@ -1737,7 +1742,8 @@ body.is-storm::after {
     left: 0;
     width: auto;
     height: calc(76px + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
     border-top: 1px solid var(--blush-faint);
     border-left: 0;
     border-radius: 22px 22px 0 0;
@@ -1820,8 +1826,11 @@ body.is-storm::after {
 }
 
 .intro {
-  padding: var(--gutter) calc(var(--gutter) + var(--panel-side, 0px))
-    calc(var(--gutter) + var(--panel-bottom, 0px)) var(--gutter);
+  padding: var(--edge-top) calc(var(--panel-side, 0px) + var(--edge-right))
+    calc(
+      var(--gutter) + max(var(--panel-bottom, 0px), env(safe-area-inset-bottom))
+    )
+    var(--edge-left);
 }
 
 .toy-row.is-owned-toy .row-price {

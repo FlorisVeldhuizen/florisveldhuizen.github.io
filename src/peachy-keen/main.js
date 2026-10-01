@@ -287,3 +287,9 @@ renderer.setAnimationLoop(() => {
   lens.render(idle ? [juice, droplets, idle.room] : [juice, droplets]);
   shock.render();
 });
+
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/peachy-keen/sw.js").catch(() => {});
+  });
+}
