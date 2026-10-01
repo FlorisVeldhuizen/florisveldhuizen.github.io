@@ -31,10 +31,12 @@ export function setDetail(node, title, lines = []) {
   );
 }
 
-const besidePanel = window.matchMedia("(min-width: 900px)");
+export const sidePanel = window.matchMedia(
+  "(min-width: 900px), (orientation: landscape) and (min-width: 640px)",
+);
 
 export function floatBeside(detail, anchor) {
-  if (!besidePanel.matches) return;
+  if (!sidePanel.matches) return;
   const r = anchor.getBoundingClientRect();
   const h = detail.offsetHeight;
   const top = Math.min(

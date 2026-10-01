@@ -1,5 +1,6 @@
-import { el, setText, animate } from "./dom";
+import { el, setText, animate, sidePanel } from "./dom";
 import { iconSvg } from "./icons";
+import { clamp } from "../util";
 import { HelpersView } from "./views/helpers";
 import { UpgradesView } from "./views/upgrades";
 import { OrchardView } from "./views/orchard";
@@ -132,9 +133,11 @@ function shineTrophy(icon) {
 }
 
 const REFRESH = 0.2;
+const DRAG_START = 8;
+const FLING = 0.6;
+const SCORE_PEEK = 64;
 const TAB_KEY = "peachy-keen-tab";
 const OPEN_KEY = "peachy-keen-shop-open";
-const WIDE = window.matchMedia("(min-width: 900px)");
 
 export class Panel {
   constructor(game, orchard, settings, modal) {
@@ -187,7 +190,7 @@ export class Panel {
     };
     this.settings = settings;
     this.timer = 0;
-    this.open = WIDE.matches;
+    this.open = sidePanel.matches;
     try {
       if (this.open) this.open = localStorage.getItem(OPEN_KEY) !== "0";
     } catch {
@@ -205,6 +208,8 @@ export class Panel {
       // The first tab is fine when storage is blocked.
     }
     this.show(this.buttons[saved] ? saved : "helpers");
+    this.score = document.querySelector(".score");
+    this.dragSheet(head);
     this.root.style.transition = "none";
     this.setOpen(this.open);
     this.root.getBoundingClientRect();
@@ -221,9 +226,10 @@ export class Panel {
     });
   }
 
-  setOpen(open) {
+  setOpen(open, full = false) {
     this.open = open;
     this.root.classList.toggle("is-open", open);
+    this.root.classList.toggle("is-full", open && full);
     document.body.classList.toggle("is-shopping", open);
     const label = open ? "Hide the shop" : "Open the shop";
     this.handle.setAttribute("aria-expanded", String(open));
@@ -231,12 +237,81 @@ export class Panel {
     this.collapse.setAttribute("aria-expanded", String(open));
     this.collapse.setAttribute("aria-label", label);
     this.collapse.title = label;
-    if (!WIDE.matches) return;
+    if (!sidePanel.matches) return;
     try {
       localStorage.setItem(OPEN_KEY, open ? "1" : "0");
     } catch {
       // The shop then opens again on the next visit.
     }
+  }
+
+  sheetStops() {
+    const h = window.innerHeight;
+    const closed = 76 + parseFloat(getComputedStyle(this.root).paddingBottom);
+    const full = h - parseFloat(getComputedStyle(this.score).top) - SCORE_PEEK;
+    return [closed, Math.min(h * 0.6, 600), full];
+  }
+
+  dragSheet(head) {
+    const { root } = this;
+    let drag = null;
+    let dragged = false;
+    const begin = (e) => {
+      if (sidePanel.matches || !e.isPrimary) return;
+      drag = { id: e.pointerId, from: root.offsetHeight, y: e.clientY };
+      Object.assign(drag, { at: e.clientY, t: e.timeStamp, v: 0 });
+    };
+    [this.handle, head].forEach((grip) =>
+      grip.addEventListener("pointerdown", begin),
+    );
+    window.addEventListener("pointermove", (e) => {
+      if (drag?.id !== e.pointerId) return;
+      if (!drag.moving) {
+        if (Math.abs(e.clientY - drag.y) < DRAG_START) return;
+        drag.moving = true;
+        dragged = true;
+        root.classList.add("is-dragging");
+      }
+      drag.v = (drag.at - e.clientY) / Math.max(1, e.timeStamp - drag.t);
+      drag.at = e.clientY;
+      drag.t = e.timeStamp;
+      const [low, , high] = this.sheetStops();
+      const height = clamp(drag.from + drag.y - e.clientY, low, high);
+      root.style.height = `${height}px`;
+    });
+    const end = (e) => {
+      if (drag?.id !== e.pointerId) return;
+      const { moving, v } = drag;
+      drag = null;
+      if (!moving) return;
+      const at = root.offsetHeight;
+      const stops = this.sheetStops();
+      let near = stops.reduce(
+        (best, stop, n) =>
+          Math.abs(stop - at) < Math.abs(stops[best] - at) ? n : best,
+        0,
+      );
+      if (v > FLING) near = stops.findIndex((stop) => stop > at + 1);
+      if (v < -FLING) near = stops.findLastIndex((stop) => stop < at - 1);
+      if (near < 0) near = v > 0 ? stops.length - 1 : 0;
+      root.classList.remove("is-dragging");
+      root.style.height = "";
+      this.setOpen(near > 0, near === 2);
+      setTimeout(() => {
+        dragged = false;
+      });
+    };
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    root.addEventListener(
+      "click",
+      (e) => {
+        if (!dragged) return;
+        e.stopPropagation();
+        e.preventDefault();
+      },
+      true,
+    );
   }
 
   scrollTabs(e) {
