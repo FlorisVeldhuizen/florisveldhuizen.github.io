@@ -14,6 +14,7 @@ import {
   Color,
   BackSide,
 } from "three";
+import { viewHeight } from "./util";
 
 const FRAME_HEIGHT = 6.4;
 const FRAME_WIDTH = 5.2;
@@ -26,7 +27,7 @@ export const RING = {
 };
 
 function fitCamera(camera) {
-  const aspect = window.innerWidth / window.innerHeight;
+  const aspect = window.innerWidth / viewHeight();
   const halfFov = (camera.fov * Math.PI) / 360;
   const needHeight = Math.max(FRAME_HEIGHT, FRAME_WIDTH / aspect);
   camera.aspect = aspect;
@@ -77,7 +78,7 @@ export function initScene() {
     powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(window.innerWidth, viewHeight());
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.5;
   renderer.localClippingEnabled = true;
@@ -132,7 +133,7 @@ export function setupResizeHandler(camera, renderer, onResize) {
     requestAnimationFrame(() => {
       pending = false;
       fitCamera(camera);
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(window.innerWidth, viewHeight());
       onResize?.();
     });
   });

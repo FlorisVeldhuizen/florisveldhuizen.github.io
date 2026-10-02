@@ -1,4 +1,5 @@
 import { Vector3 } from "three";
+import { viewHeight } from "../../util";
 
 const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 const WAKE_RADIUS = 0.8;
@@ -77,14 +78,14 @@ export class Wind {
     const w = this.wake;
     w.on = pointer.present && motion.speed > 0;
     if (!w.on) return;
-    const unit = Math.min(window.innerWidth, window.innerHeight);
+    const unit = Math.min(window.innerWidth, viewHeight());
     w.vx = motion.vx * unit;
     w.vy = motion.vy * unit;
     w.origin.copy(this.camera.position);
     w.dir
       .set(
         (pointer.x / window.innerWidth) * 2 - 1,
-        -(pointer.y / window.innerHeight) * 2 + 1,
+        -(pointer.y / viewHeight()) * 2 + 1,
         0.5,
       )
       .unproject(this.camera)
@@ -123,7 +124,7 @@ export class Wind {
       const edge = Math.exp(-(((d - WAKE_RADIUS) / (WAKE_RADIUS * 0.5)) ** 2));
       const push = core - edge * 0.35;
       if (Math.abs(push) > 0.01) {
-        const perPx = (2 * w.halfHeight(at.z)) / window.innerHeight;
+        const perPx = (2 * w.halfHeight(at.z)) / viewHeight();
         const vx = w.vx * perPx;
         const vy = -w.vy * perPx;
         const cap = Math.min(1, WAKE_MAX / Math.max(Math.hypot(vx, vy), 1e-3));

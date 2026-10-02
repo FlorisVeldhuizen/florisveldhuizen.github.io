@@ -1,6 +1,6 @@
 import { el, setText, animate, sidePanel } from "./dom";
 import { iconSvg } from "./icons";
-import { clamp } from "../util";
+import { clamp, viewHeight } from "../util";
 import { HelpersView } from "./views/helpers";
 import { UpgradesView } from "./views/upgrades";
 import { OrchardView } from "./views/orchard";
@@ -170,7 +170,11 @@ export class Panel {
       b.setAttribute("aria-label", label);
       b.title = label;
       b.id = `tab-${id}`;
-      b.addEventListener("click", () => this.show(id, true));
+      b.addEventListener("click", () => {
+        if (this.open && id === this.current && !sidePanel.matches)
+          this.setOpen(false);
+        else this.show(id, true);
+      });
       this.buttons[id] = b;
       const section = el("section", `tab-panel tab-${id}`, this.body);
       section.setAttribute("role", "tabpanel");
@@ -246,7 +250,7 @@ export class Panel {
   }
 
   sheetStops() {
-    const h = window.innerHeight;
+    const h = viewHeight();
     const closed = 76 + parseFloat(getComputedStyle(this.root).paddingBottom);
     const full = h - parseFloat(getComputedStyle(this.score).top) - SCORE_PEEK;
     return [closed, Math.min(h * 0.6, 600), full];

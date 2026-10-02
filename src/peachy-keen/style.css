@@ -17,6 +17,7 @@
   --edge-top: max(var(--gutter), env(safe-area-inset-top));
   --edge-right: max(var(--gutter), env(safe-area-inset-right));
   --edge-left: max(var(--gutter), env(safe-area-inset-left));
+  --view-h: 100dvh;
   --display: "Fraunces", "Iowan Old Style", Georgia, serif;
 }
 
@@ -32,6 +33,22 @@ body {
   overscroll-behavior: none;
   /* matches the manifest background and the iOS launch splashes */
   background: #362c3f;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root {
+    --view-h: 100vh;
+  }
+
+  html,
+  body {
+    height: 100vh;
+  }
+
+  /* Installed iOS ends the viewport above the screen bottom, so the 100vh body anchors the fixed UI. */
+  body {
+    transform: translateZ(0);
+  }
 }
 
 body {
@@ -228,8 +245,8 @@ button:focus-visible {
   background: rgba(30, 5, 12, 0.94);
   font-size: 16px;
   max-height: calc(
-    100dvh - var(--edge-top) - var(--gutter) - env(safe-area-inset-bottom) -
-      60px
+    var(--view-h) - var(--edge-top) - var(--gutter) -
+      env(safe-area-inset-bottom) - 60px
   );
   overflow-x: hidden;
   overflow-y: auto;

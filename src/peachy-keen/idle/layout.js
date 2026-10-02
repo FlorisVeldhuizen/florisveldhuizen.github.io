@@ -1,4 +1,4 @@
-import { ease } from "../util";
+import { ease, viewHeight } from "../util";
 import { sidePanel } from "./dom";
 
 const FRAME_HEIGHT = 6.4;
@@ -29,14 +29,14 @@ export class Layout {
     const rect = this.panel.root.getBoundingClientRect();
     const wide = sidePanel.matches;
     this.side = wide ? Math.max(0, window.innerWidth - rect.left) : 0;
-    this.bottom = wide ? 0 : Math.max(0, window.innerHeight - rect.top);
-    const opened = this.bottom > window.innerHeight * 0.3;
+    this.bottom = wide ? 0 : Math.max(0, viewHeight() - rect.top);
+    const opened = this.bottom > viewHeight() * 0.3;
     this.top = opened ? this.rate.getBoundingClientRect().bottom : 0;
   }
 
   // A sheet pulled past its open height covers the peach, so the peach stays framed for the open sheet.
   frameBottom() {
-    return Math.min(this.bottom, window.innerHeight * OPEN_SHARE);
+    return Math.min(this.bottom, viewHeight() * OPEN_SHARE);
   }
 
   stageRect() {
@@ -44,7 +44,7 @@ export class Layout {
       x: 0,
       y: this.top,
       w: window.innerWidth - this.side,
-      h: window.innerHeight - this.bottom - this.top,
+      h: viewHeight() - this.bottom - this.top,
     };
   }
 
@@ -54,7 +54,7 @@ export class Layout {
     this.shownBottom += (this.frameBottom() - this.shownBottom) * k;
     this.shownTop += (this.top - this.shownTop) * k;
     const w = window.innerWidth;
-    const h = window.innerHeight;
+    const h = viewHeight();
     const stageW = Math.max(1, w - this.shownSide);
     const stageH = Math.max(1, h - this.shownBottom * 0.85 - this.shownTop);
     const cam = this.camera;

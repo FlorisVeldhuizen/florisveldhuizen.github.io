@@ -1,4 +1,4 @@
-import { reducedMotion } from "../util";
+import { reducedMotion, viewHeight } from "../util";
 
 export function el(tag, className = "", parent = null, html = "") {
   const node = document.createElement(tag);
@@ -41,7 +41,7 @@ export function floatBeside(detail, anchor) {
   const h = detail.offsetHeight;
   const top = Math.min(
     Math.max(r.top + r.height / 2 - h / 2, 12),
-    window.innerHeight - h - 12,
+    viewHeight() - h - 12,
   );
   // eslint-disable-next-line no-param-reassign
   detail.style.top = `${Math.round(top)}px`;

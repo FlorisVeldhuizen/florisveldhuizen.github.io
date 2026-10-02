@@ -11,6 +11,7 @@ import {
   Vector3,
 } from "three";
 import { JUICE_LAYER, juiceMaterial, dropletPositionAt } from "./juice";
+import { viewHeight } from "./util";
 
 const LIFE = 4.2;
 const OIL_LIFE = 6;
@@ -122,7 +123,7 @@ export class Lens {
 
   resize() {
     const w = window.innerWidth;
-    const h = window.innerHeight;
+    const h = viewHeight();
     this.canvas.width = CANVAS_WIDTH;
     this.canvas.height = Math.round((CANVAS_WIDTH * h) / w);
     this.material.uniforms.uTexel.value.set(

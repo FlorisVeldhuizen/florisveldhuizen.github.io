@@ -1730,16 +1730,27 @@ body.is-storm::after {
       env(safe-area-inset-left);
     border-top: 1px solid var(--blush-faint);
     border-left: 0;
+    overflow: hidden;
     border-radius: 22px 22px 0 0;
     transition: height 0.35s cubic-bezier(0.3, 0.7, 0.2, 1);
   }
 
+  .panel-body {
+    order: 1;
+  }
+
+  .panel-head {
+    order: 2;
+    border-top: 1px solid var(--blush-faint);
+    border-bottom: 0;
+  }
+
   .panel.is-open {
-    height: min(60dvh, 600px);
+    height: min(calc(var(--view-h) * 0.6), 600px);
   }
 
   .panel.is-full {
-    height: calc(100dvh - var(--edge-top) - 64px);
+    height: calc(var(--view-h) - var(--edge-top) - 64px);
   }
 
   .panel.is-dragging {
@@ -1751,6 +1762,7 @@ body.is-storm::after {
   }
 
   .panel:not(.is-open, .is-dragging) .panel-body {
+    padding-block: 0;
     visibility: hidden;
   }
 
@@ -1796,11 +1808,13 @@ body.is-storm::after {
   }
 
   .tab {
-    padding: 8px 8px 10px;
+    padding: 10px 8px 9px;
+    border-top: 2px solid transparent;
+    border-bottom: 0;
   }
 
-  .panel:not(.is-open) .tab[aria-selected="true"] {
-    border-bottom-color: transparent;
+  .panel.is-open .tab[aria-selected="true"] {
+    border-top-color: var(--peach);
   }
 
   .hints {
@@ -1808,7 +1822,9 @@ body.is-storm::after {
   }
 
   .toasts {
-    bottom: calc(min(var(--panel-bottom, 0px), 60dvh, 600px) + 48px);
+    bottom: calc(
+      min(var(--panel-bottom, 0px), var(--view-h) * 0.6, 600px) + 48px
+    );
   }
 
   .is-shopping .meters.is-visible {

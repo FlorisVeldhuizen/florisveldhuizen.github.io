@@ -1,5 +1,5 @@
 import { Color, LinearSRGBColorSpace, Quaternion, Vector3 } from "three";
-import { ease } from "./util";
+import { ease, viewHeight } from "./util";
 
 const FADE_RATE = 9;
 const STYLE_RATE = 14;
@@ -45,7 +45,7 @@ export default class SurfaceMarker {
     this.world.copy(this.point).applyMatrix4(this.peach.mesh.matrixWorld);
     const distance = this.camera.position.distanceTo(this.world);
     const halfFov = (this.camera.fov * Math.PI) / 360;
-    return (pixels * 2 * distance * Math.tan(halfFov)) / window.innerHeight;
+    return (pixels * 2 * distance * Math.tan(halfFov)) / viewHeight();
   }
 
   update(spot, marker, delta, shrink = 0) {

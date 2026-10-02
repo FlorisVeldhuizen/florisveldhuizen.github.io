@@ -3,7 +3,7 @@ import { playCork } from "./audio";
 import { BottleModel } from "./bottle3d";
 import OilStream from "./stream";
 import OilShadow from "./oilshadow";
-import { clamp, ease, reducedMotion } from "./util";
+import { clamp, ease, reducedMotion, viewHeight } from "./util";
 
 const PEACH_BASE = 1.6;
 const PEACH_HEIGHT = 3.2;
@@ -56,20 +56,20 @@ class ModelView {
     const point = this.model.spoutWorld(this.point).project(this.camera);
     return {
       x: (point.x + 1) * 0.5 * window.innerWidth,
-      y: (1 - point.y) * 0.5 * window.innerHeight,
+      y: (1 - point.y) * 0.5 * viewHeight(),
     };
   }
 
   floorScreenY() {
     const distance = this.camera.userData.baseZ - DEPTH;
     const halfHeight = distance * Math.tan((this.camera.fov * Math.PI) / 360);
-    return window.innerHeight * 0.5 * (1 + PEACH_BASE / halfHeight);
+    return viewHeight() * 0.5 * (1 + PEACH_BASE / halfHeight);
   }
 
   heightPx() {
     const halfFov = (this.camera.fov * Math.PI) / 360;
     const peachPx =
-      (PEACH_HEIGHT * window.innerHeight) /
+      (PEACH_HEIGHT * viewHeight()) /
       (2 * this.camera.userData.baseZ * Math.tan(halfFov));
     return peachPx * HEIGHT_TO_PEACH;
   }
@@ -77,7 +77,7 @@ class ModelView {
   pixelSize() {
     const distance = this.camera.position.z - DEPTH;
     const height = 2 * distance * Math.tan((this.camera.fov * Math.PI) / 360);
-    return height / window.innerHeight;
+    return height / viewHeight();
   }
 
   place(b, delta) {
@@ -112,10 +112,7 @@ class ModelView {
   }
 
   toWorld(x, y, target) {
-    this.ndc.set(
-      (x / window.innerWidth) * 2 - 1,
-      -(y / window.innerHeight) * 2 + 1,
-    );
+    this.ndc.set((x / window.innerWidth) * 2 - 1, -(y / viewHeight()) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, this.camera);
     return this.raycaster.ray.intersectPlane(this.plane, target);
   }
@@ -315,7 +312,7 @@ export class Bottle {
     this.flingWait = FLING_COOLDOWN;
     this.fill = Math.max(0.3, this.fill - amount * 0.03);
     this.sloshVelocity += 4;
-    const unit = Math.min(window.innerWidth, window.innerHeight);
+    const unit = Math.min(window.innerWidth, viewHeight());
     const spout = this.view.spoutScreen();
     this.stream.fling(spout, peak.vx * unit, peak.vy * unit, amount);
     peak.speed = 0;

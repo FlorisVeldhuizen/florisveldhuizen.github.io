@@ -10,6 +10,7 @@ import {
   createBackgroundMaterial,
   createBackdropBlitMaterial,
 } from "./shaders";
+import { viewHeight } from "./util";
 
 const SMOKE_SCALE = 0.5;
 
@@ -30,10 +31,7 @@ export function createBackdrop(scene, renderer) {
 
   return {
     resize() {
-      material.uniforms.resolution.value.set(
-        window.innerWidth,
-        window.innerHeight,
-      );
+      material.uniforms.resolution.value.set(window.innerWidth, viewHeight());
     },
     update(delta, heat) {
       material.uniforms.time.value += delta * speed;
@@ -60,7 +58,7 @@ export function createBackdrop(scene, renderer) {
     setLens(x, y, power) {
       blit.uniforms.lensAt.value.set(x, y);
       blit.uniforms.lensPower.value = power;
-      blit.uniforms.aspect.value = window.innerWidth / window.innerHeight;
+      blit.uniforms.aspect.value = window.innerWidth / viewHeight();
     },
     setMotion(enabled) {
       speed = enabled ? 1 : 0.15;

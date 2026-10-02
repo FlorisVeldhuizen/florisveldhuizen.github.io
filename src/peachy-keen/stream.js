@@ -1,4 +1,4 @@
-import { clamp, ease, reducedMotion } from "./util";
+import { clamp, ease, reducedMotion, viewHeight } from "./util";
 
 const GRAVITY = 2400;
 const EMIT_RATE = 120;
@@ -162,7 +162,7 @@ export default class OilStream {
     this.time += delta;
     this.delta = delta;
     if (landing !== undefined)
-      this.floor = landing ? landing.y : window.innerHeight + 40;
+      this.floor = landing ? landing.y : viewHeight() + 40;
     if (landing?.tilt !== undefined) {
       const k = ease(16, delta);
       this.pool.tilt += (landing.tilt - this.pool.tilt) * k;
@@ -466,15 +466,12 @@ export default class OilStream {
       d.y += d.vy * delta;
       d.z += d.vz * delta;
       const onScreen =
-        d.x > 0 &&
-        d.x < window.innerWidth &&
-        d.y > 0 &&
-        d.y < window.innerHeight;
+        d.x > 0 && d.x < window.innerWidth && d.y > 0 && d.y < viewHeight();
       if (d.z >= 1) {
         if (onScreen) this.onLens?.(d.x, d.y, d.r * NEAR_SCALE);
         return false;
       }
-      if (d.y > window.innerHeight + 40) return false;
+      if (d.y > viewHeight() + 40) return false;
       const r = d.r * (1 + d.z * (NEAR_SCALE - 1));
       body += circle(d.x, d.y, r);
       shine += circle(d.x - r * 0.35, d.y - r * 0.4, r * 0.3);
