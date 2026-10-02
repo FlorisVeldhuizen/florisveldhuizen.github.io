@@ -6,6 +6,7 @@ import {
   floatBeside,
   clearOnLeave,
   inspectOn,
+  onHold,
   sidePanel,
   toggle,
   keepFocus,
@@ -46,10 +47,47 @@ export class HelpersView {
     this.detail = el("p", "shop-detail is-floating", root);
     this.detail.setAttribute("aria-live", "polite");
     this.focused = null;
-    clearOnLeave(this.list, this.detail, () => {
-      this.focused = null;
+    this.pinned = false;
+    clearOnLeave(this.list, this.detail, () => this.close());
+    document.addEventListener(
+      "pointerdown",
+      () => {
+        this.swallowClick = false;
+      },
+      true,
+    );
+    document.addEventListener(
+      "click",
+      (e) => {
+        if (!this.swallowClick) return;
+        this.swallowClick = false;
+        if (!this.list.contains(e.target)) return;
+        e.stopPropagation();
+        e.preventDefault();
+      },
+      true,
+    );
+    document.addEventListener("click", (e) => {
+      if (!this.pinned || e.target.closest(".row-info")) return;
+      if (!this.detail.contains(e.target)) this.close();
     });
     this.syncAmounts();
+  }
+
+  close() {
+    this.focused = null;
+    this.pinned = false;
+    toggle(this.detail, "is-hidden", true);
+    this.syncInfo();
+  }
+
+  syncInfo() {
+    const open = !this.detail.classList.contains("is-hidden");
+    this.rows.forEach(({ info }, id) => {
+      const value = String(open && this.focused === id);
+      if (info && info.getAttribute("aria-expanded") !== value)
+        info.setAttribute("aria-expanded", value);
+    });
   }
 
   syncAmounts() {
@@ -70,20 +108,21 @@ export class HelpersView {
     this.list.replaceChildren();
     this.rows.clear();
     shown.forEach(({ helper, known }) => {
-      const li = el("li", "", this.list);
+      const li = el("li", "helper-item", this.list);
       const b = el("button", `row helper-row${known ? "" : " is-mystery"}`, li);
       b.type = "button";
       b.disabled = !known;
       b.innerHTML = `
-        <span class="row-icon">${iconSvg(known ? helper.id : "lock")}</span>
+        <span class="row-icon">${iconSvg(known ? helper.id : "lock")}<svg class="hold-ring" viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="20.5"/></svg></span>
         <span class="row-main">
-          <span class="row-name">${known ? helper.name : "???"}</span>
+          <span class="row-name">${known ? helper.name : "???"}<span class="row-qty"></span></span>
           <span class="row-meta"><span class="row-cost"></span><span class="row-each"></span></span>
         </span>
         <span class="row-count"></span>
         <span class="row-bar" aria-hidden="true"><i></i></span>`;
       const parts = {
         button: b,
+        qty: b.querySelector(".row-qty"),
         cost: b.querySelector(".row-cost"),
         each: b.querySelector(".row-each"),
         count: b.querySelector(".row-count"),
@@ -92,11 +131,7 @@ export class HelpersView {
         known,
       };
       if (known) {
-        b.addEventListener("click", (e) => {
-          if (!sidePanel.matches && e.target.closest(".row-icon")) {
-            this.inspect(helper.id);
-            return;
-          }
+        b.addEventListener("click", () => {
           if (this.game.buyHelper(helper.id)) this.flash(b);
           else nudge(b.querySelector(".row-meta"));
         });
@@ -104,6 +139,17 @@ export class HelpersView {
           this.focused = helper.id;
           this.showDetail();
         });
+        onHold(b, () => {
+          this.swallowClick = true;
+          navigator.vibrate?.(10);
+          this.pin(helper.id);
+        });
+        const info = el("button", "row-info", li, iconSvg("info"));
+        info.type = "button";
+        info.setAttribute("aria-label", `About ${helper.name}`);
+        info.setAttribute("aria-expanded", "false");
+        info.addEventListener("click", () => this.inspect(helper.id));
+        parts.info = info;
       }
       this.rows.set(helper.id, parts);
     });
@@ -122,12 +168,13 @@ export class HelpersView {
 
   inspect(id) {
     const open = !this.detail.classList.contains("is-hidden");
-    if (open && this.focused === id) {
-      this.focused = null;
-      toggle(this.detail, "is-hidden", true);
-      return;
-    }
+    if (open && this.focused === id) this.close();
+    else this.pin(id);
+  }
+
+  pin(id) {
     this.focused = id;
+    this.pinned = true;
     this.showDetail();
   }
 
@@ -149,9 +196,10 @@ export class HelpersView {
       );
     else lines.push(`Each one makes ${format(each)} juice per second.`);
     setDetail(this.detail, helper.name, lines);
-    const after = sidePanel.matches ? this.list : parts.button;
+    const after = sidePanel.matches ? this.list : parts.info;
     if (after.nextElementSibling !== this.detail) after.after(this.detail);
     floatBeside(this.detail, parts.button);
+    this.syncInfo();
   }
 
   update() {
@@ -175,9 +223,9 @@ export class HelpersView {
       const { count, cost } = game.helperPrice(id);
       const capped = owned >= game.model.maxOwned;
       setText(parts.count, owned ? format(owned, { whole: true }) : "");
-      const label = count > 1 ? `×${count} ` : "";
-      setText(parts.cost, capped ? "Full" : `${label}${format(cost)}`);
-      setText(parts.each, ` · +${format(game.model.rates[id] * count)}/s`);
+      setText(parts.qty, count > 1 && !capped ? `×${count}` : "");
+      setText(parts.cost, capped ? "Full" : format(cost));
+      setText(parts.each, `+${format(game.model.rates[id] * count)}/s`);
       const affordable = !capped && cost <= s.juice;
       toggle(parts.button, "is-affordable", affordable);
       parts.button.setAttribute("aria-disabled", String(!affordable));

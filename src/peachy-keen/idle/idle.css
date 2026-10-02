@@ -397,6 +397,75 @@ body.is-storm::after {
   background: var(--blush-faint);
 }
 
+.helper-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+}
+
+.helper-item > .shop-detail {
+  grid-column: 1 / -1;
+}
+
+.row-info {
+  display: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blush-dim);
+  transition: color 0.15s ease;
+}
+
+.row-info .icon {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.5;
+}
+
+.row-info[aria-expanded="true"] {
+  color: var(--peach);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .helper-item {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .row-info {
+    display: grid;
+  }
+}
+
+.helper-row .row-icon {
+  position: relative;
+}
+
+.hold-ring {
+  position: absolute;
+  inset: -1px;
+  width: 42px;
+  height: 42px;
+  overflow: visible;
+  pointer-events: none;
+  transform: rotate(-90deg);
+}
+
+.hold-ring circle {
+  fill: none;
+  stroke: var(--peach);
+  stroke-width: 2;
+  stroke-dasharray: 129;
+  stroke-dashoffset: 129;
+}
+
+.helper-row.is-holding .hold-ring circle {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.45s linear;
+}
+
 .row-main {
   display: grid;
   gap: 1px;
@@ -415,6 +484,18 @@ body.is-storm::after {
   font-size: 14px;
   font-variant-numeric: tabular-nums;
   line-height: 1.35;
+}
+
+.row-qty {
+  margin-left: 0.4em;
+  color: var(--blush-dim);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.row-each {
+  margin-left: 0.9em;
 }
 
 .row.is-affordable .row-cost,
