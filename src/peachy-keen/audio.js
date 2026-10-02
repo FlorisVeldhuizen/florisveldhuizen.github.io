@@ -5,6 +5,9 @@ let master = null;
 let loading = null;
 const slaps = [];
 const rubs = [];
+const grabs = [];
+const kisses = [];
+const lastPlayed = new Map();
 let burst = null;
 let noise = null;
 let rub = null;
@@ -51,6 +54,12 @@ export function loadSounds() {
       }),
       Promise.all(AUDIO_CONFIG.rubSounds.map(decode)).then((buffers) =>
         rubs.push(...buffers),
+      ),
+      Promise.all(AUDIO_CONFIG.grabSounds.map(decode)).then((buffers) =>
+        grabs.push(...buffers),
+      ),
+      Promise.all(AUDIO_CONFIG.kissSounds.map(decode)).then((buffers) =>
+        kisses.push(...buffers),
       ),
     ]).catch((error) => {
       // eslint-disable-next-line no-console
@@ -325,14 +334,41 @@ export function playSquish(amount) {
   noiseHit(2200, 700, 0.06, 0.12 + amount * 0.1);
 }
 
-let lastRub = -1;
+function pickVariation(buffers) {
+  const last = lastPlayed.get(buffers) ?? -1;
+  const next =
+    (last + 1 + Math.floor(Math.random() * (buffers.length - 1))) %
+    buffers.length;
+  lastPlayed.set(buffers, next);
+  return buffers[next];
+}
+
+function playVariation(buffers, { rate, volume, cutoff = 20000 }) {
+  if (!running() || !buffers.length) return;
+  const src = ctx.createBufferSource();
+  src.buffer = pickVariation(buffers);
+  src.playbackRate.value = rate;
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = cutoff;
+  const gain = ctx.createGain();
+  gain.gain.value = volume;
+  src.connect(soften).connect(gain).connect(master);
+  src.start();
+}
+
+export function playGrab(oil = 0) {
+  playVariation(grabs, {
+    rate: (0.85 + Math.random() * 0.3) * (1 - oil * 0.1),
+    volume: 0.4 + Math.random() * 0.25,
+    cutoff: 12000 - oil * 6000,
+  });
+}
 
 export function playKnead(oil, amount) {
   if (!running() || !rubs.length) return;
-  lastRub =
-    (lastRub + 1 + Math.floor(Math.random() * (rubs.length - 1))) % rubs.length;
   const src = ctx.createBufferSource();
-  src.buffer = rubs[lastRub];
+  src.buffer = pickVariation(rubs);
   const rate = (0.94 + Math.random() * 0.12) * (1.06 - oil * 0.12);
   src.playbackRate.value = rate;
   const soften = ctx.createBiquadFilter();
@@ -351,15 +387,10 @@ export function playKnead(oil, amount) {
 }
 
 export function playKiss() {
-  noiseHit(3200, 1100, 0.05, 0.45);
-  if (!running()) return;
-  tone(ctx.currentTime + 0.03, {
-    from: 900,
-    to: 1600,
-    sweep: 0.05,
-    length: 0.07,
-    volume: 0.12,
-    attack: 0.008,
+  playVariation(kisses, {
+    rate: 0.88 + Math.random() * 0.26,
+    volume: 0.35 + Math.random() * 0.25,
+    cutoff: 5000 + Math.random() * 15000,
   });
 }
 

@@ -5,6 +5,7 @@ import {
   setRub,
   setSlide,
   playSlice,
+  playGrab,
   playKiss,
   playHeartbeat,
   playSquish,
@@ -592,7 +593,7 @@ export class Interaction {
     };
     this.pointer.grabbed = true;
     this.ui.onGrab();
-    playSquish(0.2);
+    playGrab(this.oil);
     buzz(8);
     this.talk.say("grab", 0.7);
   }

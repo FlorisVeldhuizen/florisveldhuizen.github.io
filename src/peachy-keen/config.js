@@ -8,6 +8,26 @@ import rub3Sound from "./assets/rub3.m4a?url";
 import rub4Sound from "./assets/rub4.m4a?url";
 import rub5Sound from "./assets/rub5.m4a?url";
 import rub6Sound from "./assets/rub6.m4a?url";
+import grab1Sound from "./assets/grab1.m4a?url";
+import grab2Sound from "./assets/grab2.m4a?url";
+import grab3Sound from "./assets/grab3.m4a?url";
+import grab4Sound from "./assets/grab4.m4a?url";
+import grab5Sound from "./assets/grab5.m4a?url";
+import grab6Sound from "./assets/grab6.m4a?url";
+import grab7Sound from "./assets/grab7.m4a?url";
+import grab8Sound from "./assets/grab8.m4a?url";
+import grab9Sound from "./assets/grab9.m4a?url";
+import grab10Sound from "./assets/grab10.m4a?url";
+import kiss1Sound from "./assets/kiss1.m4a?url";
+import kiss2Sound from "./assets/kiss2.m4a?url";
+import kiss3Sound from "./assets/kiss3.m4a?url";
+import kiss4Sound from "./assets/kiss4.m4a?url";
+import kiss5Sound from "./assets/kiss5.m4a?url";
+import kiss6Sound from "./assets/kiss6.m4a?url";
+import kiss7Sound from "./assets/kiss7.m4a?url";
+import kiss8Sound from "./assets/kiss8.m4a?url";
+import kiss9Sound from "./assets/kiss9.m4a?url";
+import kiss10Sound from "./assets/kiss10.m4a?url";
 
 export const PEACH_CONFIG = {
   TARGET_MODEL_HEIGHT: 3,
@@ -137,6 +157,30 @@ export const AUDIO_CONFIG = {
   slapSounds: [ass2Sound, ass3Sound, ass5Sound],
   burstSound: uhSound,
   rubSounds: [rub1Sound, rub2Sound, rub3Sound, rub4Sound, rub5Sound, rub6Sound],
+  grabSounds: [
+    grab1Sound,
+    grab2Sound,
+    grab3Sound,
+    grab4Sound,
+    grab5Sound,
+    grab6Sound,
+    grab7Sound,
+    grab8Sound,
+    grab9Sound,
+    grab10Sound,
+  ],
+  kissSounds: [
+    kiss1Sound,
+    kiss2Sound,
+    kiss3Sound,
+    kiss4Sound,
+    kiss5Sound,
+    kiss6Sound,
+    kiss7Sound,
+    kiss8Sound,
+    kiss9Sound,
+    kiss10Sound,
+  ],
   pitchVariationMin: 0.88,
   pitchVariationMax: 1.12,
   silentOffset: 0.08,
