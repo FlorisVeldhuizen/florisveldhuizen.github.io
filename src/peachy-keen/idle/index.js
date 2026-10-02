@@ -17,6 +17,10 @@ import { HELPERS } from "./data/helpers";
 import { TREE_BY_ID } from "./data/tree";
 import { format } from "./numbers";
 import { playDing, playBuy, playNotes } from "../audio";
+import { PHYSICS_CONFIG } from "../config";
+import { clamp, reducedMotion } from "../util";
+
+const SHEET_SQUASH = 0.012;
 
 export function createIdle({
   interaction,
@@ -42,6 +46,17 @@ export function createIdle({
   const panel = new Panel(game, orchard, settings, modal);
   const hud = new Hud(game);
   const layout = new Layout(camera, panel);
+  const squashWithSheet = (delta) => {
+    if (!delta || reducedMotion.matches) return;
+    const press = clamp(-layout.growth * SHEET_SQUASH, -0.08, 0.08);
+    if (Math.abs(press) < 0.002) return;
+    interaction.squashVelocity.x +=
+      PHYSICS_CONFIG.SQUASH_STIFFNESS *
+      interaction.firmness.stiffness *
+      press *
+      delta;
+    interaction.squashAxis.set(0, 1);
+  };
   const golden = new GoldenPeach(
     game,
     layout,
@@ -250,8 +265,9 @@ export function createIdle({
       game.away = null;
       flushAway();
     },
-    frame() {
-      layout.update();
+    frame(realDelta) {
+      layout.update(realDelta);
+      squashWithSheet(realDelta);
     },
     update(realDelta) {
       game.tick();

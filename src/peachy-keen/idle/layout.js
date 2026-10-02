@@ -1,4 +1,4 @@
-import { clamp, viewHeight } from "../util";
+import { Spring, clamp, viewHeight } from "../util";
 import { sidePanel } from "./dom";
 
 const FRAME_HEIGHT = 6.4;
@@ -6,6 +6,8 @@ const FRAME_WIDTH = 5.2;
 const OPEN_SHARE = 0.6;
 const TOP_FROM = 0.15;
 const TOP_RAMP = 0.2;
+const SETTLE_FREQUENCY = 17;
+const SETTLE_DAMPING = 0.55;
 
 export class Layout {
   constructor(camera, panel) {
@@ -15,7 +17,13 @@ export class Layout {
     this.bottom = 0;
     this.top = 0;
     this.cssKey = "";
+    this.growth = 0;
     this.measure();
+    this.shown = Array.from(
+      { length: 3 },
+      () => new Spring(0, SETTLE_FREQUENCY, SETTLE_DAMPING),
+    );
+    this.targetZ = null;
   }
 
   measure() {
@@ -42,8 +50,7 @@ export class Layout {
     };
   }
 
-  // The sheet already eases in CSS, so framing follows its measured size each frame.
-  update() {
+  update(delta) {
     this.measure();
     const bottom = this.frameBottom();
     const w = window.innerWidth;
@@ -57,9 +64,16 @@ export class Layout {
       (FRAME_WIDTH * h) / stageW,
     );
     const z = worldH / 2 / Math.tan(halfFov);
-    cam.userData.baseZ = z;
-    const x = Math.round(this.side / 2);
-    const y = Math.round((bottom - this.top) / 2);
+    const targets = [z, this.side / 2, (bottom - this.top) / 2];
+    const snap = this.targetZ === null || !delta;
+    const [shownZ, shownX, shownY] = targets.map((t, i) =>
+      snap ? this.shown[i].snap(t) : this.shown[i].step(t, delta),
+    );
+    this.growth = snap ? 0 : (this.targetZ - z) / (z * delta);
+    this.targetZ = z;
+    cam.userData.baseZ = shownZ;
+    const x = Math.round(shownX);
+    const y = Math.round(shownY);
     const view = cam.view;
     if (
       !view ||

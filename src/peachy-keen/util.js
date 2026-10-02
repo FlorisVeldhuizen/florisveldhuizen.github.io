@@ -6,6 +6,35 @@ export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 export const ease = (rate, delta) => 1 - Math.exp(-delta * rate);
 
+const SPRING_STEP = 1 / 120;
+
+export class Spring {
+  constructor(value, frequency, damping) {
+    this.value = value;
+    this.velocity = 0;
+    this.stiffness = frequency * frequency;
+    this.friction = 2 * damping * frequency;
+  }
+
+  snap(value) {
+    this.value = value;
+    this.velocity = 0;
+    return value;
+  }
+
+  step(target, delta) {
+    for (let left = delta; left > 0; left -= SPRING_STEP) {
+      const h = Math.min(left, SPRING_STEP);
+      this.velocity +=
+        ((target - this.value) * this.stiffness -
+          this.velocity * this.friction) *
+        h;
+      this.value += this.velocity * h;
+    }
+    return this.value;
+  }
+}
+
 const bezier = (s, a, b) =>
   3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s * s * b + s ** 3;
 

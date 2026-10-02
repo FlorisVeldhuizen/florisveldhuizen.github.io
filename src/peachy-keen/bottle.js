@@ -4,13 +4,15 @@ import { BottleModel } from "./bottle3d";
 import OilStream from "./stream";
 import OilShadow from "./oilshadow";
 import { HintDrop } from "./hintdrop";
-import { clamp, ease, reducedMotion, viewHeight } from "./util";
+import { Spring, clamp, ease, reducedMotion, viewHeight } from "./util";
 
 const PEACH_HEIGHT = 3.2;
 const HEIGHT_TO_PEACH = 0.28;
 const WIDTH_TO_HEIGHT = 0.52;
 const HINT_GAP_PX = 24;
 const CATCH_PX = 48;
+const BASE_Y = -0.5;
+const SQUASH_PER_GROWTH = 0.012;
 const DEPTH = 2.4;
 const POUR_ANGLE = 118;
 const LEAN_ANGLE = 12;
@@ -106,7 +108,9 @@ class ModelView {
       .setFromRotationMatrix(this.basis)
       .premultiply(this.camera.quaternion)
       .multiply(this.yaw.setFromAxisAngle(AXIS, b.yaw));
-    this.group.scale.setScalar(scale);
+    const stretch = 1 - b.squash.value;
+    const width = 1 / Math.sqrt(stretch);
+    this.group.scale.set(scale * width, scale * stretch, scale * width);
     if (b.carried) {
       this.toWorld(b.spoutPoint.x, b.spoutPoint.y, this.group.position);
       this.group.position.addScaledVector(
@@ -115,6 +119,10 @@ class ModelView {
       );
     } else {
       this.toWorld(b.screen.x, b.screen.y - b.raise, this.group.position);
+      this.group.position.addScaledVector(
+        up.applyQuaternion(this.camera.quaternion),
+        -BASE_Y * scale * (stretch - 1),
+      );
     }
     this.model.fill = b.fill;
     this.updateCork(delta);
@@ -201,6 +209,8 @@ export class Bottle {
     this.slosh = 0;
     this.sloshVelocity = 0;
     this.homeShift = 0;
+    this.grow = new Spring(0, 14, 0.38);
+    this.squash = new Spring(0, 13, 0.3);
     this.lift = 0;
     this.raise = 0;
     this.yaw = 0;
@@ -226,8 +236,23 @@ export class Bottle {
     window.addEventListener("resize", () => this.updateHome());
   }
 
+  followSize(delta) {
+    const target = this.view.heightPx();
+    if (!delta || this.heightPx === undefined) {
+      this.squash.snap(0);
+      return this.grow.snap(target);
+    }
+    const height = this.grow.step(target, delta);
+    const growth = this.grow.velocity / height;
+    const press = reducedMotion.matches
+      ? 0
+      : clamp(-growth * SQUASH_PER_GROWTH, -0.08, 0.08);
+    this.squash.step(press, delta);
+    return height;
+  }
+
   updateHome(delta) {
-    const height = this.view.heightPx();
+    const height = this.followSize(delta);
     if (delta === undefined) this.hintDrop.settle();
     else this.hintDrop.update(delta);
     const drop = this.hintDrop.bottleAt;
