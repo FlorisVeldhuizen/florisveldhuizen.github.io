@@ -7,8 +7,12 @@ const slaps = [];
 const rubs = [];
 const grabs = [];
 const kisses = [];
+const glugs = [];
+const snaps = [];
+const slices = [];
 const lastPlayed = new Map();
 let burst = null;
+let rubLoop = null;
 let noise = null;
 let rub = null;
 let slide = null;
@@ -45,22 +49,27 @@ function noiseBuffer() {
 
 export function loadSounds() {
   if (!loading) {
+    const sets = [
+      [AUDIO_CONFIG.slapSounds, slaps],
+      [AUDIO_CONFIG.rubSounds, rubs],
+      [AUDIO_CONFIG.grabSounds, grabs],
+      [AUDIO_CONFIG.kissSounds, kisses],
+      [AUDIO_CONFIG.glugSounds, glugs],
+      [AUDIO_CONFIG.snapSounds, snaps],
+      [AUDIO_CONFIG.sliceSounds, slices],
+    ];
     loading = Promise.all([
-      Promise.all(AUDIO_CONFIG.slapSounds.map(decode)).then((buffers) =>
-        slaps.push(...buffers),
+      ...sets.map(([urls, buffers]) =>
+        Promise.all(urls.map(decode)).then((decoded) =>
+          buffers.push(...decoded),
+        ),
       ),
       decode(AUDIO_CONFIG.burstSound).then((buffer) => {
         burst = buffer;
       }),
-      Promise.all(AUDIO_CONFIG.rubSounds.map(decode)).then((buffers) =>
-        rubs.push(...buffers),
-      ),
-      Promise.all(AUDIO_CONFIG.grabSounds.map(decode)).then((buffers) =>
-        grabs.push(...buffers),
-      ),
-      Promise.all(AUDIO_CONFIG.kissSounds.map(decode)).then((buffers) =>
-        kisses.push(...buffers),
-      ),
+      decode(AUDIO_CONFIG.rubLoopSound).then((buffer) => {
+        rubLoop = buffer;
+      }),
     ]).catch((error) => {
       // eslint-disable-next-line no-console
       console.error("Could not load sounds:", error);
@@ -109,6 +118,7 @@ export function playBurst() {
   const now = ctx.currentTime;
   const src = ctx.createBufferSource();
   src.buffer = burst;
+  src.playbackRate.value = 0.92 + Math.random() * 0.16;
   const gain = ctx.createGain();
   gain.gain.value = 0.85;
   src.connect(gain).connect(master);
@@ -125,12 +135,12 @@ export function playBurst() {
   thump.stop(now + 0.45);
 }
 
-function noiseLoop() {
+function noiseLoop(buffer = noiseBuffer(), filter = "bandpass") {
   const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer();
+  src.buffer = buffer;
   src.loop = true;
   const band = ctx.createBiquadFilter();
-  band.type = "bandpass";
+  band.type = filter;
   const gain = ctx.createGain();
   gain.gain.value = 0;
   src.connect(band).connect(gain).connect(master);
@@ -151,13 +161,21 @@ function expireLoop(loop, audible) {
 export function setRub(amount, oil) {
   if (!running()) return;
   if (!rub) {
-    if (amount <= 0) return;
-    rub = noiseLoop();
+    if (amount <= 0 || !rubLoop) return;
+    rub = noiseLoop(rubLoop, "lowpass");
   }
   const now = ctx.currentTime;
-  rub.gain.gain.setTargetAtTime(amount * (0.05 + oil * 0.1), now, 0.05);
-  rub.band.frequency.setTargetAtTime(700 + amount * 900 - oil * 300, now, 0.05);
-  rub.band.Q.value = 1.5 + oil * 5;
+  rub.gain.gain.setTargetAtTime(amount * (0.3 + oil * 0.2), now, 0.05);
+  rub.src.playbackRate.setTargetAtTime(
+    0.9 + amount * 0.3 - oil * 0.1,
+    now,
+    0.1,
+  );
+  rub.band.frequency.setTargetAtTime(
+    2500 + amount * 5000 - oil * 1500,
+    now,
+    0.05,
+  );
   rub = expireLoop(rub, amount > 0);
 }
 
@@ -215,45 +233,14 @@ export function playSettle() {
 }
 
 export function playSlice() {
-  noiseHit(7000, 1800, 0.18, 0.5);
-}
-
-export function playTear(duration) {
-  if (!running()) return;
-  const now = ctx.currentTime;
-  const end = now + duration;
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer();
-  src.loop = true;
-  const band = ctx.createBiquadFilter();
-  band.type = "bandpass";
-  band.Q.value = 4;
-  band.frequency.setValueAtTime(700, now);
-  band.frequency.exponentialRampToValueAtTime(2600, end);
-  const fibres = ctx.createOscillator();
-  fibres.type = "square";
-  fibres.frequency.setValueAtTime(18, now);
-  fibres.frequency.exponentialRampToValueAtTime(70, end);
-  const fibreDepth = ctx.createGain();
-  fibreDepth.gain.value = 0.5;
-  const crackle = ctx.createGain();
-  crackle.gain.value = 0.5;
-  fibres.connect(fibreDepth).connect(crackle.gain);
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.001, now);
-  gain.gain.exponentialRampToValueAtTime(0.22, end);
-  gain.gain.linearRampToValueAtTime(0, end + 0.01);
-  src.connect(band).connect(crackle).connect(gain).connect(master);
-  src.start(now, Math.random() * 0.5);
-  fibres.start(now);
-  src.stop(end + 0.02);
-  fibres.stop(end + 0.02);
+  playVariation(slices, {
+    rate: 0.9 + Math.random() * 0.2,
+    volume: 0.45 + Math.random() * 0.15,
+  });
 }
 
 export function playSplash() {
   if (!running()) return;
-  noiseHit(1800, 260, 0.38, 0.45, "lowpass");
-  noiseHit(3200, 900, 0.12, 0.3);
   const now = ctx.currentTime;
   for (let n = 0; n < 7; n += 1) {
     const pitch = 900 + Math.random() * 1600;
@@ -413,15 +400,10 @@ export function playHeartbeat(strength) {
 }
 
 export function playGlug(amount) {
-  if (!running()) return;
-  const now = ctx.currentTime;
-  const from = 180 + Math.random() * 120;
-  tone(now, {
-    from,
-    to: from * 2.6,
-    sweep: 0.07,
-    length: 0.09,
-    volume: 0.06 + amount * 0.08,
+  playVariation(glugs, {
+    rate: 0.85 + Math.random() * 0.35,
+    volume: 0.15 + amount * 0.25,
+    cutoff: 6000,
   });
 }
 
@@ -458,12 +440,10 @@ function tone(at, { from, to, sweep, length, volume, attack = 0.01 }) {
 export function playSnap(amount) {
   if (!running()) return;
   const now = ctx.currentTime;
-  noiseHit(
-    2600 + amount * 1800,
-    700,
-    0.03 + amount * 0.03,
-    0.12 + amount * 0.4,
-  );
+  playVariation(snaps, {
+    rate: 0.9 + amount * 0.2 + Math.random() * 0.1,
+    volume: 0.1 + amount * 0.45,
+  });
   if (slaps.length) {
     const src = ctx.createBufferSource();
     src.buffer = slaps[Math.floor(Math.random() * slaps.length)];
@@ -518,6 +498,10 @@ function pad(notes, type, cutoff) {
   return gain;
 }
 
+function swell(now, period) {
+  return Math.max(0, Math.sin((now / period) * 2 * Math.PI)) ** 2;
+}
+
 let choir = null;
 
 export function setChoir(amount) {
@@ -526,7 +510,8 @@ export function setChoir(amount) {
     if (amount <= 0) return;
     choir = pad([220, 277.18, 329.63, 440], "triangle", 1400);
   }
-  choir.gain.setTargetAtTime(amount * 0.018, ctx.currentTime, 0.8);
+  const now = ctx.currentTime;
+  choir.gain.setTargetAtTime(amount * 0.018 * swell(now, 37), now, 0.8);
 }
 
 let chant = null;
@@ -539,7 +524,11 @@ export function setChant(amount) {
   }
   const now = ctx.currentTime;
   const breathe = 0.7 + 0.3 * Math.sin(now * 0.8);
-  chant.gain.setTargetAtTime(amount * 0.02 * breathe, now, 0.4);
+  chant.gain.setTargetAtTime(
+    amount * 0.02 * breathe * swell(now, 29),
+    now,
+    0.4,
+  );
 }
 
 export function playThump(amount = 1) {

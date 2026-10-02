@@ -12,7 +12,6 @@ import {
   playSnap,
   playSlide,
   playSettle,
-  playTear,
   playSplash,
   playGlug,
 } from "./audio";
@@ -1232,7 +1231,6 @@ export class Interaction {
     this.sliceCenter = center;
     this.sliceNormal = normal;
     playSlice();
-    playTear(SLICE_HOLD * WINDUP_FROM);
     buzz(15);
   }
 

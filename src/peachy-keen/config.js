@@ -28,6 +28,30 @@ import kiss7Sound from "./assets/kiss7.m4a?url";
 import kiss8Sound from "./assets/kiss8.m4a?url";
 import kiss9Sound from "./assets/kiss9.m4a?url";
 import kiss10Sound from "./assets/kiss10.m4a?url";
+import snap1Sound from "./assets/snap1.m4a?url";
+import snap2Sound from "./assets/snap2.m4a?url";
+import snap3Sound from "./assets/snap3.m4a?url";
+import snap4Sound from "./assets/snap4.m4a?url";
+import snap5Sound from "./assets/snap5.m4a?url";
+import snap6Sound from "./assets/snap6.m4a?url";
+import snap7Sound from "./assets/snap7.m4a?url";
+import snap8Sound from "./assets/snap8.m4a?url";
+import snap9Sound from "./assets/snap9.m4a?url";
+import snap10Sound from "./assets/snap10.m4a?url";
+import slice1Sound from "./assets/slice1.m4a?url";
+import slice2Sound from "./assets/slice2.m4a?url";
+import slice3Sound from "./assets/slice3.m4a?url";
+import glug1Sound from "./assets/glug1.m4a?url";
+import glug2Sound from "./assets/glug2.m4a?url";
+import glug3Sound from "./assets/glug3.m4a?url";
+import glug4Sound from "./assets/glug4.m4a?url";
+import glug5Sound from "./assets/glug5.m4a?url";
+import glug6Sound from "./assets/glug6.m4a?url";
+import glug7Sound from "./assets/glug7.m4a?url";
+import glug8Sound from "./assets/glug8.m4a?url";
+import glug9Sound from "./assets/glug9.m4a?url";
+import glug10Sound from "./assets/glug10.m4a?url";
+import rubLoopSound from "./assets/rubloop.m4a?url";
 
 export const PEACH_CONFIG = {
   TARGET_MODEL_HEIGHT: 3,
@@ -181,6 +205,32 @@ export const AUDIO_CONFIG = {
     kiss9Sound,
     kiss10Sound,
   ],
+  glugSounds: [
+    glug1Sound,
+    glug2Sound,
+    glug3Sound,
+    glug4Sound,
+    glug5Sound,
+    glug6Sound,
+    glug7Sound,
+    glug8Sound,
+    glug9Sound,
+    glug10Sound,
+  ],
+  snapSounds: [
+    snap1Sound,
+    snap2Sound,
+    snap3Sound,
+    snap4Sound,
+    snap5Sound,
+    snap6Sound,
+    snap7Sound,
+    snap8Sound,
+    snap9Sound,
+    snap10Sound,
+  ],
+  sliceSounds: [slice1Sound, slice2Sound, slice3Sound],
+  rubLoopSound,
   pitchVariationMin: 0.88,
   pitchVariationMax: 1.12,
   silentOffset: 0.08,
