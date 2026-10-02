@@ -1,4 +1,5 @@
 import { AUDIO_CONFIG } from "./config";
+import { clamp } from "./util";
 
 let ctx = null;
 let master = null;
@@ -10,6 +11,8 @@ const kisses = [];
 const glugs = [];
 const snaps = [];
 const slices = [];
+const pats = [];
+const skinBodies = [];
 const lastPlayed = new Map();
 let burst = null;
 let massageBank = null;
@@ -60,6 +63,8 @@ export function loadSounds() {
       [AUDIO_CONFIG.glugSounds, glugs],
       [AUDIO_CONFIG.snapSounds, snaps],
       [AUDIO_CONFIG.sliceSounds, slices],
+      [AUDIO_CONFIG.patSounds, pats],
+      [AUDIO_CONFIG.skinBodySounds, skinBodies],
     ];
     loading = Promise.all([
       ...sets.map(([urls, buffers]) =>
@@ -114,6 +119,31 @@ function cutLows(node, hz) {
   return node.connect(filter);
 }
 
+const onsets = new WeakMap();
+
+function onset(buffer) {
+  if (!onsets.has(buffer)) {
+    const data = buffer.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < data.length; i += 1)
+      if (Math.abs(data[i]) > Math.abs(data[peak])) peak = i;
+    const floor = Math.abs(data[peak]) * 0.1;
+    let start = 0;
+    const window = Math.round(buffer.sampleRate * 0.002);
+    for (let i = peak; i > window; i -= 1) {
+      let quiet = true;
+      for (let j = i - window; j < i && quiet; j += 1)
+        quiet = Math.abs(data[j]) < floor;
+      if (quiet) {
+        start = i;
+        break;
+      }
+    }
+    onsets.set(buffer, Math.max(0, start / buffer.sampleRate - 0.003));
+  }
+  return onsets.get(buffer);
+}
+
 let lastSlap = null;
 
 export function cutSlap() {
@@ -140,7 +170,7 @@ export function playSlap(intensity, heat, oil, pitch = 1, lowCut = 0) {
   const gain = ctx.createGain();
   gain.gain.value = 0.35 + intensity * 0.5;
   cutLows(src.connect(tone), lowCut).connect(gain).connect(master);
-  src.start(now, AUDIO_CONFIG.silentOffset);
+  src.start(now, onset(src.buffer));
   lastSlap = gain;
 
   if (oil > 0.15)
@@ -586,10 +616,10 @@ function noiseHit(
   length,
   volume,
   type = "bandpass",
-  { q = 2, attack = 0 } = {},
+  { q = 2, attack = 0, at } = {},
 ) {
   if (!running()) return;
-  const now = ctx.currentTime;
+  const now = at ?? ctx.currentTime;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuffer();
   const filter = ctx.createBiquadFilter();
@@ -627,6 +657,120 @@ export function setSlide(speed, height) {
   slide.gain.gain.setTargetAtTime(Math.min(1, speed) * 0.22, now, 0.02);
   slide.band.frequency.setTargetAtTime(900 + height * 2300, now, 0.02);
   slide = expireLoop(slide, speed > 0);
+}
+
+const PAT = { volume: 0.6, brightness: 5000, range: 0.7, body: 0.35 };
+const WOBBLE = { ...PAT, brightness: 4000, range: 0.8, swings: 3, decay: 0.44 };
+const PAT_VARIETY = 0.6;
+const lastPat = new Map();
+
+function vary(amount) {
+  return 1 + (Math.random() * 2 - 1) * amount * PAT_VARIETY;
+}
+
+function pickPat(buffers, weight, spread) {
+  const clampIndex = (i) => clamp(i, 0, buffers.length - 1);
+  let i = clampIndex(
+    Math.round(weight * (buffers.length - 1) + (Math.random() - 0.5) * spread),
+  );
+  if (buffers.length > 1 && i === lastPat.get(buffers))
+    i = clampIndex(
+      i === buffers.length - 1 || (i > 0 && Math.random() < 0.5)
+        ? i - 1
+        : i + 1,
+    );
+  lastPat.set(buffers, i);
+  return buffers[i];
+}
+
+function patLayer(at, buffer, { volume, cutoff, pan, skip = 0 }) {
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.playbackRate.value = vary(0.035);
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = cutoff;
+  const gain = ctx.createGain();
+  gain.gain.value = volume;
+  const panner = ctx.createStereoPanner();
+  panner.pan.value = pan;
+  src.connect(soften).connect(gain).connect(panner).connect(master);
+  src.start(at, onset(buffer) + skip);
+}
+
+function pat(at, weight, pan, oil, mix) {
+  const { range } = mix;
+  const heavy = clamp(0.5 + (clamp(weight, 0, 1) - 0.5) * range * 2, 0, 1);
+  const volume =
+    mix.volume * (1 - range + range * (0.2 + 0.8 * heavy ** 1.3)) * vary(0.25);
+  const cutoff =
+    mix.brightness *
+    (1 - range * 0.5 + range * heavy) *
+    (1 - oil * 0.4) *
+    vary(0.3);
+  const side = clamp(
+    pan + (Math.random() * 2 - 1) * 0.25 * PAT_VARIETY,
+    -0.8,
+    0.8,
+  );
+  const spread = 1.2 + PAT_VARIETY * 2.4;
+  patLayer(at, pickPat(pats, heavy, spread), {
+    volume,
+    cutoff,
+    pan: side,
+    skip: Math.random() * 0.003 * PAT_VARIETY,
+  });
+  if (heavy > 0.35 && Math.random() < 0.35 * PAT_VARIETY)
+    patLayer(
+      at + 0.008 + Math.random() * 0.014,
+      pickPat(pats, heavy * 0.6, spread),
+      {
+        volume: volume * (0.25 + Math.random() * 0.2),
+        cutoff: cutoff * 0.7,
+        pan: -side * 0.5,
+      },
+    );
+  if (skinBodies.length)
+    patLayer(
+      at + Math.random() * 0.006 * PAT_VARIETY,
+      pickPat(skinBodies, Math.random(), spread),
+      {
+        volume:
+          mix.body * volume * (0.3 + 0.7 * heavy) * (0.6 + Math.random() * 0.4),
+        cutoff: cutoff * 0.6,
+        pan: side * 0.6,
+        skip: Math.random() * 0.004 * PAT_VARIETY,
+      },
+    );
+  if (oil > 0.15)
+    noiseHit(2400, 500, 0.08, 0.22 * weight * oil, "bandpass", { at });
+}
+
+export function playPat(weight, pan, oil) {
+  if (!running() || !pats.length) return;
+  pat(ctx.currentTime, weight, pan, oil, PAT);
+}
+
+export function playWobble(strength, swingSeconds, oil) {
+  if (!running() || !pats.length) return;
+  const now = ctx.currentTime;
+  const swings = Math.max(
+    1,
+    Math.round(WOBBLE.swings * (0.35 + strength * 0.65)),
+  );
+  for (let k = 0; k < swings; k += 1) {
+    const fade = WOBBLE.decay ** k;
+    pat(
+      now + 0.04 + swingSeconds * (k + 1),
+      strength * fade,
+      k % 2 ? 0.15 : -0.15,
+      oil,
+      {
+        ...WOBBLE,
+        volume: WOBBLE.volume * (0.5 + 0.5 * fade),
+      },
+    );
+  }
 }
 
 export function playSettle() {
@@ -872,7 +1016,7 @@ function snapSlap(amount, crisp) {
     cutLows(src.connect(soften), crisp ? 250 : 0)
       .connect(gain)
       .connect(master);
-    src.start(now, AUDIO_CONFIG.silentOffset);
+    src.start(now, onset(src.buffer));
   }
 }
 

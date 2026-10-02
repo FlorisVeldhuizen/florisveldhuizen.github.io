@@ -169,8 +169,18 @@ export const INTERACTION_CONFIG = {
   MASSAGE_RADIUS: 0.7,
   WAISTBAND_FROM: 0.55,
   CLAP_GAP_MS: 320,
+  WIGGLE_SPEED: 6,
+  WIGGLE_SWING: 0.5,
+  WIGGLE_TURNS: 2,
+  WIGGLE_GAP: 0.22,
+  WOBBLE_FROM: 0.25,
   HEARTBEAT_FROM: 0.45,
 };
+
+const inNumberOrder = (files) =>
+  Object.keys(files)
+    .sort((a, b) => a.match(/\d+/)[0] - b.match(/\d+/)[0])
+    .map((path) => files[path]);
 
 export const AUDIO_CONFIG = {
   slapSounds: [ass2Sound, ass3Sound, ass5Sound],
@@ -214,6 +224,20 @@ export const AUDIO_CONFIG = {
     snap10Sound,
   ],
   sliceSounds: [slice1Sound, slice2Sound, slice3Sound],
+  patSounds: inNumberOrder(
+    import.meta.glob("./assets/pat*.m4a", {
+      eager: true,
+      query: "?url",
+      import: "default",
+    }),
+  ),
+  skinBodySounds: inNumberOrder(
+    import.meta.glob("./assets/skinbody*.m4a", {
+      eager: true,
+      query: "?url",
+      import: "default",
+    }),
+  ),
   massageBankSound,
   pitchVariationMin: 0.88,
   pitchVariationMax: 1.12,

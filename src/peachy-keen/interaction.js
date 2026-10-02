@@ -17,6 +17,8 @@ import {
   playSettle,
   playSplash,
   playGlug,
+  playPat,
+  playWobble,
 } from "./audio";
 import {
   PHYSICS_CONFIG,
@@ -605,6 +607,12 @@ export class Interaction {
       age: 0,
       ripple: 0,
       sounded: false,
+      side: 0,
+      peak: 0,
+      turnX: 0,
+      turnAt: 0,
+      streak: 0,
+      pattedAt: 0,
     };
     this.pointer.grabbed = true;
     this.ui.onGrab();
@@ -649,6 +657,7 @@ export class Interaction {
       playGrab(this.oil);
     }
     g.drag = clamp(motion.speed / 2.5, 0, 0.6);
+    this.updateWiggle(g, limit);
     const still = g.age > 0.25 && motion.speed < CFG.GRAB_STILL_SPEED;
     g.knead = still
       ? Math.min(1, g.knead + delta / CFG.GRAB_KNEAD_SECONDS)
@@ -695,6 +704,36 @@ export class Interaction {
     this.spin.addScaledVector(lever.cross(g.pull), 9 * delta);
     this.addHeat(2 * delta * (0.2 + length), 99);
     this.wake();
+  }
+
+  updateWiggle(g, limit) {
+    const vx = g.pullVelocity.x / limit;
+    g.peak = Math.max(g.peak, Math.abs(vx));
+    const side = Math.abs(vx) > 0.4 ? Math.sign(vx) : 0;
+    if (side && g.side && side !== g.side) {
+      const swing = Math.abs(g.pull.x - g.turnX) / limit;
+      const fast = g.peak > CFG.WIGGLE_SPEED && swing > CFG.WIGGLE_SWING;
+      const inRow = fast && this.clock - g.turnAt < 0.6;
+      g.streak = inRow ? g.streak + 1 : Number(fast);
+      g.turnAt = this.clock;
+      if (
+        g.streak > CFG.WIGGLE_TURNS &&
+        this.clock - g.pattedAt > CFG.WIGGLE_GAP
+      ) {
+        g.pattedAt = this.clock;
+        const weight =
+          (g.peak - CFG.WIGGLE_SPEED) / 24 +
+          Math.min(0.1, (g.streak - CFG.WIGGLE_TURNS) * 0.02);
+        playPat(
+          Math.min(1, weight),
+          clamp(g.pull.x / limit, -0.6, 0.6),
+          this.oil,
+        );
+      }
+      g.peak = 0;
+      g.turnX = g.pull.x;
+    }
+    if (side) g.side = side;
   }
 
   releaseGrab() {
@@ -801,6 +840,13 @@ export class Interaction {
       if (tension > 0.5) this.lens.splash(flung, this.oil);
     }
     playSlap(0.4 + length * 0.6, this.heat / 100, this.oil, 1.1);
+    const stretch = length / CFG.GRAB_REACH;
+    if (stretch > CFG.WOBBLE_FROM)
+      playWobble(
+        Math.min(1, (stretch - CFG.WOBBLE_FROM) / (1 - CFG.WOBBLE_FROM)),
+        Math.PI / (this.firmness.dentFrequency * 0.85),
+        this.oil,
+      );
     this.talk.say("release", 0.6);
     this.addHeat(5 * length);
     this.ui.onSnapback(at.x, at.y, length / CFG.GRAB_REACH);
