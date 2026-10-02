@@ -137,7 +137,6 @@ const DRAG_START = 8;
 const FLING = 0.6;
 const SCORE_PEEK = 64;
 const TAB_KEY = "peachy-keen-tab";
-const OPEN_KEY = "peachy-keen-shop-open";
 
 export class Panel {
   constructor(game, orchard, settings, modal) {
@@ -195,11 +194,6 @@ export class Panel {
     this.settings = settings;
     this.timer = 0;
     this.open = sidePanel.matches;
-    try {
-      if (this.open) this.open = localStorage.getItem(OPEN_KEY) !== "0";
-    } catch {
-      // The shop then starts open.
-    }
     this.collapse = el("button", "panel-collapse", head, iconSvg("chevron"));
     this.collapse.type = "button";
     [this.handle, this.collapse].forEach((b) =>
@@ -241,12 +235,6 @@ export class Panel {
     this.collapse.setAttribute("aria-expanded", String(open));
     this.collapse.setAttribute("aria-label", label);
     this.collapse.title = label;
-    if (!sidePanel.matches) return;
-    try {
-      localStorage.setItem(OPEN_KEY, open ? "1" : "0");
-    } catch {
-      // The shop then opens again on the next visit.
-    }
   }
 
   sheetStops() {

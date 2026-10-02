@@ -5,11 +5,10 @@ import OilStream from "./stream";
 import OilShadow from "./oilshadow";
 import { clamp, ease, reducedMotion, viewHeight } from "./util";
 
-const PEACH_BASE = 1.6;
 const PEACH_HEIGHT = 3.2;
 const HEIGHT_TO_PEACH = 0.28;
 const WIDTH_TO_HEIGHT = 0.52;
-const HINT_GAP_PX = 12;
+const HINT_GAP_PX = 24;
 const DEPTH = 2.4;
 const POUR_ANGLE = 118;
 const LEAN_ANGLE = 12;
@@ -58,12 +57,6 @@ class ModelView {
       x: (point.x + 1) * 0.5 * window.innerWidth,
       y: (1 - point.y) * 0.5 * viewHeight(),
     };
-  }
-
-  floorScreenY() {
-    const distance = this.camera.userData.baseZ - DEPTH;
-    const halfHeight = distance * Math.tan((this.camera.fov * Math.PI) / 360);
-    return viewHeight() * 0.5 * (1 + PEACH_BASE / halfHeight);
   }
 
   heightPx() {
@@ -207,23 +200,17 @@ export class Bottle {
     this.el.addEventListener("pointerleave", () => {
       this.hovered = false;
     });
-    this.resize();
+    this.hints = document.querySelector(".hints");
+    this.updateHome();
     this.screen.x = this.homeX;
     this.screen.y = this.homeY;
-    window.addEventListener("resize", () => this.resize());
-  }
-
-  resize() {
-    this.hintsTop = document.querySelector(".hints").offsetTop;
-    this.updateHome();
+    window.addEventListener("resize", () => this.updateHome());
   }
 
   updateHome() {
     const height = this.view.heightPx();
-    const bottom = Math.min(
-      this.view.floorScreenY(),
-      this.hintsTop - HINT_GAP_PX,
-    );
+    // The hints follow the idle shop sheet, so their top is read every frame.
+    const bottom = this.hints.offsetTop - HINT_GAP_PX;
     const homeY = bottom - height / 2;
     if (homeY === this.homeY && height === this.heightPx) return;
     this.heightPx = height;

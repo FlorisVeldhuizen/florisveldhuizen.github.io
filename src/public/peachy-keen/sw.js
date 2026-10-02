@@ -1,5 +1,5 @@
 // Bump on a release that has to drop everything the browser is holding; hashed asset names cover the rest.
-const CACHE = "peachy-keen-v1";
+const CACHE = "peachy-keen-v2";
 
 const SHELL = [
   "/peachy-keen/",

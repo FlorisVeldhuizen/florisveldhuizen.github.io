@@ -24,6 +24,11 @@ export class Modal {
       if (e.key === "Tab") this.trap(e);
     });
     this.queue = [];
+    this.onIdle = null;
+  }
+
+  get open() {
+    return !this.root.hidden;
   }
 
   show(options) {
@@ -111,6 +116,7 @@ export class Modal {
     this.returnFocus?.focus?.();
     const next = this.queue.shift();
     if (next) this.show(next);
+    else this.onIdle?.();
   }
 
   confirm({ title, text, yes, danger = false, onYes }) {

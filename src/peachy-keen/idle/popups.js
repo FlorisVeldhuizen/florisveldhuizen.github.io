@@ -4,9 +4,14 @@ import { reducedMotion } from "../util";
 
 const POP_GAP_MS = 70;
 const TOAST_MS = 3600;
+const TOAST_RUSH_MS = 2200;
+const TOAST_QUEUE = 4;
 
 export class Popups {
-  constructor() {
+  constructor(modal) {
+    this.modal = modal;
+    this.waiting = [];
+    this.showing = false;
     this.layer = document.getElementById("combos");
     this.toasts = el("div", "toasts", document.body);
     this.toasts.setAttribute("role", "status");
@@ -72,12 +77,19 @@ export class Popups {
   }
 
   toast(kicker, title, text, kind = "trophy") {
+    this.waiting.push([kicker, title, text, kind]);
+    if (this.waiting.length > TOAST_QUEUE) this.waiting.shift();
+    this.next();
+  }
+
+  next() {
+    if (this.showing || this.modal.open || !this.waiting.length) return;
+    const [kicker, title, text, kind] = this.waiting.shift();
+    this.showing = true;
     const box = el("div", `toast-card is-${kind}`, this.toasts);
     el("small", "", box).textContent = kicker;
     el("strong", "", box).textContent = title;
     if (text) el("span", "", box).textContent = text;
-    while (this.toasts.children.length > 2)
-      this.toasts.firstElementChild.remove();
     animate(
       box,
       [
@@ -86,7 +98,14 @@ export class Popups {
         { opacity: 1, transform: "none", offset: 0.88 },
         { opacity: 0, transform: "translateY(-6px)" },
       ],
-      { duration: TOAST_MS, easing: "ease-out" },
-    ).finished.then(() => box.remove());
+      {
+        duration: this.waiting.length ? TOAST_RUSH_MS : TOAST_MS,
+        easing: "ease-out",
+      },
+    ).finished.then(() => {
+      box.remove();
+      this.showing = false;
+      this.next();
+    });
   }
 }

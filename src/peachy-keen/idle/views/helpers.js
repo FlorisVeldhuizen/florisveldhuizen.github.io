@@ -5,6 +5,8 @@ import {
   setDetail,
   floatBeside,
   clearOnLeave,
+  inspectOn,
+  sidePanel,
   toggle,
   keepFocus,
   nudge,
@@ -64,6 +66,7 @@ export class HelpersView {
   }
 
   build(shown) {
+    this.list.after(this.detail);
     this.list.replaceChildren();
     this.rows.clear();
     shown.forEach(({ helper, known }) => {
@@ -89,17 +92,18 @@ export class HelpersView {
         known,
       };
       if (known) {
-        b.addEventListener("click", () => {
-          this.focused = helper.id;
+        b.addEventListener("click", (e) => {
+          if (e.target.closest(".row-icon")) {
+            this.inspect(helper.id);
+            return;
+          }
           if (this.game.buyHelper(helper.id)) this.flash(b);
           else nudge(b.querySelector(".row-meta"));
         });
-        const show = () => {
+        inspectOn(b, () => {
           this.focused = helper.id;
           this.showDetail();
-        };
-        b.addEventListener("pointerenter", show);
-        b.addEventListener("focus", show);
+        });
       }
       this.rows.set(helper.id, parts);
     });
@@ -114,6 +118,17 @@ export class HelpersView {
       { duration: 380, easing: "ease-out" },
     );
     this.update();
+  }
+
+  inspect(id) {
+    const open = !this.detail.classList.contains("is-hidden");
+    if (open && this.focused === id && !sidePanel.matches) {
+      this.focused = null;
+      toggle(this.detail, "is-hidden", true);
+      return;
+    }
+    this.focused = id;
+    this.showDetail();
   }
 
   showDetail() {
@@ -134,6 +149,8 @@ export class HelpersView {
       );
     else lines.push(`Each one makes ${format(each)} juice per second.`);
     setDetail(this.detail, helper.name, lines);
+    const after = sidePanel.matches ? this.list : parts.button;
+    if (after.nextElementSibling !== this.detail) after.after(this.detail);
     floatBeside(this.detail, parts.button);
   }
 

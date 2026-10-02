@@ -37,7 +37,8 @@ export function createIdle({
   game.buzzer = buzzer;
   const orchard = new Orchard(game);
   const modal = new Modal();
-  const popups = new Popups();
+  const popups = new Popups(modal);
+  modal.onIdle = () => popups.next();
   const panel = new Panel(game, orchard, settings, modal);
   const hud = new Hud(game);
   const layout = new Layout(camera, panel);

@@ -60,6 +60,16 @@ export function clearOnLeave(area, detail, onClear) {
   });
 }
 
+// The inline detail on phones would push rows around under a moving mouse, so hover shows it beside the panel only.
+export function inspectOn(button, show) {
+  button.addEventListener("pointerenter", (e) => {
+    if (e.pointerType === "mouse" && sidePanel.matches) show();
+  });
+  button.addEventListener("focus", () => {
+    if (button.matches(":focus-visible")) show();
+  });
+}
+
 export function animate(node, frames, options) {
   const last = frames[frames.length - 1];
   return node.animate(reducedMotion.matches ? [last, last] : frames, options);

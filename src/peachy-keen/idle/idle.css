@@ -383,6 +383,20 @@ body.is-storm::after {
   color: var(--peach);
 }
 
+.rows > li > .shop-detail {
+  position: static;
+  margin: 2px 0 12px;
+  box-shadow: none;
+}
+
+.rows > li > .shop-detail.is-hidden {
+  display: none;
+}
+
+.rows > li:has(> .shop-detail:not(.is-hidden)) .row-icon {
+  background: var(--blush-faint);
+}
+
 .row-main {
   display: grid;
   gap: 1px;
@@ -1436,11 +1450,8 @@ body.is-storm::after {
   z-index: 20;
   display: grid;
   place-items: center;
-  padding: var(--edge-top) calc(var(--panel-side, 0px) + var(--edge-right))
-    calc(
-      var(--gutter) + max(var(--panel-bottom, 0px), env(safe-area-inset-bottom))
-    )
-    var(--edge-left);
+  padding: var(--edge-top) var(--edge-right)
+    calc(var(--gutter) + env(safe-area-inset-bottom)) var(--edge-left);
   background: rgba(10, 0, 4, 0.62);
   cursor: auto;
 }
@@ -1741,8 +1752,11 @@ body.is-storm::after {
 
   .panel-head {
     order: 2;
-    border-top: 1px solid var(--blush-faint);
     border-bottom: 0;
+  }
+
+  .panel.is-open .panel-head {
+    box-shadow: inset 0 1px var(--blush-faint);
   }
 
   .panel.is-open {
@@ -1758,6 +1772,10 @@ body.is-storm::after {
   }
 
   .is-shopping .hints {
+    opacity: 0;
+  }
+
+  body:has(.toast-card) .hints {
     opacity: 0;
   }
 
