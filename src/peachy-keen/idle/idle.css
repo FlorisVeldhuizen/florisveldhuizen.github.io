@@ -1748,11 +1748,15 @@ body.is-storm::after {
 
   .panel-body {
     order: 1;
+    transition:
+      padding-block 0.35s cubic-bezier(0.3, 0.7, 0.2, 1),
+      visibility 0.35s;
   }
 
   .panel-head {
     order: 2;
     border-bottom: 0;
+    transition: box-shadow 0.35s ease;
   }
 
   .panel.is-open .panel-head {
@@ -1771,8 +1775,13 @@ body.is-storm::after {
     transition: none;
   }
 
+  .hints {
+    transition: opacity 0.2s ease;
+  }
+
   .is-shopping .hints {
     opacity: 0;
+    --hints-away: 1;
   }
 
   body:has(.toast-card) .hints {
@@ -1827,12 +1836,25 @@ body.is-storm::after {
 
   .tab {
     padding: 10px 8px 9px;
-    border-top: 2px solid transparent;
     border-bottom: 0;
   }
 
-  .panel.is-open .tab[aria-selected="true"] {
-    border-top-color: var(--peach);
+  .tab::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 8px;
+    left: 8px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--peach);
+    transform: scaleX(0);
+    transition: transform 0.2s ease;
+  }
+
+  .panel.is-open .tab[aria-selected="true"]::before {
+    transform: scaleX(1);
+    transition: transform 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) 0.15s;
   }
 
   .hints {
