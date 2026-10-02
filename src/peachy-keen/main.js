@@ -259,6 +259,8 @@ renderer.setAnimationLoop(() => {
   if (renderer.shadowMap.enabled && !shadows) clearShadow();
   renderer.shadowMap.enabled = shadows;
   const delta = realDelta * interaction.timeScale(realDelta);
+  // The camera and bottle read the framing, so it updates before them.
+  idle?.frame();
   interaction.update(delta);
   naughty.update(delta);
   idle?.update(realDelta);

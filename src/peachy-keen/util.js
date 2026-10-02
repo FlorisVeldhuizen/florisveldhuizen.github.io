@@ -6,6 +6,20 @@ export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 export const ease = (rate, delta) => 1 - Math.exp(-delta * rate);
 
+const bezier = (s, a, b) =>
+  3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s * s * b + s ** 3;
+
+export const cubicBezier = (x1, y1, x2, y2) => (t) => {
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 20; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (bezier(mid, x1, x2) < t) lo = mid;
+    else hi = mid;
+  }
+  return bezier((lo + hi) / 2, y1, y2);
+};
+
 const installed = window.matchMedia(
   "(display-mode: standalone), (display-mode: fullscreen)",
 );

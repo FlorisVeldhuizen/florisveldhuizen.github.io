@@ -1,9 +1,11 @@
-import { ease, viewHeight } from "../util";
+import { clamp, viewHeight } from "../util";
 import { sidePanel } from "./dom";
 
 const FRAME_HEIGHT = 6.4;
 const FRAME_WIDTH = 5.2;
 const OPEN_SHARE = 0.6;
+const TOP_FROM = 0.15;
+const TOP_RAMP = 0.2;
 
 export class Layout {
   constructor(camera, panel) {
@@ -12,17 +14,8 @@ export class Layout {
     this.side = 0;
     this.bottom = 0;
     this.top = 0;
-    this.shownSide = 0;
-    this.shownBottom = 0;
-    this.shownTop = 0;
-    this.shownZ = camera.userData.baseZ;
     this.cssKey = "";
-    new ResizeObserver(() => this.measure()).observe(panel.root);
-    window.addEventListener("resize", () => this.measure());
     this.measure();
-    this.shownSide = this.side;
-    this.shownBottom = this.frameBottom();
-    this.shownTop = this.top;
   }
 
   measure() {
@@ -30,8 +23,9 @@ export class Layout {
     const wide = sidePanel.matches;
     this.side = wide ? Math.max(0, window.innerWidth - rect.left) : 0;
     this.bottom = wide ? 0 : Math.max(0, viewHeight() - rect.top);
-    const opened = this.bottom > viewHeight() * 0.3;
-    this.top = opened ? this.rate.getBoundingClientRect().bottom : 0;
+    const h = viewHeight();
+    const opened = clamp((this.bottom - h * TOP_FROM) / (h * TOP_RAMP), 0, 1);
+    this.top = opened * this.rate.getBoundingClientRect().bottom;
   }
 
   // A sheet pulled past its open height covers the peach, so the peach stays framed for the open sheet.
@@ -48,15 +42,14 @@ export class Layout {
     };
   }
 
-  update(delta) {
-    const k = ease(6, delta);
-    this.shownSide += (this.side - this.shownSide) * k;
-    this.shownBottom += (this.frameBottom() - this.shownBottom) * k;
-    this.shownTop += (this.top - this.shownTop) * k;
+  // The sheet already eases in CSS, so framing follows its measured size each frame.
+  update() {
+    this.measure();
+    const bottom = this.frameBottom();
     const w = window.innerWidth;
     const h = viewHeight();
-    const stageW = Math.max(1, w - this.shownSide);
-    const stageH = Math.max(1, h - this.shownBottom * 0.85 - this.shownTop);
+    const stageW = Math.max(1, w - this.side);
+    const stageH = Math.max(1, h - bottom * 0.85 - this.top);
     const cam = this.camera;
     const halfFov = (cam.fov * Math.PI) / 360;
     const worldH = Math.max(
@@ -64,10 +57,9 @@ export class Layout {
       (FRAME_WIDTH * h) / stageW,
     );
     const z = worldH / 2 / Math.tan(halfFov);
-    this.shownZ += (z - this.shownZ) * k;
-    cam.userData.baseZ = this.shownZ;
-    const x = Math.round(this.shownSide / 2);
-    const y = Math.round((this.shownBottom - this.shownTop) / 2);
+    cam.userData.baseZ = z;
+    const x = Math.round(this.side / 2);
+    const y = Math.round((bottom - this.top) / 2);
     const view = cam.view;
     if (
       !view ||

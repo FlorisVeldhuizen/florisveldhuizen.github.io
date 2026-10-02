@@ -3,16 +3,14 @@ import { playCork } from "./audio";
 import { BottleModel } from "./bottle3d";
 import OilStream from "./stream";
 import OilShadow from "./oilshadow";
-import { HintDrop, contactSpeed } from "./hintdrop";
+import { HintDrop } from "./hintdrop";
 import { clamp, ease, reducedMotion, viewHeight } from "./util";
 
 const PEACH_HEIGHT = 3.2;
 const HEIGHT_TO_PEACH = 0.28;
 const WIDTH_TO_HEIGHT = 0.52;
 const HINT_GAP_PX = 24;
-const BASE_Y = -0.5;
-// Matches the height transition of the idle shop sheet in idle.css.
-const SHEET_SECONDS = 0.35;
+const CATCH_PX = 48;
 const DEPTH = 2.4;
 const POUR_ANGLE = 118;
 const LEAN_ANGLE = 12;
@@ -22,7 +20,20 @@ const AXIS = new Vector3(0, 1, 0);
 const FLING_SPEED = 2.8;
 const FLING_COOLDOWN = 1.2;
 
-const smoothstep = (t) => t * t * (3 - 2 * t);
+function sheetTop() {
+  const panel = document.querySelector(".panel");
+  const sheet = getComputedStyle(document.documentElement).getPropertyValue(
+    "--panel-bottom",
+  );
+  if (!panel || !parseFloat(sheet)) return viewHeight();
+  return panel.getBoundingClientRect().top;
+}
+
+// A smooth minimum, so the sheet picks the bottle up gradually instead of with a hard edge.
+function softMin(a, b, k) {
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.min(a, b) - (h * h * k) / 4;
+}
 
 const wrap = (degrees) => ((((degrees + 180) % 360) + 360) % 360) - 180;
 
@@ -95,9 +106,7 @@ class ModelView {
       .setFromRotationMatrix(this.basis)
       .premultiply(this.camera.quaternion)
       .multiply(this.yaw.setFromAxisAngle(AXIS, b.yaw));
-    const stretch = 1 + b.squash;
-    const width = 1 / Math.sqrt(stretch);
-    this.group.scale.set(scale * width, scale * stretch, scale * width);
+    this.group.scale.setScalar(scale);
     if (b.carried) {
       this.toWorld(b.spoutPoint.x, b.spoutPoint.y, this.group.position);
       this.group.position.addScaledVector(
@@ -106,10 +115,6 @@ class ModelView {
       );
     } else {
       this.toWorld(b.screen.x, b.screen.y - b.raise, this.group.position);
-      this.group.position.addScaledVector(
-        up.applyQuaternion(this.camera.quaternion),
-        -BASE_Y * scale * (stretch - 1),
-      );
     }
     this.model.fill = b.fill;
     this.updateCork(delta);
@@ -195,12 +200,7 @@ export class Bottle {
     this.spoutPoint = { x: 0, y: 0 };
     this.slosh = 0;
     this.sloshVelocity = 0;
-    this.squash = 0;
-    this.squashVelocity = 0;
-    this.dropSide = 1;
-    this.contacts = 0;
-    this.dropStart = 0;
-    this.dropShift = 0;
+    this.homeShift = 0;
     this.lift = 0;
     this.raise = 0;
     this.yaw = 0;
@@ -228,26 +228,14 @@ export class Bottle {
 
   updateHome(delta) {
     const height = this.view.heightPx();
-    const before = this.hintDrop.bottleState.at;
     if (delta === undefined) this.hintDrop.settle();
     else this.hintDrop.update(delta);
-    const drop = this.hintDrop.bottleState.at;
-    const away =
-      getComputedStyle(this.hints).getPropertyValue("--hints-away").trim() ===
-      "1";
-    const step = delta === undefined ? 1 : delta / SHEET_SECONDS;
-    this.cornerTime = clamp(
-      (this.cornerTime ?? 0) + (away ? step : -step),
-      0,
-      1,
-    );
-    // The hints follow the idle shop sheet, so their top is read every frame.
-    const aboveHints = this.hints.offsetTop + drop - HINT_GAP_PX;
-    const corner = this.cornerBottom();
-    const toCorner = smoothstep(this.cornerTime);
-    const bottom = aboveHints + (corner - aboveHints) * toCorner;
-    this.dropShift = (drop - before) * (1 - toCorner);
+    const drop = this.hintDrop.bottleAt;
+    const rest = this.hints.offsetTop + drop - HINT_GAP_PX;
+    // The shop sheet pushes the bottle up when it rises past it, and lets it back down as it falls.
+    const bottom = softMin(rest, sheetTop() - this.el.offsetLeft, CATCH_PX);
     const homeY = bottom - height / 2;
+    this.homeShift = this.homeY === undefined ? 0 : homeY - this.homeY;
     if (homeY === this.homeY && height === this.heightPx) return;
     this.heightPx = height;
     this.homeY = homeY;
@@ -258,41 +246,6 @@ export class Bottle {
       height: `${height}px`,
     });
     this.homeX = this.el.offsetLeft + width / 2;
-  }
-
-  cornerBottom() {
-    const sheet = getComputedStyle(document.documentElement).getPropertyValue(
-      "--panel-bottom",
-    );
-    return viewHeight() - (parseFloat(sheet) || 0) - this.el.offsetLeft;
-  }
-
-  reactToDrop() {
-    const motion = this.hintDrop.bottle;
-    if (motion.start !== this.dropStart) {
-      this.dropStart = motion.start;
-      this.contacts = 0;
-    }
-    const contact = this.hintDrop.bottleState.contact ?? 0;
-    while (this.contacts < contact) {
-      this.contacts += 1;
-      this.land(contactSpeed(motion, this.contacts));
-    }
-  }
-
-  land(speed) {
-    this.dropSide = -this.dropSide;
-    this.squashVelocity -= Math.min(speed * 0.007, 3.2);
-    this.velocity.angle += this.dropSide * Math.min(speed * 0.55, 200);
-    this.sloshVelocity += this.dropSide * Math.min(speed * 0.025, 7);
-  }
-
-  updateSquash(delta) {
-    const { phase, speed = 0 } = this.hintDrop.bottleState;
-    const target = phase === "fall" ? clamp(speed * 0.00018, 0, 0.08) : 0;
-    this.squashVelocity +=
-      ((target - this.squash) * 520 - this.squashVelocity * 16) * delta;
-    this.squash = clamp(this.squash + this.squashVelocity * delta, -0.14, 0.12);
   }
 
   size() {
@@ -410,9 +363,7 @@ export class Bottle {
     this.oilShadow.update(this.stream);
     this.time += delta;
     this.updateHome(delta);
-    this.screen.y += this.dropShift;
-    this.reactToDrop();
-    this.updateSquash(delta);
+    this.screen.y += this.homeShift;
     const v = this.velocity;
     v.x += ((this.homeX - this.screen.x) * 170 - v.x * 20) * delta;
     v.y += ((this.homeY - this.screen.y) * 170 - v.y * 20) * delta;

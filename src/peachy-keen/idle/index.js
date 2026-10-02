@@ -250,10 +250,12 @@ export function createIdle({
       game.away = null;
       flushAway();
     },
+    frame() {
+      layout.update();
+    },
     update(realDelta) {
       game.tick();
       orchard.update(realDelta);
-      layout.update(realDelta);
       hud.update();
       panel.update(realDelta);
       renders.update();

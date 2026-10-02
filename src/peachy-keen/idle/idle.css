@@ -1824,14 +1824,16 @@ body.is-storm::after {
     border-left: 0;
     overflow: hidden;
     border-radius: 22px 22px 0 0;
-    transition: height 0.35s cubic-bezier(0.3, 0.7, 0.2, 1);
+    transition: height 0.35s cubic-bezier(0.45, 0, 0.2, 1);
   }
 
   .panel-body {
     order: 1;
     transition:
       padding-block 0.35s cubic-bezier(0.3, 0.7, 0.2, 1),
-      visibility 0.35s;
+      visibility 0.35s,
+      opacity 0.3s ease 0.06s,
+      translate 0.4s cubic-bezier(0.3, 0.7, 0.2, 1);
   }
 
   .panel-head {
@@ -1846,6 +1848,7 @@ body.is-storm::after {
 
   .panel.is-open {
     height: min(calc(var(--view-h) * 0.6), 600px);
+    transition: height 0.35s cubic-bezier(0.3, 0.7, 0.2, 1);
   }
 
   .panel.is-full {
@@ -1857,12 +1860,13 @@ body.is-storm::after {
   }
 
   .hints {
-    transition: opacity 0.2s ease;
+    bottom: calc(76px + env(safe-area-inset-bottom) + 44px);
+    transition: opacity 0.15s ease 0.1s;
   }
 
   .is-shopping .hints {
     opacity: 0;
-    --hints-away: 1;
+    transition: opacity 0.15s ease;
   }
 
   body:has(.toast-card) .hints {
@@ -1872,6 +1876,13 @@ body.is-storm::after {
   .panel:not(.is-open, .is-dragging) .panel-body {
     padding-block: 0;
     visibility: hidden;
+    opacity: 0;
+    translate: 0 12px;
+    transition:
+      padding-block 0.35s cubic-bezier(0.3, 0.7, 0.2, 1),
+      visibility 0.35s,
+      opacity 0.15s ease-out,
+      translate 0.2s ease-in;
   }
 
   .toast-card {
@@ -1924,8 +1935,8 @@ body.is-storm::after {
     content: "";
     position: absolute;
     top: 0;
-    right: 8px;
-    left: 8px;
+    right: 0;
+    left: 0;
     height: 2px;
     border-radius: 1px;
     background: var(--peach);
@@ -1936,10 +1947,6 @@ body.is-storm::after {
   .panel.is-open .tab[aria-selected="true"]::before {
     transform: scaleX(1);
     transition: transform 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) 0.15s;
-  }
-
-  .hints {
-    bottom: calc(var(--panel-bottom, 0px) + 44px);
   }
 
   .toasts {
