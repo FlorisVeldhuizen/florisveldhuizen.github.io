@@ -8,16 +8,11 @@ import rub3Sound from "./assets/rub3.m4a?url";
 import rub4Sound from "./assets/rub4.m4a?url";
 import rub5Sound from "./assets/rub5.m4a?url";
 import rub6Sound from "./assets/rub6.m4a?url";
-import grab1Sound from "./assets/grab1.m4a?url";
-import grab2Sound from "./assets/grab2.m4a?url";
-import grab3Sound from "./assets/grab3.m4a?url";
 import grab4Sound from "./assets/grab4.m4a?url";
 import grab5Sound from "./assets/grab5.m4a?url";
 import grab6Sound from "./assets/grab6.m4a?url";
-import grab7Sound from "./assets/grab7.m4a?url";
 import grab8Sound from "./assets/grab8.m4a?url";
 import grab9Sound from "./assets/grab9.m4a?url";
-import grab10Sound from "./assets/grab10.m4a?url";
 import kiss1Sound from "./assets/kiss1.m4a?url";
 import kiss2Sound from "./assets/kiss2.m4a?url";
 import kiss3Sound from "./assets/kiss3.m4a?url";
@@ -52,6 +47,20 @@ import glug8Sound from "./assets/glug8.m4a?url";
 import glug9Sound from "./assets/glug9.m4a?url";
 import glug10Sound from "./assets/glug10.m4a?url";
 import rubLoopSound from "./assets/rubloop.m4a?url";
+import massageBankSound from "./assets/massagebank.m4a?url";
+import wettouch1Sound from "./assets/wettouch1.m4a?url";
+import wettouch3Sound from "./assets/wettouch3.m4a?url";
+import wettouch4Sound from "./assets/wettouch4.m4a?url";
+import wettouch5Sound from "./assets/wettouch5.m4a?url";
+import wettouch6Sound from "./assets/wettouch6.m4a?url";
+import wettouch7Sound from "./assets/wettouch7.m4a?url";
+import wettouch8Sound from "./assets/wettouch8.m4a?url";
+import squelch1Sound from "./assets/squelch1.m4a?url";
+import squelch2Sound from "./assets/squelch2.m4a?url";
+import squelch3Sound from "./assets/squelch3.m4a?url";
+import squelch4Sound from "./assets/squelch4.m4a?url";
+import squelch5Sound from "./assets/squelch5.m4a?url";
+import squelch6Sound from "./assets/squelch6.m4a?url";
 
 export const PEACH_CONFIG = {
   TARGET_MODEL_HEIGHT: 3,
@@ -181,18 +190,7 @@ export const AUDIO_CONFIG = {
   slapSounds: [ass2Sound, ass3Sound, ass5Sound],
   burstSound: uhSound,
   rubSounds: [rub1Sound, rub2Sound, rub3Sound, rub4Sound, rub5Sound, rub6Sound],
-  grabSounds: [
-    grab1Sound,
-    grab2Sound,
-    grab3Sound,
-    grab4Sound,
-    grab5Sound,
-    grab6Sound,
-    grab7Sound,
-    grab8Sound,
-    grab9Sound,
-    grab10Sound,
-  ],
+  grabSounds: [grab4Sound, grab5Sound, grab6Sound, grab8Sound, grab9Sound],
   kissSounds: [
     kiss1Sound,
     kiss2Sound,
@@ -231,6 +229,24 @@ export const AUDIO_CONFIG = {
   ],
   sliceSounds: [slice1Sound, slice2Sound, slice3Sound],
   rubLoopSound,
+  massageBankSound,
+  wetTouchSounds: [
+    wettouch1Sound,
+    wettouch3Sound,
+    wettouch4Sound,
+    wettouch5Sound,
+    wettouch6Sound,
+    wettouch7Sound,
+    wettouch8Sound,
+  ],
+  squelchSounds: [
+    squelch1Sound,
+    squelch2Sound,
+    squelch3Sound,
+    squelch4Sound,
+    squelch5Sound,
+    squelch6Sound,
+  ],
   pitchVariationMin: 0.88,
   pitchVariationMax: 1.12,
   silentOffset: 0.08,

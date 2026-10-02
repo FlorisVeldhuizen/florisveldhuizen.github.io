@@ -1,12 +1,11 @@
 // Bump on a release that has to drop everything the browser is holding; hashed asset names cover the rest.
-const CACHE = "peachy-keen-v2";
+const CACHE = "peachy-keen-v3";
 
 const SHELL = [
   "/peachy-keen/",
   "/peachy-keen/manifest.webmanifest",
   "/peachy-keen/icon-192.png",
   "/peachy-keen/icon-512.png",
-  "/peachy-keen/favicon-32.png",
 ];
 
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];

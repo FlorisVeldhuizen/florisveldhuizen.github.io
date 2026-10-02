@@ -3,17 +3,25 @@ import {
   playSlap,
   playBurst,
   setRub,
+  setDrag,
   setSlide,
   playSlice,
   playGrab,
+  cutSlap,
   playKiss,
   playHeartbeat,
   playSquish,
   playSnap,
+  playFibre,
   playSlide,
   playSettle,
   playSplash,
   playGlug,
+  playKnead,
+  playSquelch,
+  playTouch,
+  playRelease,
+  wetBurst,
 } from "./audio";
 import {
   PHYSICS_CONFIG,
@@ -98,6 +106,14 @@ export class Interaction {
     this.lastSmackAt = -Infinity;
     this.rubPulse = 0;
     this.rubbing = 0;
+    this.rubHeading = null;
+    this.rubSpin = 0;
+    this.accentAt = 0;
+    this.rubSeenAt = 0;
+    this.rubBase = 0;
+    this.surgeAt = 0;
+    this.touchAt = 0;
+    this.rubStartAt = 0;
     this.massage = {
       amount: 0,
       target: 0,
@@ -411,6 +427,20 @@ export class Interaction {
     return { vx, vy, speed: Math.hypot(vx, vy) };
   }
 
+  pathSpeed(now) {
+    const s = this.pointer.samples;
+    let first = s.length - 1;
+    while (first > 0 && now - s[first - 1].t < CFG.SAMPLE_WINDOW_MS) first -= 1;
+    const b = s[s.length - 1];
+    if (!b || first === s.length - 1 || now - b.t > CFG.SAMPLE_WINDOW_MS)
+      return 0;
+    let path = 0;
+    for (let i = first + 1; i < s.length; i += 1)
+      path += Math.hypot(s[i].x - s[i - 1].x, s[i].y - s[i - 1].y);
+    const dt = Math.max(CFG.SAMPLE_MIN_MS, b.t - s[first].t) / 1000;
+    return path / dt / Math.min(window.innerWidth, viewHeight());
+  }
+
   raycastAt(x, y) {
     if (!this.peach.mesh) return null;
     this.ndc.set((x / window.innerWidth) * 2 - 1, -(y / viewHeight()) * 2 + 1);
@@ -460,7 +490,8 @@ export class Interaction {
     const now = performance.now();
     if (now - this.lastTapAt < CFG.CLAP_GAP_MS) {
       this.lastTapAt = -Infinity;
-      this.claps = { left: 3, timer: 0 };
+      this.claps = { left: 3, timer: 0.06 };
+      cutSlap();
       this.talk.say("clap", 0.6);
       return;
     }
@@ -586,10 +617,10 @@ export class Interaction {
       knead: 0,
       age: 0,
       ripple: 0,
+      sounded: false,
     };
     this.pointer.grabbed = true;
     this.ui.onGrab();
-    playGrab(this.oil);
     buzz(8);
     this.talk.say("grab", 0.7);
   }
@@ -626,6 +657,11 @@ export class Interaction {
     const speed = g.pullVelocity.length();
     g.tension = length / limit;
     g.age += delta;
+    if (!g.sounded && (g.age > 0.12 || this.pointer.travel > 8)) {
+      g.sounded = true;
+      playGrab(this.oil);
+    }
+    g.drag = clamp(motion.speed / 2.5, 0, 0.6);
     const still = g.age > 0.25 && motion.speed < CFG.GRAB_STILL_SPEED;
     g.knead = still
       ? Math.min(1, g.knead + delta / CFG.GRAB_KNEAD_SECONDS)
@@ -676,6 +712,7 @@ export class Interaction {
 
   releaseGrab() {
     const g = this.grab;
+    this.pointer.armed = false;
     const length = g.pull.length();
     this.emit("release", { knead: g.knead, length });
     this.velocity.addScaledVector(g.pull, -1.6);
@@ -1114,8 +1151,8 @@ export class Interaction {
       this.kickVelocity.y -= 1;
       this.trauma = Math.max(this.trauma, 0.35);
     }
-    playSnap(1);
-    playHeartbeat(1.3);
+    playFibre(1);
+    playHeartbeat(0.65);
     buzz([25, 40, 60]);
     this.ui.onCharge();
     this.talk.say("charge");
@@ -1235,7 +1272,7 @@ export class Interaction {
   }
 
   tearFibre(index) {
-    playSnap(0.15 + index * 0.1);
+    playFibre(0.15 + index * 0.1);
     buzz(10 + index * 6);
     if (!reducedMotion.matches) {
       this.trauma = Math.max(this.trauma, 0.15 + index * 0.08);
@@ -1276,8 +1313,8 @@ export class Interaction {
     buzz([40, 30, 80]);
     this.kickVelocity.addScaledVector(this.sliceNormal, 1.2);
     this.kickVelocity.y -= 0.8;
-    playSlap(1, 0.6, 0.6, 0.75);
-    playSnap(1);
+    playSlap(0.7, 0.6, 0.6, 0.75, 120);
+    playSnap(1, true);
     playBurst();
     playSplash();
     this.emit("snap");
@@ -1445,7 +1482,7 @@ export class Interaction {
 
   pour(hit, landing, motion, flow, delta) {
     const spread = clamp(motion.speed / 1.2, 0, 1);
-    this.rubbing = 0.25 + spread * 0.35;
+    this.rubbing = clamp(motion.speed / 2.5, 0.02, 0.6);
     this.oil = Math.min(
       1,
       this.oil + CFG.OIL_POUR_RATE * delta * (0.6 + spread),
@@ -1606,9 +1643,68 @@ export class Interaction {
       const dir = this.tempA.set(motion.vx, -motion.vy, -0.6).normalize();
       this.peach.addJiggle(hit.point, dir, 0.03 * strength, 0.55);
     }
-    this.rubbing = 0.2 + strength * 0.35;
+    const afterSmack = performance.now() - this.lastSmackAt < 400;
+    const rubSpeed = Math.max(motion.speed, this.pathSpeed(performance.now()));
+    this.rubbing = afterSmack ? 0.001 : clamp(rubSpeed / 2.5, 0.02, 0.6);
+    if (afterSmack) {
+      this.rubSeenAt = 0;
+    } else {
+      this.rubTurn(motion);
+      this.rubLiquid(this.rubbing);
+    }
     this.wake();
     this.talk.say("rub", delta * 0.5);
+  }
+
+  rubLiquid(amount) {
+    const now = performance.now();
+    if (!this.rubSeenAt) {
+      this.wetTouch(playTouch, amount);
+      this.rubBase = amount;
+      this.rubStartAt = now;
+    } else if (amount - this.rubBase > 0.2 && now - this.surgeAt > 300) {
+      playSquelch(this.oil, amount);
+      this.surgeAt = now;
+    }
+    this.rubBase = Math.max(amount, this.rubBase - 0.004);
+    this.rubSeenAt = now;
+  }
+
+  wetTouch(play, amount) {
+    const now = performance.now();
+    if (now - this.touchAt < 900) return;
+    play(this.oil, amount);
+    this.touchAt = now;
+  }
+
+  rubTurn(motion) {
+    if (motion.speed < 0.3) return;
+    const now = performance.now();
+    const x = motion.vx / motion.speed;
+    const y = motion.vy / motion.speed;
+    const last = this.rubHeading;
+    if (last && now - last.t < 400) {
+      const dot = x * last.x + y * last.y;
+      const cross = last.x * y - last.y * x;
+      if (
+        dot < -0.5 &&
+        Math.abs(this.rubSpin) < 0.6 &&
+        now - this.accentAt > 300
+      ) {
+        playKnead(
+          this.oil,
+          0.15 + clamp(last.speed / 2.5, 0, 0.6) * 0.5,
+          3500 - this.oil * 1000,
+        );
+        wetBurst();
+        this.accentAt = now;
+      }
+      if (dot > -0.5)
+        this.rubSpin = this.rubSpin * 0.9 + Math.atan2(cross, dot);
+    } else {
+      this.rubSpin = 0;
+    }
+    this.rubHeading = { x, y, speed: motion.speed, t: now };
   }
 
   updateMassage(delta) {
@@ -1878,7 +1974,17 @@ export class Interaction {
     if (!this.rubbing)
       this.oil = Math.max(0, this.oil - CFG.OIL_DRY_RATE * delta);
     this.peach.setOil(this.oil);
-    setRub(this.rubbing, this.oil);
+    if (this.rubSeenAt && performance.now() - this.rubSeenAt > 120) {
+      if (performance.now() - this.rubStartAt > 400)
+        this.wetTouch(playRelease, this.rubBase);
+      this.rubSeenAt = 0;
+    }
+    setRub(
+      this.carrying ? 0 : this.rubbing,
+      this.oil,
+      clamp((this.pointer.x / window.innerWidth) * 2 - 1, -1, 1) * 0.5,
+    );
+    setDrag(this.grab ? this.grab.drag : 0, this.oil);
 
     this.juice.update(delta);
     this.ui.setMeters(this.heat / 100, this.oil);

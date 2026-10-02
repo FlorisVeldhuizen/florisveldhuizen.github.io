@@ -10,11 +10,15 @@ const kisses = [];
 const glugs = [];
 const snaps = [];
 const slices = [];
+const wetTouches = [];
+const squelches = [];
 const lastPlayed = new Map();
 let burst = null;
 let rubLoop = null;
+let massageBank = null;
 let noise = null;
 let rub = null;
+let drag = null;
 let slide = null;
 
 function context() {
@@ -57,6 +61,8 @@ export function loadSounds() {
       [AUDIO_CONFIG.glugSounds, glugs],
       [AUDIO_CONFIG.snapSounds, snaps],
       [AUDIO_CONFIG.sliceSounds, slices],
+      [AUDIO_CONFIG.wetTouchSounds, wetTouches],
+      [AUDIO_CONFIG.squelchSounds, squelches],
     ];
     loading = Promise.all([
       ...sets.map(([urls, buffers]) =>
@@ -69,6 +75,9 @@ export function loadSounds() {
       }),
       decode(AUDIO_CONFIG.rubLoopSound).then((buffer) => {
         rubLoop = buffer;
+      }),
+      decode(AUDIO_CONFIG.massageBankSound).then((buffer) => {
+        massageBank = buffer;
       }),
     ]).catch((error) => {
       // eslint-disable-next-line no-console
@@ -89,7 +98,24 @@ export function setMuted(muted) {
   master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.02);
 }
 
-export function playSlap(intensity, heat, oil, pitch = 1) {
+function cutLows(node, hz) {
+  if (!hz) return node;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "highpass";
+  filter.frequency.value = hz;
+  filter.Q.value = 0.707;
+  return node.connect(filter);
+}
+
+let lastSlap = null;
+
+export function cutSlap() {
+  if (!running() || !lastSlap) return;
+  lastSlap.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+  lastSlap = null;
+}
+
+export function playSlap(intensity, heat, oil, pitch = 1, lowCut = 0) {
   if (slaps.length === 0) return;
   const now = ctx.currentTime;
   const src = ctx.createBufferSource();
@@ -106,8 +132,9 @@ export function playSlap(intensity, heat, oil, pitch = 1) {
   tone.frequency.value = 12000 - oil * 6000;
   const gain = ctx.createGain();
   gain.gain.value = 0.35 + intensity * 0.5;
-  src.connect(tone).connect(gain).connect(master);
+  cutLows(src.connect(tone), lowCut).connect(gain).connect(master);
   src.start(now, AUDIO_CONFIG.silentOffset);
+  lastSlap = gain;
 
   if (oil > 0.15)
     noiseHit(2400, 500, 0.14, 0.35 * intensity * oil, "bandpass", { q: 3 });
@@ -125,22 +152,22 @@ export function playBurst() {
   src.start(now);
 
   const thump = ctx.createOscillator();
-  thump.frequency.setValueAtTime(120, now);
-  thump.frequency.exponentialRampToValueAtTime(38, now + 0.35);
+  thump.frequency.setValueAtTime(160, now);
+  thump.frequency.exponentialRampToValueAtTime(55, now + 0.08);
   const thumpGain = ctx.createGain();
-  thumpGain.gain.setValueAtTime(0.5, now);
-  thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+  thumpGain.gain.setValueAtTime(0.3, now);
+  thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
   thump.connect(thumpGain).connect(master);
   thump.start(now);
-  thump.stop(now + 0.45);
+  thump.stop(now + 0.21);
 }
 
-function noiseLoop(buffer = noiseBuffer(), filter = "bandpass") {
+function noiseLoop() {
   const src = ctx.createBufferSource();
-  src.buffer = buffer;
+  src.buffer = noiseBuffer();
   src.loop = true;
   const band = ctx.createBiquadFilter();
-  band.type = filter;
+  band.type = "bandpass";
   const gain = ctx.createGain();
   gain.gain.value = 0;
   src.connect(band).connect(gain).connect(master);
@@ -158,25 +185,212 @@ function expireLoop(loop, audible) {
   return null;
 }
 
-export function setRub(amount, oil) {
+const HANN = Float32Array.from(
+  { length: 32 },
+  (_, n) => Math.sin((Math.PI * n) / 31) ** 2,
+);
+
+function rubChain(bodyFrequency = 400) {
+  const lowpass = ctx.createBiquadFilter();
+  lowpass.type = "lowpass";
+  const body = ctx.createBiquadFilter();
+  body.type = "peaking";
+  body.frequency.value = bodyFrequency;
+  body.Q.value = 0.9;
+  const shelf = ctx.createBiquadFilter();
+  shelf.type = "highshelf";
+  shelf.frequency.value = 6000;
+  shelf.gain.value = -6;
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  lowpass.connect(body).connect(shelf).connect(gain).connect(master);
+  return { lowpass, body, shelf, gain, level: 0, nextGrain: 0, heardAt: 0 };
+}
+
+function rubGrain(at, rate, length, chain = rub, buffer = rubLoop, pan = 0) {
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
+  const envelope = ctx.createGain();
+  envelope.gain.setValueCurveAtTime(HANN, at, length);
+  const place = ctx.createStereoPanner();
+  place.pan.value = pan;
+  src.connect(envelope).connect(place).connect(chain.lowpass);
+  const offset = Math.random() * (buffer.duration - length * rate - 0.01);
+  src.start(at, Math.max(0, offset), length * rate + 0.01);
+}
+
+function wetVolume(oil, amount) {
+  return (0.06 + amount * 0.15) * Math.min(oil, 0.6);
+}
+
+export function playSquelch(oil, amount) {
+  if (oil < 0.15) return;
+  playVariation(squelches, {
+    rate: 0.85 + Math.random() * 0.2,
+    volume: wetVolume(oil, amount),
+    cutoff: 3500 - oil * 1000,
+  });
+}
+
+let wetBurstUntil = 0;
+
+export function wetBurst(length = 0.15) {
+  if (running()) wetBurstUntil = ctx.currentTime + length;
+}
+
+function playWetClip(buffer, rate, volume, oil, attack) {
+  const now = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.playbackRate.value = rate;
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = 3300 - oil * 1500;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + attack);
+  src.connect(soften).connect(gain).connect(master);
+  src.start(now);
+}
+
+export function playTouch(oil, amount) {
+  if (!running() || oil < 0.15 || !wetTouches.length) return;
+  const buffer = pickVariation(wetTouches);
+  playWetClip(
+    buffer,
+    0.8 + Math.random() * 0.15,
+    wetVolume(oil, amount),
+    oil,
+    0.012,
+  );
+  wetBurst(0.12);
+}
+
+const peels = new Map();
+
+export function playRelease(oil, amount) {
+  if (!running() || oil < 0.15 || !wetTouches.length) return;
+  const touch = pickVariation(wetTouches);
+  if (!peels.has(touch)) {
+    const peel = ctx.createBuffer(1, touch.length, touch.sampleRate);
+    peel.copyToChannel(touch.getChannelData(0).slice().reverse(), 0);
+    peels.set(touch, peel);
+  }
+  playWetClip(
+    peels.get(touch),
+    0.75 + Math.random() * 0.15,
+    wetVolume(oil, amount) * 0.8,
+    oil,
+    0.005,
+  );
+}
+
+function wetSpeck(at, rate) {
+  const buffer = squelches[Math.floor(Math.random() * squelches.length)];
+  const length = 0.04;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.playbackRate.value = rate * (0.9 + Math.random() * 0.2);
+  const envelope = ctx.createGain();
+  envelope.gain.setValueCurveAtTime(
+    HANN.map((v) => v * (0.3 + Math.random() * 0.4)),
+    at,
+    length,
+  );
+  src.connect(envelope).connect(rub.lowpass);
+  const offset = Math.random() * (buffer.duration - length * rate - 0.01);
+  src.start(at, Math.max(0, offset), length * rate + 0.01);
+}
+
+export function setRub(amount, oil, pan = 0) {
   if (!running()) return;
   if (!rub) {
-    if (amount <= 0 || !rubLoop) return;
-    rub = noiseLoop(rubLoop, "lowpass");
+    if (amount <= 0 || !rubLoop || !massageBank) return;
+    rub = rubChain();
+    rub.shelf.frequency.value = 3500;
+    rub.shelf.gain.value = -8;
+    const glue = ctx.createDynamicsCompressor();
+    glue.threshold.value = -30;
+    glue.knee.value = 10;
+    glue.ratio.value = 2.5;
+    glue.attack.value = 0.01;
+    glue.release.value = 0.15;
+    rub.shelf.disconnect();
+    rub.shelf.connect(glue).connect(rub.gain);
   }
   const now = ctx.currentTime;
-  rub.gain.gain.setTargetAtTime(amount * (0.3 + oil * 0.2), now, 0.05);
-  rub.src.playbackRate.setTargetAtTime(
-    0.9 + amount * 0.3 - oil * 0.1,
+  const smooth = rub.smooth ?? amount;
+  rub.smooth = smooth + (amount - smooth) * (amount > smooth ? 0.2 : 0.1);
+  const speed = rub.smooth / 0.6;
+  const level = amount > 0 ? speed ** 1.6 * 0.36 * (0.1 + oil * 0.05) : 0;
+  rub.gain.gain.setTargetAtTime(level, now, level > rub.level ? 0.08 : 0.06);
+  rub.level = level;
+  rub.lowpass.frequency.setTargetAtTime(
+    2400 + rub.smooth * 2000 - oil * 600,
     now,
-    0.1,
+    0.12,
   );
-  rub.band.frequency.setTargetAtTime(
-    2500 + amount * 5000 - oil * 1500,
+  rub.lowpass.Q.value = 0.7 + oil * 1.3;
+  rub.body.gain.setTargetAtTime(3 + speed * 2 + oil * 3, now, 0.1);
+  if (amount > 0) {
+    rub.heardAt = now;
+    const rate = (0.8 + rub.smooth * 0.33) * (1 - oil * 0.1);
+    const gap = 0.045 - speed * 0.025;
+    rub.nextGrain = Math.max(rub.nextGrain, now + 0.01);
+    while (rub.nextGrain < now + 0.06) {
+      const lotion = Math.random() < 0.05 + speed * 0.1;
+      rubGrain(
+        rub.nextGrain,
+        rate,
+        0.12 + oil * 0.05,
+        rub,
+        lotion ? rubLoop : massageBank,
+        Math.max(-1, Math.min(1, pan + (Math.random() - 0.5) * 0.3)),
+      );
+      const wet = rub.nextGrain < wetBurstUntil ? 2 : 1;
+      const speck = (oil - 0.2) * 0.3 * (0.4 + amount / 0.6) * wet;
+      if (squelches.length && Math.random() < speck)
+        wetSpeck(rub.nextGrain, rate);
+      rub.nextGrain += gap * (0.85 + Math.random() * 0.3);
+    }
+  } else if (now - rub.heardAt > 1) {
+    rub.gain.disconnect();
+    rub = null;
+  }
+}
+
+export function setDrag(amount, oil) {
+  if (!running()) return;
+  if (!drag) {
+    if (amount <= 0 || !rubLoop) return;
+    drag = rubChain(300);
+    drag.body.gain.value = 2;
+    drag.lowpass.Q.value = 0.5;
+  }
+  const now = ctx.currentTime;
+  const speed = amount / 0.6;
+  const level = speed ** 0.8 * 0.04 * (1 + oil * 0.4);
+  drag.gain.gain.setTargetAtTime(level, now, level > drag.level ? 0.12 : 0.04);
+  drag.level = level;
+  drag.lowpass.frequency.setTargetAtTime(
+    900 + speed * 1100 - oil * 300,
     now,
-    0.05,
+    0.08,
   );
-  rub = expireLoop(rub, amount > 0);
+  if (amount > 0) {
+    drag.heardAt = now;
+    const rate = (0.55 + speed * 0.35) * (1 - oil * 0.08);
+    drag.nextGrain = Math.max(drag.nextGrain, now + 0.01);
+    while (drag.nextGrain < now + 0.06) {
+      rubGrain(drag.nextGrain, rate, 0.16 + oil * 0.04, drag);
+      drag.nextGrain +=
+        0.05 * (1 - amount * 0.6) * (0.85 + Math.random() * 0.3);
+    }
+  } else if (now - drag.heardAt > 1) {
+    drag.gain.disconnect();
+    drag = null;
+  }
 }
 
 function noiseHit(
@@ -330,7 +544,7 @@ function pickVariation(buffers) {
   return buffers[next];
 }
 
-function playVariation(buffers, { rate, volume, cutoff = 20000 }) {
+function playVariation(buffers, { rate, volume, cutoff = 20000, lowCut = 0 }) {
   if (!running() || !buffers.length) return;
   const src = ctx.createBufferSource();
   src.buffer = pickVariation(buffers);
@@ -340,19 +554,39 @@ function playVariation(buffers, { rate, volume, cutoff = 20000 }) {
   soften.frequency.value = cutoff;
   const gain = ctx.createGain();
   gain.gain.value = volume;
-  src.connect(soften).connect(gain).connect(master);
+  cutLows(src.connect(soften), lowCut).connect(gain).connect(master);
   src.start();
 }
 
 export function playGrab(oil = 0) {
-  playVariation(grabs, {
-    rate: (0.85 + Math.random() * 0.3) * (1 - oil * 0.1),
-    volume: 0.4 + Math.random() * 0.25,
-    cutoff: 12000 - oil * 6000,
+  if (!running() || !grabs.length) return;
+  const now = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = pickVariation(grabs);
+  const rate = (0.85 + Math.random() * 0.3) * (1 - oil * 0.1);
+  src.playbackRate.value = rate;
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = 12000 - oil * 6000;
+  const gain = ctx.createGain();
+  const length = Math.min(0.2, src.buffer.duration / rate);
+  const attack = 0.008 / length;
+  const volume = 0.34 + Math.random() * 0.06;
+  const envelope = Float32Array.from({ length: 128 }, (_, n) => {
+    const at = n / 127;
+    const shape =
+      at < attack
+        ? Math.sin((Math.PI / 2) * (at / attack))
+        : Math.cos((Math.PI / 2) * ((at - attack) / (1 - attack)));
+    return volume * shape ** 2;
   });
+  gain.gain.setValueCurveAtTime(envelope, now, length);
+  src.connect(soften).connect(gain).connect(master);
+  src.start(now);
+  src.stop(now + length);
 }
 
-export function playKnead(oil, amount) {
+export function playKnead(oil, amount, cutoff = 9000 - oil * 5000) {
   if (!running() || !rubs.length) return;
   const src = ctx.createBufferSource();
   src.buffer = pickVariation(rubs);
@@ -360,7 +594,7 @@ export function playKnead(oil, amount) {
   src.playbackRate.value = rate;
   const soften = ctx.createBiquadFilter();
   soften.type = "lowpass";
-  soften.frequency.value = 9000 - oil * 5000;
+  soften.frequency.value = cutoff;
   const gain = ctx.createGain();
   const swell = Float32Array.from(
     { length: 32 },
@@ -402,7 +636,7 @@ export function playHeartbeat(strength) {
 export function playGlug(amount) {
   playVariation(glugs, {
     rate: 0.85 + Math.random() * 0.35,
-    volume: 0.15 + amount * 0.25,
+    volume: 0.075 + amount * 0.125,
     cutoff: 6000,
   });
 }
@@ -437,14 +671,9 @@ function tone(at, { from, to, sweep, length, volume, attack = 0.01 }) {
   osc.stop(at + length + 0.02);
 }
 
-export function playSnap(amount) {
-  if (!running()) return;
-  const now = ctx.currentTime;
-  playVariation(snaps, {
-    rate: 0.9 + amount * 0.2 + Math.random() * 0.1,
-    volume: 0.1 + amount * 0.45,
-  });
+function snapSlap(amount, crisp) {
   if (slaps.length) {
+    const now = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = slaps[Math.floor(Math.random() * slaps.length)];
     src.playbackRate.value = 1.1 + amount * 0.25 + Math.random() * 0.12;
@@ -452,10 +681,33 @@ export function playSnap(amount) {
     soften.type = "lowpass";
     soften.frequency.value = 2500 + amount * 7000;
     const gain = ctx.createGain();
-    gain.gain.value = 0.12 + amount * 0.55;
-    src.connect(soften).connect(gain).connect(master);
+    gain.gain.value = crisp ? 0.35 : 0.12 + amount * 0.55;
+    cutLows(src.connect(soften), crisp ? 250 : 0)
+      .connect(gain)
+      .connect(master);
     src.start(now, AUDIO_CONFIG.silentOffset);
   }
+}
+
+export function playSnap(amount, crisp = false) {
+  if (!running()) return;
+  playVariation(snaps, {
+    rate: 0.9 + amount * 0.2 + Math.random() * 0.1,
+    volume: 0.1 + amount * 0.45,
+    lowCut: crisp ? 300 : 0,
+  });
+  snapSlap(amount, crisp);
+}
+
+export function playFibre(amount) {
+  if (!running()) return;
+  noiseHit(
+    2600 + amount * 1800,
+    700,
+    0.03 + amount * 0.03,
+    0.12 + amount * 0.4,
+  );
+  snapSlap(amount, false);
 }
 
 export function playDing() {
@@ -465,7 +717,10 @@ export function playDing() {
   tone(now + 0.12, { from: 2093, to: 2093, length: 0.35, volume: 0.1 });
 }
 
-export function playNotes(notes, { gap = 0.08, length = 0.3, volume = 0.08 } = {}) {
+export function playNotes(
+  notes,
+  { gap = 0.08, length = 0.3, volume = 0.08 } = {},
+) {
   if (!running()) return;
   const now = ctx.currentTime;
   notes.forEach((hz, n) =>
@@ -533,7 +788,14 @@ export function setChant(amount) {
 
 export function playThump(amount = 1) {
   if (!running()) return;
-  tone(ctx.currentTime, { from: 70, to: 38, sweep: 0.16, length: 0.22, volume: 0.1 * amount, attack: 0.005 });
+  tone(ctx.currentTime, {
+    from: 70,
+    to: 38,
+    sweep: 0.16,
+    length: 0.22,
+    volume: 0.1 * amount,
+    attack: 0.005,
+  });
 }
 
 export function playWhoosh(amount = 1) {
