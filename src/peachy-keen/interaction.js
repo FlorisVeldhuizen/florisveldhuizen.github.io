@@ -17,11 +17,6 @@ import {
   playSettle,
   playSplash,
   playGlug,
-  playKnead,
-  playSquelch,
-  playTouch,
-  playRelease,
-  wetBurst,
 } from "./audio";
 import {
   PHYSICS_CONFIG,
@@ -106,14 +101,6 @@ export class Interaction {
     this.lastSmackAt = -Infinity;
     this.rubPulse = 0;
     this.rubbing = 0;
-    this.rubHeading = null;
-    this.rubSpin = 0;
-    this.accentAt = 0;
-    this.rubSeenAt = 0;
-    this.rubBase = 0;
-    this.surgeAt = 0;
-    this.touchAt = 0;
-    this.rubStartAt = 0;
     this.massage = {
       amount: 0,
       target: 0,
@@ -1646,65 +1633,8 @@ export class Interaction {
     const afterSmack = performance.now() - this.lastSmackAt < 400;
     const rubSpeed = Math.max(motion.speed, this.pathSpeed(performance.now()));
     this.rubbing = afterSmack ? 0.001 : clamp(rubSpeed / 2.5, 0.02, 0.6);
-    if (afterSmack) {
-      this.rubSeenAt = 0;
-    } else {
-      this.rubTurn(motion);
-      this.rubLiquid(this.rubbing);
-    }
     this.wake();
     this.talk.say("rub", delta * 0.5);
-  }
-
-  rubLiquid(amount) {
-    const now = performance.now();
-    if (!this.rubSeenAt) {
-      this.wetTouch(playTouch, amount);
-      this.rubBase = amount;
-      this.rubStartAt = now;
-    } else if (amount - this.rubBase > 0.2 && now - this.surgeAt > 300) {
-      playSquelch(this.oil, amount);
-      this.surgeAt = now;
-    }
-    this.rubBase = Math.max(amount, this.rubBase - 0.004);
-    this.rubSeenAt = now;
-  }
-
-  wetTouch(play, amount) {
-    const now = performance.now();
-    if (now - this.touchAt < 900) return;
-    play(this.oil, amount);
-    this.touchAt = now;
-  }
-
-  rubTurn(motion) {
-    if (motion.speed < 0.3) return;
-    const now = performance.now();
-    const x = motion.vx / motion.speed;
-    const y = motion.vy / motion.speed;
-    const last = this.rubHeading;
-    if (last && now - last.t < 400) {
-      const dot = x * last.x + y * last.y;
-      const cross = last.x * y - last.y * x;
-      if (
-        dot < -0.5 &&
-        Math.abs(this.rubSpin) < 0.6 &&
-        now - this.accentAt > 300
-      ) {
-        playKnead(
-          this.oil,
-          0.15 + clamp(last.speed / 2.5, 0, 0.6) * 0.5,
-          3500 - this.oil * 1000,
-        );
-        wetBurst();
-        this.accentAt = now;
-      }
-      if (dot > -0.5)
-        this.rubSpin = this.rubSpin * 0.9 + Math.atan2(cross, dot);
-    } else {
-      this.rubSpin = 0;
-    }
-    this.rubHeading = { x, y, speed: motion.speed, t: now };
   }
 
   updateMassage(delta) {
@@ -1974,11 +1904,6 @@ export class Interaction {
     if (!this.rubbing)
       this.oil = Math.max(0, this.oil - CFG.OIL_DRY_RATE * delta);
     this.peach.setOil(this.oil);
-    if (this.rubSeenAt && performance.now() - this.rubSeenAt > 120) {
-      if (performance.now() - this.rubStartAt > 400)
-        this.wetTouch(playRelease, this.rubBase);
-      this.rubSeenAt = 0;
-    }
     setRub(
       this.carrying ? 0 : this.rubbing,
       this.oil,

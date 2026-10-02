@@ -46,21 +46,7 @@ import glug7Sound from "./assets/glug7.m4a?url";
 import glug8Sound from "./assets/glug8.m4a?url";
 import glug9Sound from "./assets/glug9.m4a?url";
 import glug10Sound from "./assets/glug10.m4a?url";
-import rubLoopSound from "./assets/rubloop.m4a?url";
 import massageBankSound from "./assets/massagebank.m4a?url";
-import wettouch1Sound from "./assets/wettouch1.m4a?url";
-import wettouch3Sound from "./assets/wettouch3.m4a?url";
-import wettouch4Sound from "./assets/wettouch4.m4a?url";
-import wettouch5Sound from "./assets/wettouch5.m4a?url";
-import wettouch6Sound from "./assets/wettouch6.m4a?url";
-import wettouch7Sound from "./assets/wettouch7.m4a?url";
-import wettouch8Sound from "./assets/wettouch8.m4a?url";
-import squelch1Sound from "./assets/squelch1.m4a?url";
-import squelch2Sound from "./assets/squelch2.m4a?url";
-import squelch3Sound from "./assets/squelch3.m4a?url";
-import squelch4Sound from "./assets/squelch4.m4a?url";
-import squelch5Sound from "./assets/squelch5.m4a?url";
-import squelch6Sound from "./assets/squelch6.m4a?url";
 
 export const PEACH_CONFIG = {
   TARGET_MODEL_HEIGHT: 3,
@@ -228,26 +214,7 @@ export const AUDIO_CONFIG = {
     snap10Sound,
   ],
   sliceSounds: [slice1Sound, slice2Sound, slice3Sound],
-  rubLoopSound,
   massageBankSound,
-  wetTouchSounds: [
-    wettouch1Sound,
-    wettouch3Sound,
-    wettouch4Sound,
-    wettouch5Sound,
-    wettouch6Sound,
-    wettouch7Sound,
-    wettouch8Sound,
-  ],
-  squelchSounds: [
-    squelch1Sound,
-    squelch2Sound,
-    squelch3Sound,
-    squelch4Sound,
-    squelch5Sound,
-    squelch6Sound,
-  ],
   pitchVariationMin: 0.88,
   pitchVariationMax: 1.12,
-  silentOffset: 0.08,
 };
