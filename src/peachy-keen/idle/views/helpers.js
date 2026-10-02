@@ -93,7 +93,7 @@ export class HelpersView {
       };
       if (known) {
         b.addEventListener("click", (e) => {
-          if (e.target.closest(".row-icon")) {
+          if (!sidePanel.matches && e.target.closest(".row-icon")) {
             this.inspect(helper.id);
             return;
           }
@@ -122,7 +122,7 @@ export class HelpersView {
 
   inspect(id) {
     const open = !this.detail.classList.contains("is-hidden");
-    if (open && this.focused === id && !sidePanel.matches) {
+    if (open && this.focused === id) {
       this.focused = null;
       toggle(this.detail, "is-hidden", true);
       return;
