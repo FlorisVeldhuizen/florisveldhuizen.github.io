@@ -87,10 +87,22 @@ export function loadSounds() {
   return loading;
 }
 
-export async function unlockAudio() {
+function unlockAudio() {
   const c = context();
-  if (c.state === "suspended") await c.resume();
-  return loadSounds();
+  if (c.state !== "running") c.resume().catch(() => {});
+  loadSounds();
+}
+
+const GESTURES = ["pointerdown", "pointerup", "touchend", "click", "keydown"];
+
+// Mobile browsers suspend audio on background or interruption, and a touch pointerdown may not resume it.
+export function keepAudioUnlocked() {
+  GESTURES.forEach((type) =>
+    window.addEventListener(type, unlockAudio, {
+      capture: true,
+      passive: true,
+    }),
+  );
 }
 
 export function setMuted(muted) {

@@ -12,7 +12,7 @@ import { Naughty } from "./naughty";
 import { MoodLight } from "./mood";
 import { Wild } from "./wild";
 import { Shock } from "./shock";
-import { unlockAudio, loadSounds, setMuted, playLensHit } from "./audio";
+import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
 
 const MODE_KEY = "peachy-keen-mode";
@@ -202,6 +202,7 @@ peach.load(setProgress).then(async () => {
   ]);
   juice.clear();
   loadSounds();
+  keepAudioUnlocked();
 
   const start = async () => {
     started = true;
@@ -216,21 +217,12 @@ peach.load(setProgress).then(async () => {
   };
 
   if (switching) {
-    // Browsers only allow sound after a gesture, so it waits for the first press.
-    window.addEventListener("pointerdown", unlockAudio, { once: true });
     start();
     return;
   }
   introStatus.textContent = "Click anywhere to begin. Sound on.";
   intro.classList.add("is-ready");
-  intro.addEventListener(
-    "click",
-    () => {
-      unlockAudio();
-      start();
-    },
-    { once: true },
-  );
+  intro.addEventListener("click", start, { once: true });
 });
 
 const SHADOW_HOLD = 1.5;
