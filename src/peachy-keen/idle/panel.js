@@ -286,13 +286,20 @@ export class Panel {
       if (v > FLING) near = stops.findIndex((stop) => stop > at + 1);
       if (v < -FLING) near = stops.findLastIndex((stop) => stop < at - 1);
       if (near < 0) near = v > 0 ? stops.length - 1 : 0;
+      root.classList.add("is-released");
       root.classList.remove("is-dragging");
       root.style.height = "";
       this.setOpen(near > 0, near === 2);
+      if (!root.getAnimations().some((a) => a.transitionProperty === "height"))
+        root.classList.remove("is-released");
       setTimeout(() => {
         dragged = false;
       });
     };
+    root.addEventListener("transitionend", (e) => {
+      if (e.target === root && e.propertyName === "height")
+        root.classList.remove("is-released");
+    });
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
     root.addEventListener(
