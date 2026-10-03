@@ -201,11 +201,22 @@ body.is-storm::after {
   flex: 1;
   scrollbar-gutter: stable;
   min-height: 0;
-  padding: 14px 14px 28px;
+  padding: 0 14px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-color: var(--blush-faint) transparent;
   scrollbar-width: thin;
+}
+
+.panel-body::before,
+.panel-body::after {
+  content: "";
+  display: block;
+  height: 14px;
+}
+
+.panel-body::after {
+  height: 28px;
 }
 
 .panel-title {
@@ -1830,7 +1841,6 @@ body.is-storm::after {
   .panel-body {
     order: 1;
     transition:
-      padding-block 0.35s cubic-bezier(0.3, 0.7, 0.2, 1),
       visibility 0.35s,
       opacity 0.3s ease 0.06s,
       translate 0.4s cubic-bezier(0.3, 0.7, 0.2, 1);
@@ -1878,12 +1888,10 @@ body.is-storm::after {
   }
 
   .panel:not(.is-open, .is-dragging) .panel-body {
-    padding-block: 0;
     visibility: hidden;
     opacity: 0;
     translate: 0 12px;
     transition:
-      padding-block 0.35s cubic-bezier(0.3, 0.7, 0.2, 1),
       visibility 0.35s,
       opacity 0.15s ease-out,
       translate 0.2s ease-in;
