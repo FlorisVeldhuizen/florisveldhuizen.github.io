@@ -607,16 +607,16 @@ export class Interaction {
       age: 0,
       ripple: 0,
       sounded: false,
-      side: 0,
       peak: 0,
-      turnX: 0,
+      turnPoint: new Vector3(),
       turnAt: 0,
       streak: 0,
       pattedAt: 0,
+      endArmed: true,
       wild: 0,
       shaken: 0,
       heading: new Vector3(),
-      flungAt: 0,
+      turning: 0,
     };
     this.pointer.grabbed = true;
     this.ui.onGrab();
@@ -661,8 +661,9 @@ export class Interaction {
       playGrab(this.oil);
     }
     g.drag = clamp(motion.speed / 2.5, 0, 0.6);
-    this.updateWiggle(g, limit);
-    this.updateShake(g, delta, world);
+    const turnedFrom = this.trackTurn(g, delta);
+    this.updateShake(g, delta, world, turnedFrom);
+    this.updateWiggle(g, limit, turnedFrom);
     const still = g.age > 0.25 && motion.speed < CFG.GRAB_STILL_SPEED;
     g.knead = still
       ? Math.min(1, g.knead + delta / CFG.GRAB_KNEAD_SECONDS)
@@ -711,61 +712,100 @@ export class Interaction {
     this.wake();
   }
 
-  updateWiggle(g, limit) {
-    const vx = g.pullVelocity.x / limit;
-    g.peak = Math.max(g.peak, Math.abs(vx));
-    const side = Math.abs(vx) > 0.4 ? Math.sign(vx) : 0;
-    if (side && g.side && side !== g.side) {
-      const swing = Math.abs(g.pull.x - g.turnX) / limit;
-      const fast = g.peak > CFG.WIGGLE_SPEED && swing > CFG.WIGGLE_SWING;
-      const inRow = fast && this.clock - g.turnAt < 0.6;
-      g.streak = inRow ? g.streak + 1 : Number(fast);
-      g.turnAt = this.clock;
-      if (
-        g.streak > CFG.WIGGLE_TURNS &&
-        this.clock - g.pattedAt > CFG.WIGGLE_GAP
-      ) {
-        g.pattedAt = this.clock;
-        const weight =
-          (g.peak - CFG.WIGGLE_SPEED) / 32 +
-          Math.min(0.1, (g.streak - CFG.WIGGLE_TURNS) * 0.02);
-        playPat(
-          Math.min(1, weight),
-          clamp(g.pull.x / limit, -0.6, 0.6),
-          this.oil,
-        );
-      }
-      g.peak = 0;
-      g.turnX = g.pull.x;
-    }
-    if (side) g.side = side;
+  trackTurn(g, delta) {
+    const speed = g.pullVelocity.length();
+    if (speed < 0.5) return null;
+    const heading = this.tempB.copy(g.pullVelocity).divideScalar(speed);
+    const from = g.heading.clone();
+    g.heading.copy(heading);
+    if (from.lengthSq() === 0) return null;
+    g.turning = g.turning * Math.exp(-delta * 2) + from.angleTo(heading);
+    if (g.turning < CFG.WIGGLE_TURN_ANGLE) return null;
+    g.turning = 0;
+    return from;
   }
 
-  updateShake(g, delta, world) {
+  flingPoint(heading) {
+    const c = this.group.position;
+    this.raycaster.set(
+      this.tempA.set(
+        c.x + heading.x * 0.6 + (Math.random() - 0.5),
+        c.y + heading.y * 0.6 + (Math.random() - 0.5),
+        20,
+      ),
+      this.tempB.set(0, 0, -1),
+    );
+    return this.raycaster.intersectObject(this.peach.mesh, false)[0] || null;
+  }
+
+  updateWiggle(g, limit, turnedFrom) {
+    g.peak = Math.max(g.peak, g.pullVelocity.length() / limit);
+    if (g.tension < 0.6) g.endArmed = true;
+    if (!turnedFrom) return;
+    const peak = g.peak;
+    const swing = g.pull.distanceTo(g.turnPoint) / limit;
+    g.peak = 0;
+    g.turnPoint.copy(g.pull);
+    const fast =
+      peak > CFG.WIGGLE_SPEED &&
+      swing > CFG.WIGGLE_SWING &&
+      g.wild > CFG.WIGGLE_WILD;
+    if (
+      !fast &&
+      g.endArmed &&
+      g.tension > CFG.DRAG_END_TENSION &&
+      peak > CFG.DRAG_END_SPEED
+    ) {
+      g.endArmed = false;
+      const pan = clamp(g.pull.x / limit, -0.6, 0.6);
+      playPat(0.1, pan, this.oil, {
+        gain:
+          0.5 *
+          (CFG.WIGGLE_QUIET +
+            (1 - CFG.WIGGLE_QUIET) *
+              clamp(peak / CFG.DRAG_END_SPEED - 1, 0, 1)),
+      });
+      this.squashVelocity.x += 0.1;
+      this.squashAxis
+        .set(Math.abs(turnedFrom.x), Math.abs(turnedFrom.y))
+        .normalize();
+    }
+    const inRow = fast && this.clock - g.turnAt < 0.6;
+    g.streak = inRow ? g.streak + 1 : Number(fast);
+    g.turnAt = this.clock;
+    if (!fast || this.clock - g.pattedAt < CFG.WIGGLE_GAP) return;
+    g.pattedAt = this.clock;
+    const weight = clamp((peak - CFG.WIGGLE_SPEED) / 32, 0, 1);
+    const ramp = Math.min(1, g.streak / CFG.WIGGLE_RAMP) ** 2;
+    const pace = clamp(peak / CFG.WIGGLE_SPEED - 1, 0, 1);
+    const gain = ramp * (CFG.WIGGLE_QUIET + (1 - CFG.WIGGLE_QUIET) * pace);
+    playPat(weight, clamp(g.pull.x / limit, -0.6, 0.6), this.oil, { gain });
+    this.squashVelocity.x += (0.15 + weight * 0.25) * ramp;
+    this.squashAxis
+      .set(Math.abs(turnedFrom.x), Math.abs(turnedFrom.y))
+      .normalize();
+  }
+
+  updateShake(g, delta, world, turnedFrom) {
     const shake = this.pathSpeed(performance.now());
     g.wild +=
       (clamp((shake - 1.5) / 2.5, 0, 1) - g.wild) * (1 - Math.exp(-delta * 8));
     g.shaken =
       g.wild > 0.3 ? g.shaken + g.wild * delta : Math.max(0, g.shaken - delta);
-
-    const speed = g.pullVelocity.length();
-    if (speed < 0.5) return;
-    const heading = this.tempB.copy(g.pullVelocity).divideScalar(speed);
-    const turned = heading.dot(g.heading) < -0.3;
-    const thrown = g.heading.clone().multiplyScalar(2 + g.wild * 2);
-    g.heading.copy(heading);
-    if (!turned || this.oil < 0.25 || g.wild < 0.4) return;
-    if (this.clock - g.flungAt < 0.15) return;
-    g.flungAt = this.clock;
+    if (!turnedFrom || this.oil < 0.25 || g.wild < 0.4) return;
+    if (Math.random() > CFG.FLING_CHANCE) return;
+    const hit = this.flingPoint(turnedFrom);
     const flung = this.droplets.spray(
-      world.clone(),
-      g.normal.clone().transformDirection(this.peach.mesh.matrixWorld),
-      thrown,
-      this.oil * g.wild * 0.5,
+      hit ? hit.point.clone() : world.clone(),
+      (hit ? hit.face.normal : g.normal)
+        .clone()
+        .transformDirection(this.peach.mesh.matrixWorld),
+      turnedFrom.clone().multiplyScalar(2 + g.wild * 2),
+      this.oil * g.wild * CFG.FLING_AMOUNT,
       0.4,
     );
-    if (g.wild > 0.7 && Math.random() < 0.3)
-      this.lens.splash(flung, this.oil * 0.5);
+    if (g.wild > 0.7 && Math.random() < 0.15)
+      this.lens.splash(flung, this.oil * 0.35);
   }
 
   releaseGrab() {
@@ -774,7 +814,6 @@ export class Interaction {
     const length = g.pull.length();
     this.emit("release", { knead: g.knead, length });
     this.velocity.addScaledVector(g.pull, -1.6);
-    if (length > 0.08) playSquish(0.2 + length * 0.3);
     if (g.shaken > 1.5) {
       const dizzy = Math.min(1, g.shaken / 4);
       this.spin.z += (Math.random() < 0.5 ? -1 : 1) * dizzy * 2.5;
@@ -876,7 +915,7 @@ export class Interaction {
       );
       if (tension > 0.5) this.lens.splash(flung, this.oil);
     }
-    playSlap(0.4 + length * 0.6, this.heat / 100, this.oil, 1.1);
+    this.releaseSound(r);
     const stretch = length / CFG.GRAB_REACH;
     if (stretch > CFG.WOBBLE_FROM)
       playWobble(
@@ -888,6 +927,20 @@ export class Interaction {
     this.addHeat(5 * length);
     this.ui.onSnapback(at.x, at.y, length / CFG.GRAB_REACH);
     if (this.heat >= 100) this.charge();
+  }
+
+  releaseSound(r) {
+    const { length } = r;
+    const stretch = clamp(length / CFG.GRAB_REACH, 0, 1);
+    playSlap(
+      (0.4 + length * 0.6) * stretch ** 1.5,
+      this.heat / 100,
+      this.oil,
+      1.1,
+    );
+    const pan = clamp(r.worldPull.x / CFG.GRAB_REACH, -0.6, 0.6);
+    const gain = 1.1 * (0.6 + stretch * 0.4);
+    playPat(0.45 + stretch * 0.55, pan, this.oil, { gain, flam: false });
   }
 
   cheekPoint(side, dy) {
@@ -1992,7 +2045,10 @@ export class Interaction {
       this.oil,
       clamp((this.pointer.x / window.innerWidth) * 2 - 1, -1, 1) * 0.5,
     );
-    setDrag(this.grab ? this.grab.drag + this.grab.wild * 0.4 : 0, this.oil);
+    setDrag(
+      this.grab ? this.grab.drag + this.grab.wild * CFG.SHAKE_DRAG_BOOST : 0,
+      this.oil,
+    );
 
     this.juice.update(delta);
     this.ui.setMeters(this.heat / 100, this.oil);

@@ -242,8 +242,8 @@ const VELVET = {
 const PULLED = {
   grain: 0.14,
   jump: 0.1,
-  grit: 0.1,
-  bright: 0.5,
+  grit: 0.05,
+  bright: 0.35,
   body: 1.4,
   skip: 0.5,
   lowCut: 1000,
@@ -604,7 +604,7 @@ export function setDrag(amount, oil) {
   }
   const now = ctx.currentTime;
   const speed = amount / 0.6;
-  const level = speed ** 0.8 * 0.04 * (1 + oil * 0.4);
+  const level = speed ** 0.8 * 0.028 * (1 + oil * 0.4);
   drag.gain.gain.setTargetAtTime(level, now, level > drag.level ? 0.12 : 0.04);
   drag.level = level;
   if (!playVelvet(drag, now, amount, speed, oil, 0)) drag = null;
@@ -659,14 +659,21 @@ export function setSlide(speed, height) {
   slide = expireLoop(slide, speed > 0);
 }
 
-const PAT = { volume: 0.35, brightness: 3500, range: 0.7, body: 0.25 };
+const PAT = {
+  volume: 0.35,
+  brightness: 3500,
+  range: 0.7,
+  body: 0.25,
+  flam: true,
+};
 const WOBBLE = {
-  volume: 0.6,
+  volume: 0.3,
   brightness: 4000,
   range: 0.8,
   body: 0.35,
   swings: 3,
-  decay: 0.44,
+  decay: 0.375,
+  flam: true,
 };
 const PAT_VARIETY = 0.6;
 const lastPat = new Map();
@@ -727,7 +734,7 @@ function pat(at, weight, pan, oil, mix) {
     pan: side,
     skip: Math.random() * 0.003 * PAT_VARIETY,
   });
-  if (heavy > 0.35 && Math.random() < 0.35 * PAT_VARIETY)
+  if (mix.flam && heavy > 0.35 && Math.random() < 0.35 * PAT_VARIETY)
     patLayer(
       at + 0.008 + Math.random() * 0.014,
       pickPat(pats, heavy * 0.6, spread),
@@ -751,9 +758,13 @@ function pat(at, weight, pan, oil, mix) {
     );
 }
 
-export function playPat(weight, pan, oil) {
+export function playPat(weight, pan, oil, { gain = 1, flam = true } = {}) {
   if (!running() || !pats.length) return;
-  pat(ctx.currentTime, weight, pan, oil, PAT);
+  pat(ctx.currentTime, weight, pan, oil, {
+    ...PAT,
+    volume: PAT.volume * gain,
+    flam,
+  });
 }
 
 export function playWobble(strength, swingSeconds, oil) {
@@ -764,7 +775,7 @@ export function playWobble(strength, swingSeconds, oil) {
     Math.round(WOBBLE.swings * (0.35 + strength * 0.65)),
   );
   for (let k = 0; k < swings; k += 1) {
-    const fade = WOBBLE.decay ** k;
+    const fade = WOBBLE.decay ** (k + 1);
     pat(
       now + 0.04 + swingSeconds * (k + 1),
       strength * fade,
@@ -772,7 +783,7 @@ export function playWobble(strength, swingSeconds, oil) {
       oil,
       {
         ...WOBBLE,
-        volume: WOBBLE.volume * (0.5 + 0.5 * fade),
+        volume: WOBBLE.volume * (0.25 + 0.75 * fade),
       },
     );
   }
