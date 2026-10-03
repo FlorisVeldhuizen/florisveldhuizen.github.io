@@ -727,14 +727,13 @@ export class Interaction {
 
   flingPoint(heading) {
     const c = this.group.position;
-    this.raycaster.set(
-      this.tempA.set(
-        c.x + heading.x * 0.6 + (Math.random() - 0.5),
-        c.y + heading.y * 0.6 + (Math.random() - 0.5),
-        20,
-      ),
-      this.tempB.set(0, 0, -1),
+    const { ray } = this.raycaster;
+    ray.origin.set(
+      c.x + heading.x * 0.6 + (Math.random() - 0.5),
+      c.y + heading.y * 0.6 + (Math.random() - 0.5),
+      20,
     );
+    ray.direction.set(0, 0, -1);
     return this.raycaster.intersectObject(this.peach.mesh, false)[0] || null;
   }
 
