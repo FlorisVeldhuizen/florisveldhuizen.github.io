@@ -613,6 +613,10 @@ export class Interaction {
       turnAt: 0,
       streak: 0,
       pattedAt: 0,
+      wild: 0,
+      shaken: 0,
+      heading: new Vector3(),
+      flungAt: 0,
     };
     this.pointer.grabbed = true;
     this.ui.onGrab();
@@ -658,6 +662,7 @@ export class Interaction {
     }
     g.drag = clamp(motion.speed / 2.5, 0, 0.6);
     this.updateWiggle(g, limit);
+    this.updateShake(g, delta, world);
     const still = g.age > 0.25 && motion.speed < CFG.GRAB_STILL_SPEED;
     g.knead = still
       ? Math.min(1, g.knead + delta / CFG.GRAB_KNEAD_SECONDS)
@@ -722,7 +727,7 @@ export class Interaction {
       ) {
         g.pattedAt = this.clock;
         const weight =
-          (g.peak - CFG.WIGGLE_SPEED) / 24 +
+          (g.peak - CFG.WIGGLE_SPEED) / 32 +
           Math.min(0.1, (g.streak - CFG.WIGGLE_TURNS) * 0.02);
         playPat(
           Math.min(1, weight),
@@ -736,6 +741,33 @@ export class Interaction {
     if (side) g.side = side;
   }
 
+  updateShake(g, delta, world) {
+    const shake = this.pathSpeed(performance.now());
+    g.wild +=
+      (clamp((shake - 1.5) / 2.5, 0, 1) - g.wild) * (1 - Math.exp(-delta * 8));
+    g.shaken =
+      g.wild > 0.3 ? g.shaken + g.wild * delta : Math.max(0, g.shaken - delta);
+
+    const speed = g.pullVelocity.length();
+    if (speed < 0.5) return;
+    const heading = this.tempB.copy(g.pullVelocity).divideScalar(speed);
+    const turned = heading.dot(g.heading) < -0.3;
+    const thrown = g.heading.clone().multiplyScalar(2 + g.wild * 2);
+    g.heading.copy(heading);
+    if (!turned || this.oil < 0.25 || g.wild < 0.4) return;
+    if (this.clock - g.flungAt < 0.15) return;
+    g.flungAt = this.clock;
+    const flung = this.droplets.spray(
+      world.clone(),
+      g.normal.clone().transformDirection(this.peach.mesh.matrixWorld),
+      thrown,
+      this.oil * g.wild * 0.5,
+      0.4,
+    );
+    if (g.wild > 0.7 && Math.random() < 0.3)
+      this.lens.splash(flung, this.oil * 0.5);
+  }
+
   releaseGrab() {
     const g = this.grab;
     this.pointer.armed = false;
@@ -743,6 +775,11 @@ export class Interaction {
     this.emit("release", { knead: g.knead, length });
     this.velocity.addScaledVector(g.pull, -1.6);
     if (length > 0.08) playSquish(0.2 + length * 0.3);
+    if (g.shaken > 1.5) {
+      const dizzy = Math.min(1, g.shaken / 4);
+      this.spin.z += (Math.random() < 0.5 ? -1 : 1) * dizzy * 2.5;
+      this.wobbleAll(0.04 + dizzy * 0.06);
+    }
     if (g.knead > 0.2) {
       const world = this.peach.mesh.localToWorld(g.local.clone());
       const outward = g.normal
@@ -1955,7 +1992,7 @@ export class Interaction {
       this.oil,
       clamp((this.pointer.x / window.innerWidth) * 2 - 1, -1, 1) * 0.5,
     );
-    setDrag(this.grab ? this.grab.drag : 0, this.oil);
+    setDrag(this.grab ? this.grab.drag + this.grab.wild * 0.4 : 0, this.oil);
 
     this.juice.update(delta);
     this.ui.setMeters(this.heat / 100, this.oil);

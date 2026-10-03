@@ -616,10 +616,10 @@ function noiseHit(
   length,
   volume,
   type = "bandpass",
-  { q = 2, attack = 0, at } = {},
+  { q = 2, attack = 0 } = {},
 ) {
   if (!running()) return;
-  const now = at ?? ctx.currentTime;
+  const now = ctx.currentTime;
   const src = ctx.createBufferSource();
   src.buffer = noiseBuffer();
   const filter = ctx.createBiquadFilter();
@@ -659,8 +659,15 @@ export function setSlide(speed, height) {
   slide = expireLoop(slide, speed > 0);
 }
 
-const PAT = { volume: 0.6, brightness: 5000, range: 0.7, body: 0.35 };
-const WOBBLE = { ...PAT, brightness: 4000, range: 0.8, swings: 3, decay: 0.44 };
+const PAT = { volume: 0.35, brightness: 3500, range: 0.7, body: 0.25 };
+const WOBBLE = {
+  volume: 0.6,
+  brightness: 4000,
+  range: 0.8,
+  body: 0.35,
+  swings: 3,
+  decay: 0.44,
+};
 const PAT_VARIETY = 0.6;
 const lastPat = new Map();
 
@@ -742,8 +749,6 @@ function pat(at, weight, pan, oil, mix) {
         skip: Math.random() * 0.004 * PAT_VARIETY,
       },
     );
-  if (oil > 0.15)
-    noiseHit(2400, 500, 0.08, 0.22 * weight * oil, "bandpass", { at });
 }
 
 export function playPat(weight, pan, oil) {
