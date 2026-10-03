@@ -256,7 +256,10 @@ export class Bottle {
     if (delta === undefined) this.hintDrop.settle();
     else this.hintDrop.update(delta);
     const drop = this.hintDrop.bottleAt;
-    const rest = this.hints.offsetTop + drop - HINT_GAP_PX;
+    const shown = this.hints.offsetHeight - drop;
+    const line = Math.min(...this.hintDrop.lines.map((l) => l.offsetHeight));
+    const gap = HINT_GAP_PX * clamp(shown / line, 0, 1);
+    const rest = this.hints.offsetTop + drop - gap;
     // The shop sheet pushes the bottle up when it rises past it, and lets it back down as it falls.
     const bottom = softMin(rest, sheetTop() - this.el.offsetLeft, CATCH_PX);
     const homeY = bottom - height / 2;
