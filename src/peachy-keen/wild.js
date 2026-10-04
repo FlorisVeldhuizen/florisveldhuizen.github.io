@@ -179,7 +179,7 @@ class Disco {
     this.fade = 0;
     this.amount = 0;
     this.weight = 0;
-    this.clock = 0;
+    this.beat = 0;
     this.lastBeat = -1;
     this.spinning = false;
     this.move = { x: 0, lift: 0, yaw: 0, roll: 0 };
@@ -210,8 +210,8 @@ class Disco {
       }
       return;
     }
-    this.clock += dt;
-    const beat = discoBeat() ?? (this.clock * DISCO_BPM) / 60;
+    this.beat = discoBeat() ?? this.beat + (dt * DISCO_BPM) / 60;
+    const { beat } = this;
     const kick = Math.exp(-(beat % 1) * 6);
     const sweep = Math.sin((beat * Math.PI) / 8);
     const [pink, cyan, spot] = this.lights;
