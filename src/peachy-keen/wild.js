@@ -325,10 +325,6 @@ export class Wild {
     this.tool = "hand";
   }
 
-  warmups() {
-    return [this.disco.mirror.holder];
-  }
-
   set(key, value) {
     if (key === "disco") this.disco.set(value);
     if (key === "tool") {

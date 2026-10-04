@@ -142,7 +142,6 @@ export class GoldenPeach {
             .applyMatrix4(mesh.matrix),
         );
     }
-    return this.holder;
   }
 
   spawn() {

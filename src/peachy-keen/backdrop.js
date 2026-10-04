@@ -28,8 +28,10 @@ export function createBackdrop(scene, renderer) {
   scene.add(plane);
   const size = new Vector2();
   let speed = 1;
+  let frame = 0;
 
   return {
+    texture: target.texture,
     resize() {
       material.uniforms.resolution.value.set(window.innerWidth, viewHeight());
     },
@@ -41,8 +43,12 @@ export function createBackdrop(scene, renderer) {
     },
     render() {
       renderer.getDrawingBufferSize(size).multiplyScalar(SMOKE_SCALE).ceil();
-      if (target.width !== size.x || target.height !== size.y)
-        target.setSize(size.x, size.y);
+      const resized = target.width !== size.x || target.height !== size.y;
+      if (resized) target.setSize(size.x, size.y);
+      frame += 1;
+      // The smoke drifts slowly enough to redraw at half rate; disco beams need every frame.
+      const still = material.uniforms.disco.value < 0.001;
+      if (!resized && still && frame % 2) return;
       const previous = renderer.getRenderTarget();
       renderer.setRenderTarget(target);
       renderer.render(smokeScene, smokeCamera);

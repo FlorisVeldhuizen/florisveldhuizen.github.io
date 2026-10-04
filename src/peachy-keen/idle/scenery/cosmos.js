@@ -195,10 +195,10 @@ export function starField(count) {
   points.renderOrder = -1;
   return {
     points,
-    update(t, level) {
+    update(t, level, pixelRatio) {
       const { uniforms } = points.material;
       uniforms.uTime.value = t;
-      uniforms.uScale.value = Math.min(window.devicePixelRatio, 2);
+      uniforms.uScale.value = pixelRatio;
       uniforms.uOpacity.value = level;
       points.geometry.setDrawRange(
         0,
@@ -348,10 +348,10 @@ export function constellation() {
   group.renderOrder = -1;
   return {
     group,
-    update(t, level) {
+    update(t, level, pixelRatio) {
       const { uniforms } = stars.material;
       uniforms.uTime.value = t;
-      uniforms.uScale.value = Math.min(window.devicePixelRatio, 2);
+      uniforms.uScale.value = pixelRatio;
       const show = Math.max(0, Math.min(1, (level - 0.2) / 0.4));
       uniforms.uOpacity.value = show;
       lines.material.opacity = show * (0.22 + 0.08 * Math.sin(t * 0.6));

@@ -141,36 +141,101 @@ function setProgress(fraction) {
   introTitle.style.setProperty("--progress", `${Math.round(fraction * 100)}%`);
 }
 
-async function warm(warmups) {
-  const showWarmups = (visible) => {
-    group.visible = visible;
-    warmups.forEach((h) => {
-      // eslint-disable-next-line no-param-reassign
-      h.visible = visible;
-    });
-  };
-  showWarmups(true);
+const clearColor = new Color();
+// Materials keep sampling the last shadow map after shadows switch off, so blank it.
+const clearShadow = () => {
+  const { map } = lights.key.shadow;
+  if (!map) return;
+  const alpha = renderer.getClearAlpha();
+  renderer.getClearColor(clearColor);
+  const previous = renderer.getRenderTarget();
+  renderer.setRenderTarget(map);
+  renderer.setClearColor(0xffffff, 1);
+  renderer.clear();
+  renderer.setRenderTarget(previous);
+  renderer.setClearColor(clearColor, alpha);
+};
+
+function drawEverything() {
+  const culled = [];
+  const hidden = [];
+  scene.traverse((o) => {
+    /* eslint-disable no-param-reassign */
+    if (!o.visible && !o.isLight) {
+      hidden.push(o);
+      o.visible = true;
+    }
+    if (o.frustumCulled) {
+      culled.push(o);
+      o.frustumCulled = false;
+    }
+    /* eslint-enable no-param-reassign */
+  });
   camera.layers.enable(JUICE_LAYER);
+  renderer.setScissor(0, 0, 1, 1);
+  renderer.setScissorTest(true);
+  [true, false].forEach((shadows) => {
+    renderer.shadowMap.enabled = shadows;
+    // Toggling shadows alone does not make three pick the other shader variant.
+    scene.traverse(({ material }) => {
+      [].concat(material ?? []).forEach((m) => {
+        // eslint-disable-next-line no-param-reassign
+        m.needsUpdate = true;
+      });
+    });
+    renderer.render(scene, camera);
+  });
+  renderer.render(lens.overlay, lens.overlayCamera);
+  renderer.render(shock.scene, shock.camera);
+  renderer.setScissorTest(false);
+  camera.layers.disable(JUICE_LAYER);
+  /* eslint-disable no-param-reassign */
+  culled.forEach((o) => {
+    o.frustumCulled = true;
+  });
+  hidden.forEach((o) => {
+    o.visible = false;
+  });
+  /* eslint-enable no-param-reassign */
+  clearShadow();
+}
+
+// Every lit pixel pays for each visible light, so lights that are off stay out of the shaders.
+const extraLights = [mood.candle, mood.halo, ...wild.disco.lights];
+const showExtraLights = (shown) =>
+  extraLights.forEach((light) => {
+    // eslint-disable-next-line no-param-reassign
+    light.visible = shown;
+  });
+
+async function warmLights(lit) {
+  showExtraLights(lit);
   renderer.shadowMap.enabled = true;
   const shadowed = renderer.compileAsync(scene, camera);
   renderer.shadowMap.enabled = false;
-  const compiled = Promise.all([
+  await Promise.all([
     shadowed,
     renderer.compileAsync(scene, camera),
     renderer.compileAsync(lens.overlay, lens.overlayCamera),
     renderer.compileAsync(shock.scene, shock.camera),
   ]);
-  camera.layers.disable(JUICE_LAYER);
-  showWarmups(false);
-  await compiled;
-  // compileAsync skips the shadow pass, so one hidden render builds its depth shaders.
-  showWarmups(true);
-  renderer.shadowMap.enabled = true;
-  camera.layers.enable(JUICE_LAYER);
-  renderer.render(scene, camera);
-  camera.layers.disable(JUICE_LAYER);
-  showWarmups(false);
+  // The render loop switches unlit lights off while the compile runs.
+  showExtraLights(lit);
+  // ANGLE on Metal builds a shader on its first draw, not at compile, so draw every variant into one pixel.
+  drawEverything();
 }
+
+async function warm() {
+  await warmLights(true);
+  await warmLights(false);
+}
+
+let warming = false;
+renderer.domElement.addEventListener("webglcontextrestored", async () => {
+  warming = true;
+  await warm();
+  warming = false;
+});
 
 async function startIdle() {
   introStatus.textContent = "Opening the shop";
@@ -188,18 +253,15 @@ async function startIdle() {
     mood,
   });
   naughty.set("achievements", false);
-  await warm(idle.warmups());
+  idle.prepare();
+  await warm();
   idle.ready();
 }
 
 peach.load(setProgress).then(async () => {
   setProgress(1);
-  await warm([
-    ...interaction.prepareHalves(),
-    ...wild.warmups(),
-    juice.mesh,
-    droplets.mesh,
-  ]);
+  interaction.prepareHalves();
+  await warm();
   juice.clear();
   loadSounds();
   keepAudioUnlocked();
@@ -234,23 +296,9 @@ const castersInPlay = () =>
   wild.disco.mirror.holder.visible ||
   interaction.halves?.some((h) => h.holder.visible);
 
-const clearColor = new Color();
-// Materials keep sampling the last shadow map after shadows switch off, so blank it.
-const clearShadow = () => {
-  const { map } = lights.key.shadow;
-  if (!map) return;
-  const alpha = renderer.getClearAlpha();
-  renderer.getClearColor(clearColor);
-  const previous = renderer.getRenderTarget();
-  renderer.setRenderTarget(map);
-  renderer.setClearColor(0xffffff, 1);
-  renderer.clear();
-  renderer.setRenderTarget(previous);
-  renderer.setClearColor(clearColor, alpha);
-};
-
 const clock = new Clock();
 renderer.setAnimationLoop(() => {
+  if (warming) return;
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
   shadowHold = castersInPlay()
     ? SHADOW_HOLD
@@ -268,6 +316,7 @@ renderer.setAnimationLoop(() => {
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);
   mood.update(realDelta, interaction.heat / 100);
+  showExtraLights(extraLights.some((light) => light.intensity > 0));
   peach.updateRing(camera);
   quality.update(realDelta);
   settings.showFps(quality.fps);
@@ -278,7 +327,7 @@ renderer.setAnimationLoop(() => {
   lens.update(delta);
   shock.update(realDelta);
   backdrop.render();
-  lens.render(idle ? [juice, droplets, idle.room] : [juice, droplets]);
+  lens.render([juice, droplets]);
   shock.render();
 });
 

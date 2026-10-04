@@ -73,6 +73,7 @@ export function createIdle({
     camera,
     backdrop,
     mood,
+    renderer,
   );
   let style = null;
   const syncStyle = () => {
@@ -146,14 +147,15 @@ export function createIdle({
     playNotes([659, 880, 1109], { gap: 0.09, volume: 0.06 });
   });
   game.on("harvest", () => playNotes([523, 784], { gap: 0.06, volume: 0.06 }));
-  game.on("orchard-open", () =>
+  game.on("orchard-open", () => {
+    renders.warm();
     popups.toast(
       "Unlocked",
       "The Orchard",
       "Plant the pits you get from bursts.",
       "seed",
-    ),
-  );
+    );
+  });
   game.on("bought", ({ kind, id, count }) => {
     const helper = kind === "helper" && HELPERS.find((h) => h.id === id);
     const first = helper && game.state.helpers[id] === count;
@@ -250,11 +252,12 @@ export function createIdle({
 
   return {
     room,
-    warmups() {
-      return [...room.warmups(), golden.warmup(peach)];
+    prepare() {
+      golden.warmup(peach);
     },
     ready() {
       renders.setup(renderer, scene.environment);
+      if (game.state.orchard.open) renders.warm();
       syncStyle();
       syncSkin();
       toys.sync();

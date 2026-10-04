@@ -75,7 +75,10 @@ export const juiceMaterial = new ShaderMaterial({
 });
 
 export const glowingJuiceMaterial = new ShaderMaterial({
-  uniforms: juiceMaterial.uniforms,
+  uniforms: {
+    tBehind: { value: null },
+    uResolution: { value: new Vector2(1, 1) },
+  },
   vertexShader: JUICE_VERTEX,
   fragmentShader: JUICE_FRAGMENT,
   defines: { GLOW: "" },

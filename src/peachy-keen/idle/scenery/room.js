@@ -32,10 +32,10 @@ import {
   glyphTexture,
   heartTexture,
   fogTexture,
-  makeProp,
+  makeLotus,
 } from "./shapes";
 import { Toucher } from "./touches";
-import { JUICE_LAYER, glowingJuiceMaterial } from "../../juice";
+import { glowingJuiceMaterial } from "../../juice";
 import { OilDrips } from "./oil";
 import { moonMesh, setMoonPhase, ShootingStars, usePeachShape } from "./sky";
 import { Wind } from "./wind";
@@ -178,7 +178,16 @@ function points(count, map, color, size, additive = true, opacity = 1) {
 }
 
 export class Room {
-  constructor(game, interaction, popups, scene, camera, backdrop, mood) {
+  constructor(
+    game,
+    interaction,
+    popups,
+    scene,
+    camera,
+    backdrop,
+    mood,
+    renderer,
+  ) {
     Object.assign(this, {
       game,
       i: interaction,
@@ -186,6 +195,7 @@ export class Room {
       camera,
       backdrop,
       mood,
+      renderer,
     });
     this.toucher = new Toucher(game, interaction, popups);
     this.group = new Group();
@@ -238,7 +248,8 @@ export class Room {
       glowingJuiceMaterial,
       16,
     );
-    this.droplets.layers.set(JUICE_LAYER);
+    // Refracting the smoke instead of the frame spares a full-screen copy every frame.
+    glowingJuiceMaterial.uniforms.tBehind.value = backdrop.texture;
     this.ahead = new Vector3();
     this.dropData = Array.from({ length: 16 }, () => {
       const at = new Vector3();
@@ -331,7 +342,7 @@ export class Room {
     this.constellation = constellation();
     this.constellation.group.position.set(-1, 9.5, -36);
     this.constellation.group.scale.setScalar(4.2);
-    this.moon = moonMesh();
+    this.moon = moonMesh(renderer);
     this.moon.position.set(-9, 5.5, -22);
     this.moonHalo = new Sprite(
       new SpriteMaterial({
@@ -350,7 +361,7 @@ export class Room {
     );
     this.shooting = new ShootingStars(this.group);
     this.lotuses = Array.from({ length: 3 }, (_, n) => {
-      const prop = makeProp("spa");
+      const prop = makeLotus();
       prop.visible = false;
       this.group.add(prop);
       return { prop, seed: n * 2.1 };
@@ -408,14 +419,6 @@ export class Room {
       m.count = 0;
     });
     this.group.visible = false;
-  }
-
-  warmups() {
-    return [this.group];
-  }
-
-  isActive() {
-    return this.group.visible && this.droplets.count > 0;
   }
 
   setActive(on) {
@@ -1217,6 +1220,9 @@ export class Room {
       }
     }
     this.droplets.count = drops;
+    this.renderer.getDrawingBufferSize(
+      glowingJuiceMaterial.uniforms.uResolution.value,
+    );
     this.droplets.instanceMatrix.needsUpdate = true;
 
     const candles = Math.round(12 * level(own("cult"), 50));
@@ -1333,9 +1339,10 @@ export class Room {
     this.constellation.group.visible = sky;
     this.shooting.update(delta, sky ? cosmos : 0);
     if (sky) {
-      this.stars.update(t * still, cosmos);
+      const pixelRatio = this.renderer.getPixelRatio();
+      this.stars.update(t * still, cosmos, pixelRatio);
       this.galaxy.update(t * still, cosmos);
-      this.constellation.update(t * still, cosmos);
+      this.constellation.update(t * still, cosmos, pixelRatio);
     }
   }
 }

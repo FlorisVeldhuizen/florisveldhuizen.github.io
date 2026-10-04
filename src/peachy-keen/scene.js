@@ -179,7 +179,11 @@ export class QualityGovernor {
     if (this.badWindows >= 2 && this.ratio > 1) {
       this.badWindows = 0;
       this.goodWindows = -30;
-      this.apply(Math.max(1, this.ratio - 0.25));
+      // Pixel cost grows with the square of the ratio, so jump straight to a ratio that should fit.
+      const fit = this.ratio * Math.sqrt(this.fps / this.refresh);
+      this.apply(
+        Math.max(1, Math.min(this.ratio - 0.25, Math.floor(fit * 4) / 4)),
+      );
     } else if (this.fps > this.refresh * 0.95) {
       this.goodWindows += 1;
       if (this.goodWindows >= 10 && this.ratio < this.max) {

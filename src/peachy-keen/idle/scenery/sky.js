@@ -7,12 +7,20 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  OrthographicCamera,
   PlaneGeometry,
+  RepeatWrapping,
   ShaderMaterial,
   SphereGeometry,
   SRGBColorSpace,
   Vector3,
+  WebGLRenderTarget,
 } from "three";
+
+const BAKE_WIDTH = 1024;
+const BAKE_CAMERA = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const SLOPE_RANGE = 4;
+const ALBEDO_SCALE = 0.5;
 
 const MOON_VERTEX = `
 varying vec2 vUv;
@@ -34,18 +42,7 @@ void main() {
   gl_Position = projectionMatrix * mv;
 }`;
 
-const MOON_FRAGMENT = `
-uniform sampler2D uPeach;
-uniform float uHasPeach;
-uniform vec3 uTint;
-uniform vec3 uLight;
-varying vec2 vUv;
-varying vec3 vNormal;
-varying vec3 vEast;
-varying vec3 vNorth;
-varying vec3 vLocal;
-varying vec3 vView;
-
+const MOON_SURFACE = `
 vec3 hash3(vec3 p) {
   p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6)));
   return fract(sin(p) * 43758.5453);
@@ -93,32 +90,71 @@ vec2 craterLayer(vec3 p, float scale, float keep) {
 float surface(vec3 d) {
   return craterLayer(d, 4.0, 0.3).x + craterLayer(d, 9.0, 0.32).x * 0.7 + craterLayer(d, 19.0, 0.35).x * 0.5;
 }
+`;
+
+const BAKE_VERTEX = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}`;
+
+const BAKE_FRAGMENT = `
+varying vec2 vUv;
+${MOON_SURFACE}
+void main() {
+  float lon = (vUv.x - 0.5) * 6.2831853;
+  float lat = (vUv.y - 0.5) * 3.1415927;
+  vec3 dir = vec3(cos(lat) * sin(lon), sin(lat), cos(lat) * cos(lon));
+  #ifdef SLOPE
+    vec3 eastO = normalize(cross(vec3(0.0, 1.0, 0.0), dir) + vec3(1e-4, 0.0, 0.0));
+    vec3 northO = cross(dir, eastO);
+    float e = 0.006;
+    float he = surface(normalize(dir + eastO * e)) - surface(normalize(dir - eastO * e));
+    float hn = surface(normalize(dir + northO * e)) - surface(normalize(dir - northO * e));
+    vec2 slope = vec2(he, hn) / (2.0 * e) * 0.35;
+    gl_FragColor = vec4(slope / ${SLOPE_RANGE.toFixed(1)} * 0.5 + 0.5, 0.0, 1.0);
+  #else
+    vec2 big = craterLayer(dir, 4.0, 0.3);
+    vec2 mid = craterLayer(dir, 9.0, 0.32);
+    float fresh = big.y + mid.y + craterLayer(dir, 19.0, 0.35).y;
+    float mare = smoothstep(0.46, 0.62, fbm3(dir * 1.8 + vec3(3.1, 1.7, 0.4))) * smoothstep(-0.5, 0.3, dir.z);
+    float grain = fbm3(dir * 22.0);
+    vec3 highland = vec3(0.88, 0.8, 0.73);
+    vec3 sea = vec3(0.44, 0.39, 0.4);
+    vec3 albedo = mix(highland, sea, mare * 0.85) * (0.86 + 0.26 * grain);
+    albedo *= 1.0 + (big.x + mid.x) * 0.9;
+    albedo += vec3(1.0, 0.95, 0.9) * min(fresh, 1.0) * 0.22 * (1.0 - mare * 0.5);
+    gl_FragColor = vec4(albedo * ${ALBEDO_SCALE.toFixed(1)}, 1.0);
+  #endif
+}`;
+
+const MOON_FRAGMENT = `
+uniform sampler2D uPeach;
+uniform sampler2D uAlbedo;
+uniform sampler2D uSlope;
+uniform float uHasPeach;
+uniform vec3 uTint;
+uniform vec3 uLight;
+varying vec2 vUv;
+varying vec3 vNormal;
+varying vec3 vEast;
+varying vec3 vNorth;
+varying vec3 vLocal;
+varying vec3 vView;
 
 void main() {
   vec3 dir = normalize(vLocal);
-  vec3 eastO = normalize(cross(vec3(0.0, 1.0, 0.0), dir) + vec3(1e-4, 0.0, 0.0));
-  vec3 northO = cross(dir, eastO);
-  float e = 0.006;
-  float he = surface(normalize(dir + eastO * e)) - surface(normalize(dir - eastO * e));
-  float hn = surface(normalize(dir + northO * e)) - surface(normalize(dir - northO * e));
+  vec2 at = vec2(atan(dir.x, dir.z) * 0.15915494 + 0.5, asin(clamp(dir.y, -1.0, 1.0)) * 0.31830989 + 0.5);
+  vec2 slope = (texture2D(uSlope, at).xy * 2.0 - 1.0) * ${SLOPE_RANGE.toFixed(1)};
+  vec3 albedo = texture2D(uAlbedo, at).rgb / ${ALBEDO_SCALE.toFixed(1)};
   vec3 base = normalize(vNormal);
-  vec3 n = normalize(base - (he * normalize(vEast) + hn * normalize(vNorth)) / (2.0 * e) * 0.35);
+  vec3 n = normalize(base - slope.x * normalize(vEast) - slope.y * normalize(vNorth));
   vec3 view = normalize(-vView);
   float sun = max(dot(n, uLight), 0.0);
   float lunar = 2.0 * sun / (sun + max(dot(n, view), 0.0) + 1e-3);
   float day = smoothstep(-0.03, 0.1, dot(base, uLight));
   float lit = min(lunar, 1.25) * day;
-
-  vec2 big = craterLayer(dir, 4.0, 0.3);
-  vec2 mid = craterLayer(dir, 9.0, 0.32);
-  float fresh = big.y + mid.y + craterLayer(dir, 19.0, 0.35).y;
-  float mare = smoothstep(0.46, 0.62, fbm3(dir * 1.8 + vec3(3.1, 1.7, 0.4))) * smoothstep(-0.5, 0.3, dir.z);
-  float grain = fbm3(dir * 22.0);
-  vec3 highland = vec3(0.88, 0.8, 0.73);
-  vec3 sea = vec3(0.44, 0.39, 0.4);
-  vec3 albedo = mix(highland, sea, mare * 0.85) * (0.86 + 0.26 * grain);
-  albedo *= 1.0 + (big.x + mid.x) * 0.9;
-  albedo += vec3(1.0, 0.95, 0.9) * min(fresh, 1.0) * 0.22 * (1.0 - mare * 0.5);
 
   vec3 peach = uHasPeach > 0.5 ? texture2D(uPeach, vUv).rgb * uTint : vec3(1.0, 0.7, 0.55);
   vec3 blush = peach / max(max(peach.r, peach.g), max(peach.b, 1e-3));
@@ -129,11 +165,45 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
-export function moonMesh() {
+function bakeMoon(renderer) {
+  const quad = new Mesh(new PlaneGeometry(2, 2));
+  quad.frustumCulled = false;
+  const passes = [false, true].map((slope) => ({
+    target: new WebGLRenderTarget(BAKE_WIDTH, BAKE_WIDTH / 2, {
+      depthBuffer: false,
+      wrapS: RepeatWrapping,
+    }),
+    material: new ShaderMaterial({
+      vertexShader: BAKE_VERTEX,
+      fragmentShader: BAKE_FRAGMENT,
+      defines: slope ? { SLOPE: "" } : {},
+      depthTest: false,
+      depthWrite: false,
+    }),
+  }));
+  const bake = () => {
+    const previous = renderer.getRenderTarget();
+    passes.forEach(({ target, material }) => {
+      quad.material = material;
+      renderer.setRenderTarget(target);
+      renderer.render(quad, BAKE_CAMERA);
+    });
+    renderer.setRenderTarget(previous);
+  };
+  bake();
+  // A lost context takes the baked pixels with it.
+  renderer.domElement.addEventListener("webglcontextrestored", bake);
+  return passes.map(({ target }) => target.texture);
+}
+
+export function moonMesh(renderer) {
+  const [albedo, slope] = bakeMoon(renderer);
   return new Mesh(
     new SphereGeometry(1, 96, 64),
     new ShaderMaterial({
       uniforms: {
+        uAlbedo: { value: albedo },
+        uSlope: { value: slope },
         uPeach: { value: null },
         uHasPeach: { value: 0 },
         uTint: { value: new Color(1, 1, 1) },

@@ -1,4 +1,5 @@
 import {
+  Box2,
   CanvasTexture,
   FramebufferTexture,
   LinearFilter,
@@ -19,6 +20,7 @@ const CANVAS_WIDTH = 720;
 const SURFACE = 0.2;
 const FALLOFF = [0.5, 0.444, 0.311, 0.172, 0.075, 0];
 const project = new Vector3();
+const corner = new Vector2();
 const SPRITE_SIZE = 256;
 
 function drawBlobSprite(channel) {
@@ -118,6 +120,7 @@ export class Lens {
     this.frame = null;
     this.size = new Vector2();
     this.origin = new Vector2();
+    this.reach = new Box2();
     this.resize();
   }
 
@@ -219,6 +222,7 @@ export class Lens {
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = "lighter";
+    this.reach.makeEmpty();
 
     this.drops = this.drops.filter((d) => d.age < d.life);
     this.drops.forEach((d) => {
@@ -256,6 +260,8 @@ export class Lens {
     if (r < 0.6) return;
     const reach = r * 1.8;
     this.ctx.drawImage(sprite, x - reach, y - reach, reach * 2, reach * 2);
+    this.reach.expandByPoint(corner.set(x - reach, y - reach));
+    this.reach.expandByPoint(corner.set(x + reach, y + reach));
   }
 
   captureFrame() {
@@ -287,9 +293,19 @@ export class Lens {
       this.renderer.render(this.scene, this.camera);
       this.camera.layers.set(0);
     }
-    if (this.drops.length > 0) {
+    if (this.drops.length > 0 && !this.reach.isEmpty()) {
       this.captureFrame();
+      const scale = window.innerWidth / this.canvas.width;
+      const { min, max } = this.reach;
+      this.renderer.setScissor(
+        min.x * scale - 2,
+        viewHeight() - max.y * scale - 2,
+        (max.x - min.x) * scale + 4,
+        (max.y - min.y) * scale + 4,
+      );
+      this.renderer.setScissorTest(true);
       this.renderer.render(this.overlay, this.overlayCamera);
+      this.renderer.setScissorTest(false);
     }
     this.renderer.autoClear = autoClear;
   }

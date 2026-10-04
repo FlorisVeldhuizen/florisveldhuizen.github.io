@@ -27,7 +27,7 @@ import {
   Vector3,
   WebGLRenderTarget,
 } from "three";
-import { RIPE, ROTTEN } from "./data/orchard";
+import { RIPE, ROTTEN, SEEDS } from "./data/orchard";
 
 const PLANT_SIZE = 320;
 const ICON_SIZE = 96;
@@ -289,8 +289,49 @@ export class Renders {
         sheen: 0.6,
         sheenColor: new Color(0xe6f2a8),
       }),
+      pit: new MeshPhysicalMaterial({
+        roughness: 0.7,
+        clearcoat: 0.3,
+        flatShading: true,
+        vertexColors: true,
+      }),
     };
     this.ready = true;
+  }
+
+  // Shaders build on their first draw, so draw each material once before the orchard opens.
+  warm() {
+    if (this.warmed || !this.ready) return;
+    this.warmed = true;
+    const group = new Group();
+    [
+      ...Object.values(this.shared),
+      ...SEEDS.flatMap((seed) => Object.values(this.seedMaterials(seed))),
+    ]
+      .filter((m) => m.isMaterial)
+      .forEach((m) => group.add(new Mesh(this.shared.sphere, m)));
+    const leaves = new InstancedMesh(
+      this.shared.sphere,
+      this.seedMaterials(SEEDS[0]).leaf,
+      1,
+    );
+    leaves.setColorAt(0, new Color());
+    group.add(leaves);
+    const r = this.renderer;
+    const previous = r.getRenderTarget();
+    const shadows = r.shadowMap.enabled;
+    r.shadowMap.enabled = false;
+    this.scene.add(group);
+    [
+      [PLANT_SIZE, this.plantCamera],
+      [ICON_SIZE, this.iconCamera],
+    ].forEach(([size, camera]) => {
+      r.setRenderTarget(this.target(size).target);
+      r.render(this.scene, camera);
+    });
+    this.scene.remove(group);
+    r.setRenderTarget(previous);
+    r.shadowMap.enabled = shadows;
   }
 
   target(size) {
@@ -325,18 +366,43 @@ export class Renders {
     r.setRenderTarget(slot.target);
     r.clear();
     r.render(this.scene, camera);
-    r.readRenderTargetPixels(slot.target, 0, 0, width, height, slot.pixels);
+    // Reading into a GPU buffer and collecting it later keeps the frame from waiting on the GPU.
+    const gl = r.getContext();
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer);
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, slot.pixels.byteLength, gl.STREAM_READ);
+    r.readRenderTargetPixels(slot.target, 0, 0, width, height, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.flush();
     this.scene.remove(object);
     r.setRenderTarget(previous);
     r.setClearColor(clear, alpha);
     r.shadowMap.enabled = shadows;
-    const image = slot.ctx.createImageData(width, height);
-    for (let y = 0; y < height; y += 1) {
-      const row = (height - 1 - y) * width * 4;
-      image.data.set(slot.pixels.subarray(row, row + width * 4), y * width * 4);
-    }
-    slot.ctx.putImageData(image, 0, 0);
-    return slot.canvas.toDataURL();
+    return new Promise((resolve) => {
+      const collect = () => {
+        if (gl.clientWaitSync(fence, 0, 0) === gl.TIMEOUT_EXPIRED) {
+          setTimeout(collect, 4);
+          return;
+        }
+        gl.deleteSync(fence);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, slot.pixels);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        gl.deleteBuffer(buffer);
+        const image = slot.ctx.createImageData(width, height);
+        for (let y = 0; y < height; y += 1) {
+          const row = (height - 1 - y) * width * 4;
+          image.data.set(
+            slot.pixels.subarray(row, row + width * 4),
+            y * width * 4,
+          );
+        }
+        slot.ctx.putImageData(image, 0, 0);
+        resolve(slot.canvas.toDataURL());
+      };
+      collect();
+    });
   }
 
   request(key, build, done) {
@@ -356,10 +422,11 @@ export class Renders {
     if (!this.ready) return;
     for (let n = 0; n < PER_FRAME && this.queue.length; n += 1) {
       const { key, build } = this.queue.shift();
-      const url = build();
-      this.cache.set(key, url);
-      this.waiting.get(key).forEach((done) => done(url));
-      this.waiting.delete(key);
+      build().then((url) => {
+        this.cache.set(key, url);
+        this.waiting.get(key).forEach((done) => done(url));
+        this.waiting.delete(key);
+      });
     }
   }
 
@@ -382,12 +449,10 @@ export class Renders {
           return `${((at.x + 1) * 50).toFixed(1)}% ${((1 - at.y) * 50).toFixed(1)}%`;
         };
         const root = onScreen(new Vector3());
-        return {
-          base: shot(base),
-          top: top ? shot(top) : null,
-          origin: pivot ? onScreen(pivot) : root,
-          root,
-        };
+        const origin = pivot ? onScreen(pivot) : root;
+        return Promise.all([shot(base), top && shot(top)]).then(
+          ([baseUrl, topUrl]) => ({ base: baseUrl, top: topUrl, origin, root }),
+        );
       },
       done,
     );
@@ -769,19 +834,13 @@ export class Renders {
           p.setXYZ(i, x * 0.62 * groove * tip, y, z * 0.42 * groove);
         }
         g.computeVertexNormals();
-        const material = new MeshPhysicalMaterial({
-          color: new Color(0x8a5634).lerp(new Color(seed.color), 0.35),
-          roughness: 0.7,
-          clearcoat: 0.3,
-          flatShading: true,
-          vertexColors: true,
-        });
+        const material = this.shared.pit;
+        material.color.set(0x8a5634).lerp(new Color(seed.color), 0.35);
         const pit = new Mesh(g, material);
         pit.rotation.set(0.3, 0.5, -0.5);
         pit.scale.setScalar(0.78);
         const url = this.snapshot(pit, this.iconCamera, ICON_SIZE);
         g.dispose();
-        material.dispose();
         return url;
       },
       done,

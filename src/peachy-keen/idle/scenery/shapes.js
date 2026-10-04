@@ -1,20 +1,18 @@
 import {
   CanvasTexture,
   Color,
-  CylinderGeometry,
   DoubleSide,
-  ExtrudeGeometry,
   Group,
   LatheGeometry,
   Mesh,
   MeshPhysicalMaterial,
+  Object3D,
   PlaneGeometry,
-  Shape,
   SphereGeometry,
   SRGBColorSpace,
-  TorusGeometry,
   Vector2,
 } from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils";
 
 let featherMap = null;
 
@@ -275,27 +273,6 @@ export function flameTexture() {
   return t;
 }
 
-export function moonTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#ffc49a";
-  ctx.fillRect(0, 0, 256, 128);
-  for (let n = 0; n < 60; n += 1) {
-    const x = Math.random() * 256;
-    const y = 10 + Math.random() * 108;
-    const r = 2 + Math.random() ** 2 * 12;
-    ctx.fillStyle = `rgba(190, 100, 80, ${0.12 + Math.random() * 0.18})`;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const t = new CanvasTexture(canvas);
-  t.colorSpace = SRGBColorSpace;
-  return t;
-}
-
 export function candleGeometry(height = 0.62, radius = 0.12) {
   const top = height / 2;
   return new LatheGeometry(
@@ -312,358 +289,49 @@ export function candleGeometry(height = 0.62, radius = 0.12) {
   );
 }
 
-function physical(options) {
-  return new MeshPhysicalMaterial({ roughness: 0.5, ...options });
-}
-
-function extrude(shape, depth, bevel = 0.04) {
-  return new ExtrudeGeometry(shape, {
-    depth,
-    bevelEnabled: true,
-    bevelThickness: bevel,
-    bevelSize: bevel,
-    bevelSegments: 4,
-    curveSegments: 24,
-  }).center();
-}
-
-function heartShape(s = 1) {
-  const h = new Shape();
-  h.moveTo(0, -0.5 * s);
-  h.bezierCurveTo(-0.9 * s, 0.05 * s, -0.45 * s, 0.75 * s, 0, 0.3 * s);
-  h.bezierCurveTo(0.45 * s, 0.75 * s, 0.9 * s, 0.05 * s, 0, -0.5 * s);
-  return h;
-}
-
-function starShape(outer = 0.5, inner = 0.22) {
-  const s = new Shape();
-  for (let n = 0; n < 10; n += 1) {
-    const r = n % 2 ? inner : outer;
-    const a = (n / 10) * Math.PI * 2 + Math.PI / 2;
-    const x = Math.cos(a) * r;
-    const y = Math.sin(a) * r;
-    if (n) s.lineTo(x, y);
-    else s.moveTo(x, y);
-  }
-  return s;
-}
-
-function lathe(points, material, segments = 40) {
-  return new Mesh(
-    new LatheGeometry(
-      points.map(([x, y]) => new Vector2(x, y)),
-      segments,
-    ),
-    material,
-  );
-}
-
-const MATERIALS = {
-  wood: () => physical({ color: 0xc98a52, roughness: 0.55, clearcoat: 0.4 }),
-  darkWood: () => physical({ color: 0x8a5228, roughness: 0.6 }),
-  heart: () =>
-    physical({ color: 0xff4f7a, roughness: 0.25, clearcoat: 1, sheen: 0.5 }),
-  stone: () => physical({ color: 0x2a2228, roughness: 0.18, clearcoat: 1 }),
-  glass: () =>
-    physical({
-      color: 0xffa640,
-      roughness: 0.08,
-      transparent: true,
-      opacity: 0.82,
-      clearcoat: 1,
-    }),
-  cork: () => physical({ color: 0xb8864e, roughness: 0.9 }),
-  silver: () => physical({ color: 0xe8e8f0, metalness: 1, roughness: 0.18 }),
-  gold: () => physical({ color: 0xffc94a, metalness: 1, roughness: 0.22 }),
-  towel: () =>
-    physical({
-      color: 0xfff4ec,
-      roughness: 1,
-      sheen: 1,
-      sheenColor: new Color(0xffffff),
-    }),
-  lotus: () =>
-    physical({ color: 0xffb8d0, roughness: 0.6, sheen: 1, side: DoubleSide }),
-  reamer: () =>
-    physical({
-      color: 0xffc2d4,
-      roughness: 0.06,
-      transparent: true,
-      opacity: 0.6,
-      clearcoat: 1,
-      sheen: 0.4,
-      sheenColor: new Color(0xff8fb8),
-    }),
-  juice: () =>
-    physical({
-      color: 0xe8541c,
-      roughness: 0.04,
-      clearcoat: 1,
-      emissive: 0x8a2600,
-      emissiveIntensity: 0.6,
-    }),
-  wax: () => physical({ color: 0xfff0dc, roughness: 0.7, sheen: 0.6 }),
-  moon: (map) =>
-    physical({ color: 0xffffff, map, roughness: 0.9, emissive: 0x3a1408 }),
-  pink: () =>
-    physical({
-      color: 0xff7ab8,
-      emissive: 0x6a1a44,
-      roughness: 0.3,
-      metalness: 0.4,
-    }),
-  cyan: () =>
-    physical({
-      color: 0x7ae0ff,
-      emissive: 0x104050,
-      roughness: 0.3,
-      metalness: 0.4,
-    }),
-  core: () =>
-    physical({ color: 0xffe0f0, emissive: 0xff5fa8, emissiveIntensity: 0.6 }),
-  void: () => physical({ color: 0x050104, roughness: 0.1, clearcoat: 1 }),
-  disc: () =>
-    physical({
-      color: 0xffb86a,
-      emissive: 0xff5fa8,
-      emissiveIntensity: 0.9,
-      side: DoubleSide,
-    }),
-};
-
-const PROPS = {
-  feather: () => {
-    const m = new Mesh(featherGeometry(1), featherMaterial());
-    m.position.y = -0.5;
-    m.rotation.z = -0.4;
-    return m;
-  },
-  admirer: () =>
-    new Mesh(extrude(heartShape(0.8), 0.18, 0.08), MATERIALS.heart()),
-  paddle: () => {
-    const g = new Group();
-    const face = new Shape();
-    face.absarc(0, 0.2, 0.34, 0, Math.PI * 2);
-    [
-      [-0.12, 0.3],
-      [0.12, 0.3],
-      [0, 0.1],
-    ].forEach(([x, y]) => {
-      const hole = new Shape();
-      hole.absarc(x, y, 0.05, 0, Math.PI * 2);
-      face.holes.push(hole);
-    });
-    const head = new Mesh(extrude(face, 0.06, 0.02), MATERIALS.wood());
-    head.position.y = 0.2;
-    const handle = new Mesh(
-      new CylinderGeometry(0.05, 0.06, 0.42, 16),
-      MATERIALS.darkWood(),
-    );
-    handle.position.y = -0.34;
-    g.add(head, handle);
-    return g;
-  },
-  masseuse: () => {
-    const g = new Group();
-    const mat = MATERIALS.stone();
-    [
-      [0, -0.22, 0.34],
-      [0.02, 0.0, 0.27],
-      [-0.01, 0.17, 0.2],
-    ].forEach(([x, y, r]) => {
-      const s = new Mesh(new SphereGeometry(r, 32, 16), mat);
-      s.scale.y = 0.42;
-      s.position.set(x, y, 0);
-      g.add(s);
-    });
-    return g;
-  },
-  baron: () => {
-    const g = new Group();
-    g.add(
-      lathe(
-        [
-          [0, -0.45],
-          [0.26, -0.45],
-          [0.3, -0.38],
-          [0.3, 0.05],
-          [0.16, 0.22],
-          [0.1, 0.3],
-          [0.1, 0.42],
-          [0, 0.42],
-        ],
-        MATERIALS.glass(),
-      ),
-    );
-    const cork = new Mesh(
-      new CylinderGeometry(0.09, 0.08, 0.14, 20),
-      MATERIALS.cork(),
-    );
-    cork.position.y = 0.48;
-    g.add(cork);
-    return g;
-  },
-  coach: () => {
-    const g = new Group();
-    const body = new Mesh(
-      new CylinderGeometry(0.2, 0.2, 0.34, 32),
-      MATERIALS.silver(),
-    );
-    body.rotation.x = Math.PI / 2;
-    const tube = new Mesh(
-      new CylinderGeometry(0.07, 0.08, 0.4, 20),
-      MATERIALS.silver(),
-    );
-    tube.rotation.z = Math.PI / 2;
-    tube.position.set(0.3, 0.12, 0);
-    const ring = new Mesh(
-      new TorusGeometry(0.1, 0.025, 12, 32),
-      MATERIALS.gold(),
-    );
-    ring.position.set(-0.2, 0.18, 0);
-    g.add(body, tube, ring);
-    return g;
-  },
-  choir: () => {
-    const note = new Shape();
-    note.absellipse(0, 0, 0.16, 0.12, 0, Math.PI * 2, false, -0.4);
-    const stem = new Shape();
-    stem.moveTo(0.12, 0);
-    stem.lineTo(0.17, 0);
-    stem.lineTo(0.17, 0.62);
-    stem.lineTo(0.42, 0.5);
-    stem.lineTo(0.42, 0.42);
-    stem.lineTo(0.17, 0.52);
-    stem.lineTo(0.12, 0.52);
-    const g = new Group();
-    g.add(new Mesh(extrude(note, 0.08, 0.03), MATERIALS.gold()));
-    const s = new Mesh(extrude(stem, 0.06, 0.015), MATERIALS.gold());
-    s.position.set(0.14, 0.3, 0);
-    g.add(s);
-    g.position.y = -0.2;
-    return g;
-  },
-  spa: () => {
-    const g = new Group();
-    const petal = petalGeometry().translate(0, 0.5, 0).scale(1, 1, -1);
-    const mat = MATERIALS.lotus();
-    [
-      [8, 0.62, 1.05, 0],
-      [8, 0.5, 0.6, 0.4],
-      [5, 0.36, 0.25, 0.1],
-    ].forEach(([count, size, tilt, twist]) => {
-      for (let n = 0; n < count; n += 1) {
-        const p = new Mesh(petal, mat);
-        const a = (n / count) * Math.PI * 2 + twist;
-        p.scale.setScalar(size);
-        p.position.set(Math.cos(a) * 0.05, 0, Math.sin(a) * 0.05);
-        p.rotation.set(tilt, -a + Math.PI / 2, 0, "YXZ");
-        g.add(p);
-      }
-    });
-    const core = new Mesh(new SphereGeometry(0.07, 16, 12), MATERIALS.gold());
-    core.position.y = 0.08;
-    core.scale.y = 0.6;
-    g.add(core);
-    g.position.y = -0.2;
-    return g;
-  },
-  press: () => {
-    const g = new Group();
-    const dish = lathe(
-      [
-        [0, -0.3],
-        [0.34, -0.3],
-        [0.44, -0.26],
-        [0.5, -0.12],
-        [0.52, -0.06],
-        [0.48, -0.08],
-        [0.42, -0.2],
-        [0.3, -0.25],
-        [0, -0.25],
-      ],
-      MATERIALS.reamer(),
-      48,
-    );
-    const pool = new Mesh(
-      new CylinderGeometry(0.43, 0.36, 0.08, 48),
-      MATERIALS.juice(),
-    );
-    pool.position.y = -0.2;
-    const profile = [];
-    for (let n = 0; n <= 20; n += 1) {
-      const t = n / 20;
-      profile.push(
-        new Vector2(0.3 * Math.cos((t * Math.PI) / 2) ** 0.8, -0.18 + t * 0.52),
-      );
-    }
-    const cone = new LatheGeometry(profile, 96);
-    const pos = cone.attributes.position;
-    for (let n = 0; n < pos.count; n += 1) {
-      const x = pos.getX(n);
-      const z = pos.getZ(n);
-      const up = (pos.getY(n) + 0.18) / 0.52;
-      const ridge = Math.abs(Math.cos(Math.atan2(z, x) * 6)) ** 3;
-      const k = 1 + ridge * 0.22 * Math.max(0, Math.sin(up * Math.PI)) ** 0.6;
-      pos.setXYZ(n, x * k, pos.getY(n), z * k);
-    }
-    cone.computeVertexNormals();
-    const ribs = new Mesh(cone, MATERIALS.reamer());
-    ribs.material.opacity = 0.85;
-    const handle = new Mesh(
-      new TorusGeometry(0.1, 0.03, 12, 32, Math.PI * 1.2),
-      MATERIALS.gold(),
-    );
-    handle.position.set(0.54, -0.16, 0);
-    handle.rotation.set(Math.PI / 2, 0, -Math.PI * 0.6);
-    g.add(dish, pool, ribs, handle);
-    g.rotation.x = 0.35;
-    return g;
-  },
-  cult: () => {
-    const g = new Group();
-    const wax = new Mesh(candleGeometry(), MATERIALS.wax());
-    const wick = new Mesh(
-      new CylinderGeometry(0.01, 0.01, 0.06, 6),
-      MATERIALS.stone(),
-    );
-    wick.position.y = 0.34;
-    g.add(wax, wick);
-    return g;
-  },
-  moon: () =>
-    new Mesh(new SphereGeometry(0.42, 48, 32), MATERIALS.moon(moonTexture())),
-  collider: () => {
-    const g = new Group();
-    g.add(new Mesh(new SphereGeometry(0.12, 24, 16), MATERIALS.core()));
-    [0, Math.PI / 3, -Math.PI / 3].forEach((rot, n) => {
-      const ring = new Mesh(
-        new TorusGeometry(0.4, 0.02, 10, 64),
-        n === 1 ? MATERIALS.cyan() : MATERIALS.pink(),
-      );
-      ring.rotation.set(Math.PI / 2.4, 0, rot);
-      g.add(ring);
-    });
-    return g;
-  },
-  singularity: () => {
-    const g = new Group();
-    g.add(new Mesh(new SphereGeometry(0.22, 32, 24), MATERIALS.void()));
-    const disc = new Mesh(
-      new TorusGeometry(0.38, 0.09, 4, 64),
-      MATERIALS.disc(),
-    );
-    disc.scale.z = 0.12;
-    disc.rotation.x = Math.PI / 2.3;
-    g.add(disc);
-    return g;
-  },
-  peachverse: () =>
-    new Mesh(extrude(starShape(0.48, 0.2), 0.12, 0.05), MATERIALS.gold()),
-};
-
-export function makeProp(id) {
+export function makeLotus() {
   const g = new Group();
-  g.add(PROPS[id]());
-  return g;
+  const petal = petalGeometry().translate(0, 0.5, 0).scale(1, 1, -1);
+  const place = new Object3D();
+  const petals = [];
+  [
+    [8, 0.62, 1.05, 0],
+    [8, 0.5, 0.6, 0.4],
+    [5, 0.36, 0.25, 0.1],
+  ].forEach(([count, size, tilt, twist]) => {
+    for (let n = 0; n < count; n += 1) {
+      const a = (n / count) * Math.PI * 2 + twist;
+      place.scale.setScalar(size);
+      place.position.set(Math.cos(a) * 0.05, 0, Math.sin(a) * 0.05);
+      place.rotation.set(tilt, -a + Math.PI / 2, 0, "YXZ");
+      place.updateMatrix();
+      petals.push(petal.clone().applyMatrix4(place.matrix));
+    }
+  });
+  g.add(
+    new Mesh(
+      mergeGeometries(petals),
+      new MeshPhysicalMaterial({
+        color: 0xffb8d0,
+        roughness: 0.6,
+        sheen: 1,
+        side: DoubleSide,
+      }),
+    ),
+  );
+  const core = new Mesh(
+    new SphereGeometry(0.07, 16, 12),
+    new MeshPhysicalMaterial({
+      color: 0xffc94a,
+      metalness: 1,
+      roughness: 0.22,
+    }),
+  );
+  core.position.y = 0.08;
+  core.scale.y = 0.6;
+  g.add(core);
+  g.position.y = -0.2;
+  const prop = new Group();
+  prop.add(g);
+  return prop;
 }

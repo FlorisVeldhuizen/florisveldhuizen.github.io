@@ -1460,7 +1460,6 @@ export class Interaction {
         velocity: new Vector3(),
       };
     });
-    return this.halves.map((h) => h.holder);
   }
 
   startSlice() {
