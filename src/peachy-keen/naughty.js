@@ -15,15 +15,29 @@ const ACHIEVEMENTS = {
   unwrapped: ["Unwrapped", "The lingerie came off."],
   atomic: ["Atomic", "A wedgie with a snap."],
   slippery: ["Slippery when wet", "Fully oiled."],
-  patience: ["Worth the wait", "You finished after edging."],
+  patience: ["Sweet release", "Held off three times, then let it go."],
 };
 
-const BEGGING = [
-  "Not yet.",
-  "Hold it… hold it…",
-  "Beg for it.",
-  "Almost. Not quite.",
-  "Did I say you could?",
+const EDGES_NEEDED = 3;
+const BRINK = 85;
+const COOLED = 60;
+
+const PLEADING = [
+  "Oh… oh…",
+  "Don't stop now.",
+  "So close…",
+  "Almost there…",
+  "I'm so ripe for you…",
+  "Just one more?",
+];
+
+const WHINING = [
+  "Hey! I was so close.",
+  "Rude.",
+  "You tease.",
+  "You did that on purpose.",
+  "Not fair…",
+  "Again? Really?",
 ];
 
 function element(tag, className, parent = document.body) {
@@ -121,41 +135,46 @@ class Edging {
   constructor(interaction, talk, achievements) {
     Object.assign(this, { interaction, talk });
     this.on = false;
-    this.denials = 0;
+    this.edges = 0;
+    this.atBrink = false;
     this.layer = document.getElementById("combos");
-    interaction.chargeGuard = () => this.deny();
+    interaction.on("charge", () => {
+      if (this.on && this.ready) interaction.burstPower = 1.8;
+    });
     interaction.on("burst", () => {
-      if (this.denials >= 3) achievements.unlock("patience");
-      this.denials = 0;
+      if (this.on && this.ready) achievements.unlock("patience");
+      this.edges = 0;
+      this.atBrink = false;
     });
   }
 
-  deny() {
-    const i = this.interaction;
-    if (!this.on || i.phase !== "live") return false;
-    if (this.denials >= 3) {
-      i.burstPower = 1.8;
-      this.talk.show("NOW!");
-      return false;
-    }
-    this.denials += 1;
-    i.heat = 78 + this.denials * 4;
-    i.heatHold = 1.2;
-    i.twerk = null;
-    i.wobbleAll(0.05);
-    i.trauma = Math.max(i.trauma, 0.2);
-    playHeartbeat(1);
-    this.talk.show(pick(BEGGING));
-    this.popDenied();
-    return true;
+  get ready() {
+    return this.edges >= EDGES_NEEDED;
   }
 
-  popDenied() {
+  update() {
+    const i = this.interaction;
+    if (!this.on || i.phase !== "live") return;
+    if (!this.atBrink && i.heat >= BRINK) {
+      this.atBrink = true;
+      playHeartbeat(1);
+      i.wobbleAll(0.04);
+      this.talk.show(this.ready ? "Okay. Now. Please." : pick(PLEADING));
+    } else if (this.atBrink && i.heat < COOLED) {
+      this.atBrink = false;
+      if (this.ready) return;
+      this.edges += 1;
+      this.talk.show(pick(WHINING));
+      this.popLabel(this.ready ? "Ripe & ready" : `Teased ×${this.edges}`);
+    }
+  }
+
+  popLabel(text) {
     const i = this.interaction;
     const at = i.toScreen(i.group.position);
     const radius = 1.3 * i.group.scale.x * i.pixelsPerUnit(i.group.position);
     const label = element("span", "pop", this.layer);
-    label.textContent = `Denied ×${this.denials}`;
+    label.textContent = text;
     label.style.left = `${at.x}px`;
     label.style.top = `${at.y - radius}px`;
     animate(
@@ -190,5 +209,6 @@ export class Naughty {
 
   update() {
     this.achievements.update();
+    this.edging.update();
   }
 }

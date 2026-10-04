@@ -196,8 +196,8 @@ const SPECIAL = [
   },
   {
     id: "patience",
-    name: "Worth the wait",
-    about: "You finished after edging.",
+    name: "Sweet release",
+    about: "Held off three times, then let it go.",
     test: (s) => s.seen.edged,
   },
   {

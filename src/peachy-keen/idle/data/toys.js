@@ -78,10 +78,10 @@ export const TOYS = [
   },
   {
     id: "edging",
-    name: "Tantric patience",
+    name: "The long tease",
     icon: "M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9",
     about:
-      "The peach holds back three times before it bursts. Held-back bursts pay three times as much.",
+      "Bring the peach to the brink, then let it cool off. Do it three times and the next burst pays three times as much.",
     cost: 1e7,
     setting: "edging",
     on: true,
