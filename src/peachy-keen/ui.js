@@ -12,6 +12,9 @@ export class UI {
     this.hintSwipe = document.getElementById("hint-swipe");
     this.hintRub = document.getElementById("hint-rub");
     this.hintGrab = document.getElementById("hint-grab");
+    if (window.matchMedia("(pointer: coarse)").matches)
+      this.hintGrab.textContent = "Press and hold, then drag to pull it.";
+    this.hintTip = document.getElementById("hint-tip");
     this.cursor = document.getElementById("cursor");
     this.ring = this.cursor.firstElementChild;
     this.comboLayer = document.getElementById("combos");
@@ -154,10 +157,22 @@ export class UI {
 
   onHeartbeat() {
     if (reducedMotion.matches) return;
-    this.heatFill.parentElement.animate([{ scale: "1 1" }, { scale: "1 1.4" }, { scale: "1 1" }], {
-      duration: 320,
-      easing: "ease-in-out",
-    });
+    this.heatFill.parentElement.animate(
+      [{ scale: "1 1" }, { scale: "1 1.4" }, { scale: "1 1" }],
+      {
+        duration: 320,
+        easing: "ease-in-out",
+      },
+    );
+  }
+
+  showTip(text) {
+    this.hintTip.textContent = text;
+    this.hintTip.classList.remove("is-learned");
+  }
+
+  hideTip() {
+    this.hintTip.classList.add("is-learned");
   }
 
   onRub() {

@@ -20,13 +20,16 @@ let massageMap = null;
 let brown = null;
 let noise = null;
 let rub = null;
-let drag = null;
 let slide = null;
+let muted = false;
+let lastTime = -1;
+let stalled = false;
 
 function context() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain();
+    master.gain.value = muted ? 0 : 1;
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -6;
     limiter.knee.value = 6;
@@ -87,7 +90,32 @@ export function loadSounds() {
   return loading;
 }
 
+// Mobile Safari can report "running" while its clock stops; only a new context recovers.
+function watchClock() {
+  const live = ctx?.state === "running" && !document.hidden;
+  stalled = live && ctx.currentTime === lastTime;
+  lastTime = live ? ctx.currentTime : -1;
+}
+
+function rebuildContext() {
+  const dancing = disco && !disco.stopping;
+  if (disco) dropDisco(disco);
+  ctx.close().catch(() => {});
+  ctx = null;
+  rub = null;
+  slide = null;
+  choir = null;
+  chant = null;
+  buzzer = null;
+  lastSlap = null;
+  stalled = false;
+  lastTime = -1;
+  context();
+  if (dancing) startDisco();
+}
+
 function unlockAudio() {
+  if (stalled || ctx?.state === "closed") rebuildContext();
   const c = context();
   if (c.state !== "running") c.resume().catch(() => {});
   loadSounds();
@@ -103,9 +131,11 @@ export function keepAudioUnlocked() {
       passive: true,
     }),
   );
+  setInterval(watchClock, 500);
 }
 
-export function setMuted(muted) {
+export function setMuted(on) {
+  muted = on;
   context();
   master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.02);
 }
@@ -152,7 +182,14 @@ export function cutSlap() {
   lastSlap = null;
 }
 
-export function playSlap(intensity, heat, oil, pitch = 1, lowCut = 0) {
+export function playSlap(
+  intensity,
+  heat,
+  oil,
+  pitch = 1,
+  lowCut = 0,
+  volume = 1,
+) {
   if (slaps.length === 0) return;
   const now = ctx.currentTime;
   const src = ctx.createBufferSource();
@@ -168,13 +205,15 @@ export function playSlap(intensity, heat, oil, pitch = 1, lowCut = 0) {
   tone.type = "lowpass";
   tone.frequency.value = 12000 - oil * 6000;
   const gain = ctx.createGain();
-  gain.gain.value = 0.35 + intensity * 0.5;
+  gain.gain.value = (0.35 + intensity * 0.5) * volume;
   cutLows(src.connect(tone), lowCut).connect(gain).connect(master);
   src.start(now, onset(src.buffer));
   lastSlap = gain;
 
   if (oil > 0.15)
-    noiseHit(2400, 500, 0.14, 0.35 * intensity * oil, "bandpass", { q: 3 });
+    noiseHit(2400, 500, 0.14, 0.35 * intensity * oil * volume, "bandpass", {
+      q: 3,
+    });
 }
 
 export function playBurst() {
@@ -238,17 +277,6 @@ const VELVET = {
   lowCut: 1800,
   rate: 1,
   trim: 0.81,
-};
-const PULLED = {
-  grain: 0.14,
-  jump: 0.1,
-  grit: 0.05,
-  bright: 0.35,
-  body: 1.4,
-  skip: 0.5,
-  lowCut: 1000,
-  rate: 0.6,
-  trim: 0.61,
 };
 
 function frameEnergy(data, hop, frames, measure) {
@@ -596,20 +624,6 @@ export function setRub(amount, oil, pan = 0) {
   if (!playVelvet(rub, now, amount, speed, oil, pan)) rub = null;
 }
 
-export function setDrag(amount, oil) {
-  if (!running()) return;
-  if (!drag) {
-    if (amount <= 0 || !massageMap) return;
-    drag = velvetChain(PULLED);
-  }
-  const now = ctx.currentTime;
-  const speed = amount / 0.6;
-  const level = speed ** 0.8 * 0.028 * (1 + oil * 0.4);
-  drag.gain.gain.setTargetAtTime(level, now, level > drag.level ? 0.12 : 0.04);
-  drag.level = level;
-  if (!playVelvet(drag, now, amount, speed, oil, 0)) drag = null;
-}
-
 function noiseHit(
   freqFrom,
   freqTo,
@@ -767,15 +781,17 @@ export function playPat(weight, pan, oil, { gain = 1, flam = true } = {}) {
   });
 }
 
-export function playWobble(strength, swingSeconds, oil) {
+export function playWobble(
+  strength,
+  swingSeconds,
+  oil,
+  { gain = 1, most = WOBBLE.swings, decay = WOBBLE.decay } = {},
+) {
   if (!running() || !pats.length) return;
   const now = ctx.currentTime;
-  const swings = Math.max(
-    1,
-    Math.round(WOBBLE.swings * (0.35 + strength * 0.65)),
-  );
+  const swings = Math.max(1, Math.round(most * (0.35 + strength * 0.65)));
   for (let k = 0; k < swings; k += 1) {
-    const fade = WOBBLE.decay ** (k + 1);
+    const fade = decay ** (k + 1);
     pat(
       now + 0.04 + swingSeconds * (k + 1),
       strength * fade,
@@ -783,7 +799,7 @@ export function playWobble(strength, swingSeconds, oil) {
       oil,
       {
         ...WOBBLE,
-        volume: WOBBLE.volume * (0.25 + 0.75 * fade),
+        volume: WOBBLE.volume * gain * (0.25 + 0.75 * fade),
       },
     );
   }
@@ -1002,7 +1018,7 @@ export function playCork(open) {
 }
 
 function running() {
-  return ctx && ctx.state === "running";
+  return ctx && ctx.state === "running" && !stalled;
 }
 
 function tone(at, { from, to, sweep, length, volume, attack = 0.01 }) {
@@ -1275,7 +1291,9 @@ function route(
         lfo.connect(depth).connect(panner.pan);
         lfo.start();
         disco.lfos.push(lfo);
+        disco.nodes.push(depth);
       }
+      disco.nodes.push(panner);
       out = input.connect(panner);
     }
     out.connect(disco.bus);
@@ -1288,7 +1306,9 @@ function route(
       const send = ctx.createGain();
       send.gain.value = amount;
       out.connect(send).connect(target);
+      disco.nodes.push(send);
     });
+    disco.nodes.push(input);
     disco.routes.set(key, input);
   }
   node.connect(input);
@@ -1602,7 +1622,7 @@ function reverb() {
   return convolver;
 }
 
-function ensemble(out, lfos) {
+function ensemble(out, lfos, nodes) {
   const input = ctx.createGain();
   [
     [0.012, 0.47, -0.7],
@@ -1623,11 +1643,13 @@ function ensemble(out, lfos) {
     const level = ctx.createGain();
     level.gain.value = 0.45;
     input.connect(delay).connect(level).connect(panner).connect(out);
+    nodes.push(delay, depth, level, panner);
   });
+  nodes.push(input);
   return input;
 }
 
-function makeEcho(out) {
+function makeEcho(out, nodes) {
   const input = ctx.createGain();
   const delay = ctx.createDelay(1);
   delay.delayTime.value = STEP * 3;
@@ -1638,6 +1660,7 @@ function makeEcho(out) {
   damp.frequency.value = 2400;
   input.connect(delay).connect(damp).connect(feedback).connect(delay);
   damp.connect(out);
+  nodes.push(input, delay, feedback, damp);
   return input;
 }
 
@@ -1679,6 +1702,7 @@ export function startDisco() {
   const wet = ctx.createGain();
   wet.gain.value = 0.55;
   verb.connect(wet).connect(bus);
+  const nodes = [bus, muffle, glue, verb, wet];
   disco = {
     start: ctx.currentTime + 0.1,
     next: 0,
@@ -1686,9 +1710,10 @@ export function startDisco() {
     muffle,
     stopping: null,
     verb,
-    chorus: ensemble(bus, lfos),
-    echo: makeEcho(bus),
+    chorus: ensemble(bus, lfos, nodes),
+    echo: makeEcho(bus, nodes),
     lfos,
+    nodes,
     routes: new Map(),
   };
   disco.timer = setInterval(scheduleDisco, 25);
@@ -1705,14 +1730,17 @@ export function stopDisco() {
     now + DISCO_FADE,
   );
   fading.stopping = setTimeout(
-    () => {
-      clearInterval(fading.timer);
-      fading.lfos.forEach((lfo) => lfo.stop());
-      fading.bus.disconnect();
-      if (disco === fading) disco = null;
-    },
+    () => dropDisco(fading),
     DISCO_FADE * 1000 + 100,
   );
+}
+
+function dropDisco(dropped) {
+  clearInterval(dropped.timer);
+  clearTimeout(dropped.stopping);
+  dropped.lfos.forEach((lfo) => lfo.stop());
+  dropped.nodes.forEach((node) => node.disconnect());
+  if (disco === dropped) disco = null;
 }
 
 export function discoBeat() {

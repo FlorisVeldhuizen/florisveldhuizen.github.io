@@ -3,7 +3,6 @@ import {
   playSlap,
   playBurst,
   setRub,
-  setDrag,
   setSlide,
   playSlice,
   playGrab,
@@ -28,9 +27,41 @@ import {
 } from "./config";
 import { Bottle } from "./bottle";
 import { clamp, reducedMotion, viewHeight } from "./util";
+import { tune, tuneLog } from "./tune";
 import SurfaceMarker, { MARKERS, surfaceNormal } from "./marker";
 
 const DROP_STEP_PX = 12;
+const TIPS = [
+  {
+    gesture: "rub",
+    text: (touch) =>
+      touch
+        ? "Slide a finger over the peach to rub it."
+        : "Move slowly over the peach to rub it.",
+  },
+  { gesture: "clap", text: "Tap twice quickly to clap." },
+  {
+    gesture: "knead",
+    text: "Grab and hold still to knead.",
+    when: (i) => i.toolName === "hand",
+  },
+  {
+    gesture: "shake",
+    text: "Grab and shake it fast.",
+    when: (i) => i.toolName === "hand",
+  },
+  { gesture: "latch", text: "Tap the bottle to carry it without holding." },
+  {
+    gesture: "strip",
+    text: "Pull the waistband down, or up.",
+    when: (i) => i.garment.worn,
+  },
+  {
+    gesture: "buzzmode",
+    text: "Tap to change the buzz mode.",
+    when: (i) => i.toolName === "buzz",
+  },
+];
 
 const buzz = (ms) => navigator.vibrate?.(ms);
 const SLICE_HOLD = 0.42;
@@ -150,7 +181,10 @@ export class Interaction {
     this.recoil = null;
     this.grabPlane = new Plane();
     this.grabTarget = new Vector3();
-    this.lastTapAt = -Infinity;
+    this.lastTap = null;
+    this.found = new Set();
+    this.tip = null;
+    this.tipIdle = 0;
     this.claps = null;
     this.clapNormal = new Vector3();
     this.beatTimer = 0;
@@ -173,7 +207,6 @@ export class Interaction {
     this.zoomVelocity = 0;
     this.listeners = {};
     this.pose = { x: 0, lift: 0, yaw: 0, roll: 0 };
-    this.chargeGuard = null;
     this.burstPower = 1;
 
     this.setFirmness("ripe");
@@ -214,6 +247,7 @@ export class Interaction {
     const isUi = (e) => e.target instanceof Element && e.target.closest(".ui");
     const p = this.pointer;
     const record = (e) => {
+      if (p.pressed || p.inside) this.tipIdle = 0;
       const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
       (events.length ? events : [e]).forEach((ev) => {
         p.samples.push({ x: ev.clientX, y: ev.clientY, t: ev.timeStamp });
@@ -240,6 +274,8 @@ export class Interaction {
       p.downY = e.clientY;
       p.travel = 0;
       p.grabbed = false;
+      p.touch = e.pointerType !== "mouse";
+      p.rubbing = false;
       const hit = this.raycastAt(e.clientX, e.clientY);
       p.downOnPeach = !!hit;
       p.onWaistband = this.onWaistband(hit);
@@ -249,6 +285,7 @@ export class Interaction {
         e.type === "pointerup" && e.timeStamp - p.downAt < 220 && p.travel < 14;
       if (this.carrying && e.type === "pointerup") {
         this.carryLatched = !this.carryLatched && tapped;
+        if (this.carryLatched) this.discover("latch");
       }
       if (!this.carrying && p.pressed && tapped) {
         this.tap();
@@ -272,14 +309,6 @@ export class Interaction {
   }
 
   bindShake() {
-    window.addEventListener(
-      "wheel",
-      (e) => {
-        if (e.target instanceof Element && e.target.closest(".ui")) return;
-        this.jolt(0, clamp(-e.deltaY / 100, -2, 2) * 1.6);
-      },
-      { passive: true },
-    );
     window.addEventListener("devicemotion", (e) => {
       const a = e.acceleration;
       if (!a || Math.hypot(a.x || 0, a.y || 0) < 7) return;
@@ -479,16 +508,24 @@ export class Interaction {
   tap() {
     if (this.phase !== "live") return;
     const now = performance.now();
-    if (now - this.lastTapAt < CFG.CLAP_GAP_MS) {
-      this.lastTapAt = -Infinity;
+    const { x, y } = this.pointer;
+    const hit = this.raycastAt(x, y);
+    const last = this.lastTap;
+    this.lastTap = hit ? { at: now, x, y } : null;
+    if (!hit) return;
+    if (
+      last &&
+      now - last.at < CFG.CLAP_GAP_MS &&
+      Math.hypot(x - last.x, y - last.y) < CFG.CLAP_REACH_PX
+    ) {
+      this.lastTap = null;
       this.claps = { left: 3, timer: 0.06 };
       cutSlap();
+      this.discover("clap");
       this.talk.say("clap", 0.6);
       return;
     }
-    this.lastTapAt = now;
-    const hit = this.raycastAt(this.pointer.x, this.pointer.y);
-    if (hit) this.smack(hit, 0, 0, 0.9);
+    this.smack(hit, 0, 0, 0.9);
   }
 
   smack(hit, vx, vy, strength, toolName = this.toolName) {
@@ -609,11 +646,19 @@ export class Interaction {
       age: 0,
       ripple: 0,
       sounded: false,
-      peak: 0,
-      turnPoint: new Vector3(),
-      turnAt: 0,
-      streak: 0,
+      wiggle: {
+        at: new Vector3(),
+        anchor: new Vector3(),
+        far: new Vector3(),
+        last: new Vector3(),
+        path: 0,
+        pathToFar: 0,
+        since: 0,
+        farAt: 0,
+      },
       pattedAt: 0,
+      streak: 0,
+      peak: 0,
       endArmed: true,
       wild: 0,
       shaken: 0,
@@ -621,7 +666,6 @@ export class Interaction {
       turning: 0,
     };
     this.pointer.grabbed = true;
-    this.ui.onGrab();
     buzz(8);
     this.talk.say("grab", 0.7);
   }
@@ -657,19 +701,21 @@ export class Interaction {
     const length = g.pull.length();
     const speed = g.pullVelocity.length();
     g.tension = Math.min(1, length / limit);
+    if (g.tension > 0.3) this.ui.onGrab();
     g.age += delta;
     if (!g.sounded && (g.age > 0.12 || this.pointer.travel > 8)) {
       g.sounded = true;
       playGrab(this.oil);
     }
-    g.drag = clamp(motion.speed / 2.5, 0, 0.6);
     const turnedFrom = this.trackTurn(g, delta);
     this.updateShake(g, delta, world, turnedFrom);
-    this.updateWiggle(g, limit, turnedFrom);
+    this.updateWiggle(g, limit, delta);
+    this.updateDragEnd(g, limit, delta);
     const still = g.age > 0.25 && motion.speed < CFG.GRAB_STILL_SPEED;
     g.knead = still
       ? Math.min(1, g.knead + delta / CFG.GRAB_KNEAD_SECONDS)
       : Math.max(0, g.knead - delta * 1.5);
+    if (g.knead > 0.5) this.discover("knead");
 
     const scale = this.peach.worldScale();
     const strain = clamp((g.tension - 0.55) / 0.45, 0, 1);
@@ -739,52 +785,98 @@ export class Interaction {
     return this.raycaster.intersectObject(this.peach.mesh, false)[0] || null;
   }
 
-  updateWiggle(g, limit, turnedFrom) {
-    g.peak = Math.max(g.peak, g.pullVelocity.length() / limit);
-    if (g.tension < 0.6) g.endArmed = true;
-    if (!turnedFrom) return;
-    const peak = g.peak;
-    const swing = g.pull.distanceTo(g.turnPoint) / limit;
-    g.peak = 0;
-    g.turnPoint.copy(g.pull);
-    const fast =
-      peak > CFG.WIGGLE_SPEED &&
-      swing > CFG.WIGGLE_SWING &&
-      g.wild > CFG.WIGGLE_WILD;
-    if (
-      !fast &&
-      g.endArmed &&
-      g.tension > CFG.DRAG_END_TENSION &&
-      peak > CFG.DRAG_END_SPEED
-    ) {
-      g.endArmed = false;
-      const pan = clamp(g.pull.x / limit, -0.6, 0.6);
-      playPat(0.1, pan, this.oil, {
-        gain:
-          0.5 *
-          (CFG.WIGGLE_QUIET +
-            (1 - CFG.WIGGLE_QUIET) *
-              clamp(peak / CFG.DRAG_END_SPEED - 1, 0, 1)),
-      });
-      this.squashVelocity.x += 0.1;
-      this.squashAxis
-        .set(Math.abs(turnedFrom.x), Math.abs(turnedFrom.y))
-        .normalize();
+  updateWiggle(g, limit, delta) {
+    const w = g.wiggle;
+    const at = w.at.copy(g.pull).divideScalar(limit);
+    w.path += w.last.distanceTo(at);
+    w.last.copy(at);
+    const reach = w.far.distanceTo(w.anchor);
+    const out = at.distanceTo(w.anchor);
+    if (out >= reach) {
+      w.far.copy(at);
+      w.pathToFar = w.path;
+      w.farAt = this.clock;
+      return;
     }
-    const inRow = fast && this.clock - g.turnAt < 0.6;
-    g.streak = inRow ? g.streak + 1 : Number(fast);
-    g.turnAt = this.clock;
-    if (!fast || this.clock - g.pattedAt < CFG.WIGGLE_GAP) return;
+    if (at.distanceTo(w.far) < reach * CFG.WIGGLE_RETURN) return;
+    const swing = reach;
+    const half = w.farAt - w.since;
+    const pace = w.path / Math.max(this.clock - w.since, delta);
+    const straight = swing / Math.max(w.pathToFar, swing);
+    w.anchor.copy(w.far);
+    w.far.copy(at);
+    w.path = at.distanceTo(w.anchor);
+    w.pathToFar = w.path;
+    w.since = w.farAt;
+    w.farAt = this.clock;
+    const from = tune.turnFrom / this.jiggle();
+    if (
+      swing < from ||
+      half > CFG.WIGGLE_HALF_MAX ||
+      pace < CFG.WIGGLE_PACE ||
+      this.clock - g.pattedAt < CFG.WIGGLE_GAP ||
+      g.wild < CFG.WIGGLE_WILD
+    ) {
+      g.streak = 0;
+      return;
+    }
+    g.streak = this.clock - g.pattedAt < CFG.WIGGLE_ROW ? g.streak + 1 : 1;
     g.pattedAt = this.clock;
-    const weight = clamp((peak - CFG.WIGGLE_SPEED) / 32, 0, 1);
     const ramp = Math.min(1, g.streak / CFG.WIGGLE_RAMP) ** 2;
-    const pace = clamp(peak / CFG.WIGGLE_SPEED - 1, 0, 1);
-    const gain = ramp * (CFG.WIGGLE_QUIET + (1 - CFG.WIGGLE_QUIET) * pace);
-    playPat(weight, clamp(g.pull.x / limit, -0.6, 0.6), this.oil, { gain });
-    this.squashVelocity.x += (0.15 + weight * 0.25) * ramp;
-    this.squashAxis
-      .set(Math.abs(turnedFrom.x), Math.abs(turnedFrom.y))
-      .normalize();
+    const size = clamp((swing - from) / (CFG.WIGGLE_FULL - from), 0, 1);
+    const fast = clamp(
+      (pace - CFG.WIGGLE_PACE) / (tune.turnPaceFull - CFG.WIGGLE_PACE),
+      0,
+      1,
+    );
+    // A half circle travels about 1.57x its diameter; a back-and-forth swing about 1x.
+    const sharp = clamp((straight - 0.68) / 0.22, 0, 1);
+    const gain =
+      tune.turnVolume *
+      ramp *
+      (0.15 + 0.85 * size) ** 2 *
+      (0.1 + 0.9 * fast) ** 2 *
+      (0.3 + 0.7 * sharp);
+    tuneLog(
+      `wiggle pat  pull swing ${swing.toFixed(2)} half ${half.toFixed(2)}s pace ${pace.toFixed(1)} straight ${straight.toFixed(2)} row ${g.streak} vol ${gain.toFixed(2)}`,
+    );
+    playPat(
+      size * (0.3 + 0.7 * fast),
+      clamp(g.pull.x / limit, -0.6, 0.6),
+      this.oil,
+      { gain },
+    );
+    this.squashVelocity.x += (0.1 + size * 0.3) * (0.3 + 0.7 * fast) * ramp;
+    const dir = this.tempB.copy(w.anchor).sub(at);
+    this.squashAxis.set(Math.abs(dir.x), Math.abs(dir.y)).normalize();
+  }
+
+  updateDragEnd(g, limit, delta) {
+    const speed = g.pullVelocity.length() / limit;
+    g.peak = Math.max(g.peak * Math.exp(-delta * 4), speed);
+    if (g.tension < 0.6) g.endArmed = true;
+    const { peak } = g;
+    if (
+      !g.endArmed ||
+      g.wild > CFG.WIGGLE_WILD ||
+      g.tension < CFG.DRAG_END_TENSION ||
+      peak < CFG.DRAG_END_SPEED ||
+      speed > peak * 0.5
+    )
+      return;
+    g.endArmed = false;
+    playPat(0.1, clamp(g.pull.x / limit, -0.6, 0.6), this.oil, {
+      gain:
+        0.5 *
+        (CFG.WIGGLE_QUIET +
+          (1 - CFG.WIGGLE_QUIET) * clamp(peak / CFG.DRAG_END_SPEED - 1, 0, 1)),
+    });
+    this.squashVelocity.x += 0.1;
+    this.squashAxis.set(Math.abs(g.pull.x), Math.abs(g.pull.y)).normalize();
+  }
+
+  jiggle() {
+    return this.firmness.jiggle / FIRMNESS.ripe.jiggle;
   }
 
   updateShake(g, delta, world, turnedFrom) {
@@ -793,6 +885,7 @@ export class Interaction {
       (clamp((shake - 1.5) / 2.5, 0, 1) - g.wild) * (1 - Math.exp(-delta * 8));
     g.shaken =
       g.wild > 0.3 ? g.shaken + g.wild * delta : Math.max(0, g.shaken - delta);
+    if (g.shaken > 0.5) this.discover("shake");
     if (!turnedFrom || this.oil < 0.25 || g.wild < 0.4) return;
     if (Math.random() > CFG.FLING_CHANCE) return;
     const hit = this.flingPoint(turnedFrom);
@@ -918,11 +1011,18 @@ export class Interaction {
     }
     this.releaseSound(r);
     const stretch = length / CFG.GRAB_REACH;
-    if (stretch > CFG.WOBBLE_FROM)
+    const jiggle = this.jiggle();
+    const from = Math.min(0.95, tune.wobbleFrom / jiggle);
+    if (stretch > from)
       playWobble(
-        Math.min(1, (stretch - CFG.WOBBLE_FROM) / (1 - CFG.WOBBLE_FROM)),
+        Math.min(1, (stretch - from) / (1 - from)),
         Math.PI / (this.firmness.dentFrequency * 0.85),
         this.oil,
+        {
+          gain: tune.wobbleVolume * jiggle,
+          most: Math.max(1, Math.round(2 * jiggle ** 2)),
+          decay: 0.375 ** (this.firmness.dentDecay / FIRMNESS.ripe.dentDecay),
+        },
       );
     this.talk.say("release", 0.6);
     this.addHeat(5 * length);
@@ -931,17 +1031,19 @@ export class Interaction {
   }
 
   releaseSound(r) {
-    const { length } = r;
-    const stretch = clamp(length / CFG.GRAB_REACH, 0, 1);
-    playSlap(
-      (0.4 + length * 0.6) * stretch ** 1.5,
-      this.heat / 100,
-      this.oil,
-      1.1,
-    );
+    const stretch = r.length / (CFG.GRAB_REACH * this.firmness.grab);
     const pan = clamp(r.worldPull.x / CFG.GRAB_REACH, -0.6, 0.6);
-    const gain = 1.1 * (0.6 + stretch * 0.4);
-    playPat(0.45 + stretch * 0.55, pan, this.oil, { gain, flam: false });
+    const weight = clamp(stretch, 0, 1);
+    playPat(weight, pan, this.oil, {
+      gain: 0.35 + 0.75 * weight,
+      flam: false,
+    });
+    const slap = clamp((stretch - CFG.RELEASE_SLAP_FROM) / 0.35, 0, 1);
+    tuneLog(
+      `release  stretch ${stretch.toFixed(2)} pat ${(0.35 + 0.75 * weight).toFixed(2)} slap ${slap > 0 ? (slap ** 1.5).toFixed(2) : "none"}`,
+    );
+    if (slap > 0)
+      playSlap(slap, this.heat / 100, this.oil, 1.1, 0, slap ** 1.5);
   }
 
   cheekPoint(side, dy) {
@@ -987,6 +1089,7 @@ export class Interaction {
 
   startStrip() {
     this.garment.stripping = true;
+    this.discover("strip");
     playSquish(0.2);
     this.talk.say("strip", 0.6);
   }
@@ -1109,15 +1212,22 @@ export class Interaction {
       this.peach.setLingerie(false, 0, 0);
       return;
     }
-    if (g.worn) {
-      if (g.dressing) this.updateDressing(delta);
-      const target = g.stripping || g.dressing ? g.target : 0;
-      const hike = clamp(-g.pull / 0.45, 0, 1);
-      g.velocity += (target - g.pull) * 420 * (1 - 0.5 * hike) * delta;
-      g.velocity *= Math.exp(-delta * 14);
-    } else if (g.visible > 0) {
-      g.velocity += (1.9 - g.pull) * 70 * delta;
-      g.velocity *= Math.exp(-delta * 6);
+    if (g.worn && g.dressing) this.updateDressing(delta);
+    const steps = Math.ceil(delta / PHYSICS_CONFIG.SUBSTEP);
+    const h = delta / steps;
+    for (let i = 0; i < steps; i += 1) {
+      if (g.worn) {
+        const target = g.stripping || g.dressing ? g.target : 0;
+        const hike = clamp(-g.pull / 0.45, 0, 1);
+        g.velocity += (target - g.pull) * 420 * (1 - 0.5 * hike) * h;
+        g.velocity *= Math.exp(-h * 14);
+      } else if (g.visible > 0) {
+        g.velocity += (1.9 - g.pull) * 70 * h;
+        g.velocity *= Math.exp(-h * 6);
+      }
+      g.pull += g.velocity * h;
+    }
+    if (!g.worn && g.visible > 0) {
       if (!g.freed && g.pull > 1.05) {
         g.freed = true;
         this.wobbleAll(0.1);
@@ -1128,7 +1238,6 @@ export class Interaction {
       }
       if (g.pull > 1.55) g.visible = Math.max(0, g.visible - delta * 5);
     }
-    g.pull += g.velocity * delta;
     setSlide(
       g.dressing ? Math.abs(g.velocity) / 5 : 0,
       clamp(1 - g.pull / 1.5, 0, 1),
@@ -1258,7 +1367,7 @@ export class Interaction {
   }
 
   charge() {
-    if (this.phase !== "live" || this.chargeGuard?.()) return;
+    if (this.phase !== "live") return;
     this.phase = "charging";
     this.phaseTime = 0;
     this.chargeTime = CFG.CHARGE_TIME;
@@ -1631,6 +1740,9 @@ export class Interaction {
 
   handlePointer(delta) {
     const p = this.pointer;
+    const from = { x: p.frameX ?? p.x, y: p.frameY ?? p.y };
+    p.frameX = p.x;
+    p.frameY = p.y;
     const motion = this.pointerSpeed(performance.now());
     this.ui.shapeCursor(motion.vx, motion.vy, p.present, delta);
     this.markerSpot = null;
@@ -1702,13 +1814,21 @@ export class Interaction {
     }
     const hit = this.raycastAt(p.x, p.y);
     p.inside = !!hit;
-    if (!hit) {
-      p.armed = true;
-    } else if (
+    const swiping =
       p.armed &&
       !(p.pressed && p.grabbed) &&
-      motion.speed > CFG.MIN_SWIPE_SPEED
-    ) {
+      motion.speed > CFG.MIN_SWIPE_SPEED;
+    if (!hit) {
+      const crossed = swiping && this.raycastBetween(from, p);
+      if (crossed)
+        this.smack(
+          crossed,
+          motion.vx,
+          motion.vy,
+          clamp(motion.speed / CFG.FULL_SWIPE_SPEED, 0.3, 2),
+        );
+      p.armed = !p.rubbing;
+    } else if (swiping) {
       p.armed = false;
       this.smack(
         hit,
@@ -1720,6 +1840,9 @@ export class Interaction {
       if (this.canStrip() && this.isStripPull()) {
         this.holdStripSpot(hit);
         this.startStrip();
+      } else if (p.rubbing || this.startsRub()) {
+        if (motion.speed > CFG.MASSAGE_MIN_SPEED)
+          this.massageAt(hit, motion, delta);
       } else if (this.canGrab()) {
         this.startGrab(hit);
         this.updateGrab(delta, motion);
@@ -1770,6 +1893,7 @@ export class Interaction {
     const afterSmack = performance.now() - this.lastSmackAt < 400;
     const rubSpeed = Math.max(motion.speed, this.pathSpeed(performance.now()));
     this.rubbing = afterSmack ? 0.001 : clamp(rubSpeed / 2.5, 0.02, 0.6);
+    this.discover("rub");
     this.wake();
     this.talk.say("rub", delta * 0.5);
   }
@@ -1810,11 +1934,70 @@ export class Interaction {
 
   canGrab() {
     const p = this.pointer;
-    return (
-      this.toolName === "hand" &&
-      p.armed &&
-      p.downOnPeach &&
-      (!p.onWaistband || p.travel > 28)
+    const held = performance.now() - p.downAt > CFG.GRAB_HOLD_MS;
+    let gripped = held || p.travel > CFG.GRAB_START_PX;
+    if (p.touch) gripped = held;
+    if (p.onWaistband) gripped = p.travel > 28;
+    return this.toolName === "hand" && p.armed && p.downOnPeach && gripped;
+  }
+
+  startsRub() {
+    const p = this.pointer;
+    if (
+      !p.touch ||
+      this.toolName !== "hand" ||
+      !p.downOnPeach ||
+      p.onWaistband ||
+      p.grabbed ||
+      p.travel <= CFG.GRAB_START_PX
+    )
+      return false;
+    p.rubbing = true;
+    p.armed = false;
+    return true;
+  }
+
+  raycastBetween(a, b) {
+    const steps = Math.min(
+      24,
+      Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / CFG.SWIPE_STEP_PX),
+    );
+    for (let k = 1; k < steps; k += 1) {
+      const t = k / steps;
+      const hit = this.raycastAt(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  discover(gesture) {
+    this.found.add(gesture);
+    if (this.tip?.gesture === gesture) {
+      this.tip = null;
+      this.ui.hideTip();
+    }
+  }
+
+  updateTips(delta) {
+    this.tipIdle += delta;
+    if (this.tip) {
+      this.tip.left -= delta;
+      if (this.tip.left <= 0) {
+        this.tip = null;
+        this.ui.hideTip();
+        this.tipIdle = 0;
+      }
+      return;
+    }
+    if (this.tipIdle < CFG.TIP_IDLE_SECONDS || this.phase !== "live") return;
+    const { touch } = this.pointer;
+    const open = TIPS.find(
+      (t) => !this.found.has(t.gesture) && (!t.when || t.when(this, touch)),
+    );
+    if (!open) return;
+    this.tip = { gesture: open.gesture, left: CFG.TIP_SECONDS };
+    this.ui.showTip(
+      typeof open.text === "function" ? open.text(touch) : open.text,
     );
   }
 
@@ -2015,6 +2198,7 @@ export class Interaction {
     }
 
     this.handlePointer(delta);
+    this.updateTips(delta);
     const holding = this.grab && this.markerSpot === this.grab;
     this.marker.update(
       this.markerSpot,
@@ -2045,10 +2229,6 @@ export class Interaction {
       this.carrying ? 0 : this.rubbing,
       this.oil,
       clamp((this.pointer.x / window.innerWidth) * 2 - 1, -1, 1) * 0.5,
-    );
-    setDrag(
-      this.grab ? this.grab.drag + this.grab.wild * CFG.SHAKE_DRAG_BOOST : 0,
-      this.oil,
     );
 
     this.juice.update(delta);

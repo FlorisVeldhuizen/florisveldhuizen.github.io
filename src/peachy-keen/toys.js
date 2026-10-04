@@ -4,11 +4,13 @@ import { reducedMotion } from "./util";
 
 const buzz = (ms) => navigator.vibrate?.(ms);
 const MODES = ["Steady", "Pulse", "Wave"];
+const TAP_MS = 220;
+const TAP_PX = 14;
 
 export class Buzzer {
   constructor(interaction) {
     this.i = interaction;
-    this.mode = -1;
+    this.mode = 0;
     this.level = 0;
     this.time = 0;
     this.timer = 0;
@@ -21,12 +23,18 @@ export class Buzzer {
     this.dent = new Vector3();
     this.dir = new Vector3();
     this.layer = document.getElementById("combos");
-    window.addEventListener("pointerdown", (e) => {
+    window.addEventListener("pointerup", (e) => {
       if (!this.active || interaction.phase !== "live") return;
       if (e.target instanceof Element && e.target.closest(".ui")) return;
+      const p = interaction.pointer;
+      const tapped =
+        e.timeStamp - p.downAt < TAP_MS &&
+        Math.hypot(e.clientX - p.downX, e.clientY - p.downY) < TAP_PX;
+      if (!tapped) return;
       this.mode = (this.mode + 1) % MODES.length;
       this.time = 0;
       this.label(e.clientX, e.clientY);
+      interaction.discover("buzzmode");
     });
   }
 
@@ -119,8 +127,10 @@ export class Buzzer {
       const squirm = (0.6 + heat * 2.2) * this.level;
       i.spin.z += Math.sin(this.time * 7.5) * squirm * delta * 3;
       i.spin.y += Math.cos(this.time * 4.9) * squirm * delta * 2;
-      i.velocity.x += (Math.random() - 0.5) * 0.25 * k;
-      i.velocity.y += (Math.random() - 0.5) * 0.25 * k;
+      // Random kicks add up like a random walk, so they scale with the square root of time.
+      const kick = 0.25 * k * Math.sqrt(delta * 60);
+      i.velocity.x += (Math.random() - 0.5) * kick;
+      i.velocity.y += (Math.random() - 0.5) * kick;
     }
     this.clench -= delta;
     if (heat > 0.5 && this.clench <= 0) {
