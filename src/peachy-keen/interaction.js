@@ -37,6 +37,8 @@ const SLICE_HOLD = 0.42;
 const TEARS = [0.22, 0.42, 0.6];
 const WINDUP_FROM = 0.72;
 const BEAT_LENGTH = 0.32;
+const GRAB_OVERREACH = 1.25;
+const GRAB_BODY_PULL = 4;
 
 function spring(x, v, k, c, h) {
   v.addScaledVector(x, -k * h).multiplyScalar(1 - c * h);
@@ -643,18 +645,18 @@ export class Interaction {
     const target = this.grabTarget.sub(world);
     const give = this.firmness.grab;
     const limit = CFG.GRAB_REACH * give;
-    const reach = target.length();
-    if (reach > 0)
-      target.multiplyScalar((limit * Math.tanh(reach / limit)) / reach);
+    target.divideScalar(
+      Math.hypot(1, target.length() / (limit * GRAB_OVERREACH)),
+    );
     const stiffness = (420 * this.firmness.stiffness) / give;
     g.pullVelocity
       .addScaledVector(this.tempB.copy(target).sub(g.pull), stiffness * delta)
-      .multiplyScalar(Math.exp(-delta * (10 + (1 - give) * 8)));
+      .multiplyScalar(Math.exp(-delta * (18 + (1 - give) * 8)));
     g.pull.addScaledVector(g.pullVelocity, delta);
     g.squeeze += (1 - g.squeeze) * (1 - Math.exp(-delta * 14));
     const length = g.pull.length();
     const speed = g.pullVelocity.length();
-    g.tension = length / limit;
+    g.tension = Math.min(1, length / limit);
     g.age += delta;
     if (!g.sounded && (g.age > 0.12 || this.pointer.travel > 8)) {
       g.sounded = true;
@@ -705,9 +707,9 @@ export class Interaction {
         1,
       );
     }
-    this.velocity.addScaledVector(g.pull, 9 * delta);
+    this.velocity.addScaledVector(g.pull, GRAB_BODY_PULL * delta);
     const lever = this.tempB.copy(world).sub(this.group.position);
-    this.spin.addScaledVector(lever.cross(g.pull), 9 * delta);
+    this.spin.addScaledVector(lever.cross(g.pull), GRAB_BODY_PULL * delta);
     this.addHeat(2 * delta * (0.2 + length), 99);
     this.wake();
   }
@@ -853,8 +855,8 @@ export class Interaction {
     const settle = this.firmness.dentFrequency * 0.85;
     const k = r.landed
       ? settle * settle
-      : 1100 * this.firmness.stiffness * (1 + tension * 0.8);
-    const c = r.landed ? settle * 0.5 : 8;
+      : 420 * this.firmness.stiffness * (1 + tension * 0.8);
+    const c = r.landed ? settle * 0.35 : 6;
     const h = 1 / 240;
     for (let t = 0; t < delta; t += h) {
       spring(r.pull, r.velocity, k, c, h);
@@ -866,7 +868,7 @@ export class Interaction {
     r.dent.multiplyScalar(Math.exp(-delta * 18));
     this.peach.setGrab(r.local, r.pull, r.radius, r.dent, CFG.GRAB_DENT_RADIUS);
     const motion = r.pull.length() + r.velocity.length() / 40;
-    if ((r.landed && motion < r.start.length() * 0.01) || r.age > 1.5) {
+    if ((r.landed && motion < r.start.length() * 0.01) || r.age > 2.2) {
       this.peach.releaseGrab();
       this.recoil = null;
     }
