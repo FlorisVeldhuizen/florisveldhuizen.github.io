@@ -849,9 +849,9 @@ body.is-storm::after {
 
 .pit-flier .pit-icon {
   display: block;
-  width: 18px;
-  height: 26px;
-  margin: -13px 0 0 -9px;
+  width: 22px;
+  height: 32px;
+  margin: -16px 0 0 -11px;
 }
 
 .harvest-fruit img {
@@ -1718,8 +1718,8 @@ body.is-storm::after {
 
 .away-earned {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 6px;
   margin: 2px 0;
 }
 
@@ -1732,12 +1732,6 @@ body.is-storm::after {
     "SOFT" 100,
     "WONK" 1;
   line-height: 1;
-}
-
-.away-unit {
-  color: var(--blush-dim);
-  font-size: 18px;
-  font-style: italic;
 }
 
 .away-crew {

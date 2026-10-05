@@ -3,6 +3,8 @@ import { iconSvg } from "./icons";
 import { format, formatTime } from "./numbers";
 import { HELPERS } from "./data/helpers";
 import { reducedMotion } from "../util";
+import { SyrupDrop } from "./syrup";
+import { playNotes } from "../audio";
 
 const LINES = [
   "Your peach missed you. The helpers didn't stop.",
@@ -12,20 +14,38 @@ const LINES = [
 ];
 const CREW = 6;
 const COUNT_MS = 1100;
+const SETTLE_MS = 2400;
+const SPLASH_POWER = 1.6;
+const SPLASH_BEAD = 4.8;
 
-function countUp(node, value) {
+function countUp(node, value, drop) {
   if (reducedMotion.matches) {
     // eslint-disable-next-line no-param-reassign
     node.textContent = `+${format(value)}`;
     return;
   }
   const start = performance.now();
+  let last = start;
+  let splashed = false;
   const step = (now) => {
     const k = Math.min(1, (now - start) / COUNT_MS);
     const eased = 1 - (1 - k) ** 3;
     // eslint-disable-next-line no-param-reassign
     node.textContent = `+${format(value * eased)}`;
-    if (k < 1) requestAnimationFrame(step);
+    if (k === 1 && !splashed) {
+      splashed = true;
+      drop.drip(SPLASH_BEAD, () => {
+        drop.crown(SPLASH_POWER);
+        playNotes([659, 880, 1320], { gap: 0.06, length: 0.22, volume: 0.05 });
+        node.animate(
+          [{ scale: 1 }, { scale: 1.12, offset: 0.3 }, { scale: 1 }],
+          { duration: 420, easing: "cubic-bezier(.34,1.56,.64,1)" },
+        );
+      });
+    }
+    drop.step(Math.min(0.05, (now - last) / 1000));
+    last = now;
+    if (now - start < COUNT_MS + SETTLE_MS) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
@@ -35,7 +55,7 @@ export function awayMessage(away, helpers) {
   el("p", "away-time", body, `Away for ${formatTime(away.seconds)}`);
   const earned = el("div", "away-earned", body);
   const amount = el("strong", "away-amount", earned, "+0");
-  el("span", "away-unit", earned, "juice");
+  const drop = new SyrupDrop(earned);
   const crew = HELPERS.filter((h) => (helpers[h.id] || 0) > 0).slice(-CREW);
   if (crew.length) {
     const row = el("div", "away-crew", body);
@@ -54,6 +74,6 @@ export function awayMessage(away, helpers) {
     title: "Welcome back",
     body,
     variant: "away",
-    onShow: () => countUp(amount, away.value),
+    onShow: () => countUp(amount, away.value, drop),
   };
 }

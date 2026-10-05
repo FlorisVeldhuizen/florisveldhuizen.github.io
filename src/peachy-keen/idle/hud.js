@@ -10,10 +10,11 @@ import { RollingNumber } from "./rolling-number";
 
 const ROLL_RATE = 10;
 const PIT_FLIERS = 5;
-const PIT_STAGGER_MS = 85;
+const PIT_STAGGER_MS = 90;
+const PIT_DELAY_MS = 280;
+const PIT_FLIGHT_MS = 950;
 const PIT_NOTES = [784, 880, 988, 1047, 1175];
 const HOLD_LIMIT_MS = 8000;
-const BURST_BEAD = 6.2;
 
 export class Hud {
   constructor(game) {
@@ -83,14 +84,11 @@ export class Hud {
     });
   }
 
-  burst(amount) {
-    if (reducedMotion.matches) {
-      this.held.juice = Math.max(0, this.held.juice - amount);
-      return;
-    }
-    this.drop.drip(BURST_BEAD, () => {
-      this.held.juice = Math.max(0, this.held.juice - amount);
-    });
+  splash(amount) {
+    this.held.juice = Math.max(0, this.held.juice - amount);
+    if (reducedMotion.matches) return;
+    this.drop.crown();
+    playNotes([880, 1320], { gap: 0.05, length: 0.14, volume: 0.035 });
   }
 
   flyPits(from, pits) {
@@ -113,51 +111,54 @@ export class Hud {
               { gap: 0.07, length: 0.16, volume: 0.04 },
             );
           }),
-        n * PIT_STAGGER_MS,
+        PIT_DELAY_MS + n * PIT_STAGGER_MS,
       );
     }
   }
 
   flyPit(from, to, land) {
-    const outer = el("div", "pit-flier", this.layer);
-    const inner = el("div", "", outer, pitIcon());
-    const x0 = from.x + (Math.random() - 0.5) * 60;
-    const lift = 60 + Math.random() * 50;
-    const duration = 600 + Math.random() * 100;
-    outer.animate(
-      [
-        { translate: `${x0}px 0` },
-        { translate: `${x0 + (to.x - x0) * 0.25}px 0`, offset: 0.35 },
-        { translate: `${to.x}px 0` },
-      ],
-      { duration, easing: "cubic-bezier(.5,0,.9,.6)", fill: "forwards" },
-    );
-    inner
-      .animate(
-        [
-          { translate: `0 ${from.y}px`, scale: 0.6, rotate: "0deg" },
-          {
-            translate: `0 ${from.y - lift}px`,
-            scale: 1.4,
-            offset: 0.35,
-            easing: "cubic-bezier(.55,0,.95,.45)",
-          },
-          {
-            translate: `0 ${to.y}px`,
-            scale: 1,
-            rotate: `${(Math.random() < 0.5 ? -1 : 1) * 300}deg`,
-          },
-        ],
-        {
-          duration,
-          easing: "cubic-bezier(.2,.7,.4,1)",
-          fill: "forwards",
-        },
-      )
-      .finished.then(() => {
-        outer.remove();
-        land();
-      });
+    const x0 = from.x + (Math.random() - 0.5) * 70;
+    const lift = 90 + Math.random() * 50;
+    const hang = { x: x0 + (to.x - x0) * 0.12, y: from.y - lift };
+    const spin = (Math.random() < 0.5 ? -1 : 1) * 320;
+    const across = [
+      { translate: `${x0}px 0` },
+      { translate: `${hang.x}px 0`, offset: 0.4 },
+      { translate: `${hang.x + 6}px 0`, offset: 0.55 },
+      { translate: `${to.x}px 0` },
+    ];
+    const rise = [
+      { translate: `0 ${from.y}px`, scale: 0.6, rotate: "0deg" },
+      {
+        translate: `0 ${hang.y}px`,
+        scale: 1.5,
+        rotate: `${spin * 0.3}deg`,
+        offset: 0.4,
+        easing: "cubic-bezier(.3,0,.7,1)",
+      },
+      {
+        translate: `0 ${hang.y - 6}px`,
+        scale: 1.45,
+        rotate: `${spin * 0.4}deg`,
+        offset: 0.55,
+        easing: "cubic-bezier(.6,0,1,.6)",
+      },
+      { translate: `0 ${to.y}px`, scale: 1, rotate: `${spin}deg` },
+    ];
+    [0.18, 0.4, 1].forEach((opacity, n, all) => {
+      const outer = el("div", "pit-flier", this.layer);
+      const inner = el("div", "", outer, pitIcon());
+      outer.style.opacity = opacity;
+      const delay = (all.length - 1 - n) * 45;
+      const options = { duration: PIT_FLIGHT_MS, delay, fill: "both" };
+      outer.animate(across, { ...options, easing: "linear" });
+      inner
+        .animate(rise, { ...options, easing: "cubic-bezier(.2,.6,.4,1)" })
+        .finished.then(() => {
+          outer.remove();
+          if (opacity === 1) land();
+        });
+    });
   }
 
   rollJuice(juice, dt) {

@@ -12,6 +12,15 @@ const BEAD_MAX = 7.4;
 const BEAD_HANG = 0.13;
 const BEAD_GRAVITY = 1500;
 const BEADS_IN_AIR = 3;
+const CROWN_SIZES = [4.6, 4.2, 3.9, 3.6, 3.4, 3.2, 3];
+const CROWN_SPREAD = 0.9;
+const CROWN_SPEED = 215;
+const CROWN_STAGGER = 0.015;
+const CROWN_HOLD = 0.06;
+const RISE_GRAVITY = 760;
+const FALL_GRAVITY = 980;
+const MAX_STRETCH = 1.6;
+const MELT_RATE = 14;
 
 const DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
@@ -56,8 +65,8 @@ export const pitIcon = () =>
 export const dropIcon = () =>
   `<svg class="drop-icon" viewBox="1 1 30 44" aria-hidden="true"><use href="#syrup-drop"/></svg>`;
 
-const wobbleTransform = (wobble, tilt) => {
-  const y = 1 + wobble.x * 0.12;
+const wobbleTransform = (wobble, tilt, pulse = 0) => {
+  const y = 1 + wobble.x * 0.12 + pulse;
   return `translate(16 43) rotate(${tilt.x.toFixed(2)}) scale(${(1 / Math.sqrt(y)).toFixed(3)} ${y.toFixed(3)}) translate(-16 -43)`;
 };
 
@@ -73,7 +82,14 @@ export class SyrupDrop {
     this.pool = this.body.firstElementChild;
     this.wobble = new Spring(120, 8);
     this.tilt = new Spring(90, 7);
+    this.hop = new Spring(170, 11);
+    this.pulse = new Spring(1900, 35);
+    this.shine = [...this.body.children].slice(1);
+    this.hold = 0;
+    this.flash = 0;
+    this.launches = [];
     this.beads = [];
+    this.crownDrops = [];
   }
 
   drip(size, release) {
@@ -98,6 +114,43 @@ export class SyrupDrop {
       goal: Math.min(BEAD_MAX, size),
       releases: [release],
     });
+  }
+
+  crown(power = 1) {
+    this.hold = CROWN_HOLD;
+    this.flash = 1;
+    this.pulse.x = -0.15;
+    this.pulse.v = 0;
+    this.power = power;
+    const count = Math.round(CROWN_SIZES.length * power);
+    const fan = Array.from(
+      { length: count },
+      (_, n) => (n / (count - 1)) * 2 - 1,
+    ).sort((a, b) => Math.abs(a) - Math.abs(b));
+    fan.forEach((side, n) => {
+      const size = CROWN_SIZES[Math.floor(Math.random() * CROWN_SIZES.length)];
+      const heavy = (size - 3) / 1.6;
+      const speed =
+        CROWN_SPEED *
+        Math.sqrt(power) *
+        (1.1 - heavy * 0.3) *
+        (0.85 + Math.random() * 0.3);
+      const angle = -Math.PI / 2 + side * CROWN_SPREAD;
+      this.launches.push({
+        at: n * CROWN_STAGGER,
+        x: 16 + side * 5,
+        vx: Math.cos(angle) * speed * 0.75,
+        vy: Math.sin(angle) * speed,
+        r: size * Math.sqrt(power),
+      });
+    });
+  }
+
+  launch(spec) {
+    const node = document.createElementNS(SVG, "ellipse");
+    node.setAttribute("fill", "#ff9a70");
+    this.pool.appendChild(node);
+    this.crownDrops.push({ ...spec, node, y: 5, age: 0 });
   }
 
   hit(size) {
@@ -127,11 +180,61 @@ export class SyrupDrop {
         b.node.setAttribute("r", b.r.toFixed(2));
       }
     }
+    if (this.hold > 0) {
+      this.hold -= dt;
+      if (this.hold <= 0) this.hop.v -= 130 * this.power;
+    } else {
+      this.launches = this.launches.filter((spec) => {
+        // eslint-disable-next-line no-param-reassign
+        spec.at -= dt;
+        if (spec.at > 0) return true;
+        this.launch(spec);
+        return false;
+      });
+      this.pulse.step(dt);
+    }
+    for (let i = this.crownDrops.length - 1; i >= 0; i -= 1) {
+      const d = this.crownDrops[i];
+      d.vy += (d.vy < 0 ? RISE_GRAVITY : FALL_GRAVITY) * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.age += dt;
+      const inside =
+        d.vy > 0 && Math.abs(d.x - 16) < Math.max(1, (d.y - 2) * 0.45);
+      if (inside) d.melt = (d.melt || 1) * Math.exp(-dt * MELT_RATE);
+      if ((d.melt || 1) < 0.15 || d.y > 70) {
+        d.node.remove();
+        this.crownDrops.splice(i, 1);
+      } else {
+        const speed = Math.hypot(d.vx, d.vy);
+        const stretch = Math.min(MAX_STRETCH, 1 + speed / 500);
+        const radius =
+          d.r * (1 - 0.25 * Math.min(1, d.age / 0.5)) * (d.melt || 1);
+        const angle = (Math.atan2(d.vy, d.vx) * 180) / Math.PI;
+        d.node.setAttribute("cx", d.x.toFixed(1));
+        d.node.setAttribute("cy", d.y.toFixed(1));
+        d.node.setAttribute("rx", (radius * Math.sqrt(stretch)).toFixed(2));
+        d.node.setAttribute("ry", (radius / Math.sqrt(stretch)).toFixed(2));
+        d.node.setAttribute(
+          "transform",
+          `rotate(${angle.toFixed(1)} ${d.x.toFixed(1)} ${d.y.toFixed(1)})`,
+        );
+      }
+    }
+    this.flash = Math.max(0, this.flash - dt * 8);
+    this.shine.forEach((node, n) => {
+      const base = n ? 0.3 : 0.38;
+      node.setAttribute(
+        "opacity",
+        (base + (0.9 - base) * this.flash).toFixed(2),
+      );
+    });
     this.wobble.step(dt);
     this.tilt.step(dt);
+    this.hop.step(dt);
     this.body.setAttribute(
       "transform",
-      wobbleTransform(this.wobble, this.tilt),
+      `translate(0 ${this.hop.x.toFixed(2)}) ${wobbleTransform(this.wobble, this.tilt, this.pulse.x)}`,
     );
   }
 }

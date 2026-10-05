@@ -129,7 +129,7 @@ export function createIdle({
     );
     const pitText = `+${pits} ${pits === 1 ? "pit" : "pits"}${lucky ? ", lucky!" : ""}`;
     popups.big(at.x, at.y - 30, `+${format(value)}`, pitText);
-    hud.burst(value);
+    hud.splash(value);
     if (pits > 0) hud.flyPits({ x: at.x, y: at.y - 30 }, pits);
   });
   let trophies = [];
