@@ -1732,6 +1732,7 @@ body.is-storm::after {
     "SOFT" 100,
     "WONK" 1;
   line-height: 1;
+  text-align: right;
 }
 
 .away-crew {

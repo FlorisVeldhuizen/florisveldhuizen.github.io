@@ -19,11 +19,11 @@ const SPLASH_POWER = 1.6;
 const SPLASH_BEAD = 4.8;
 
 function countUp(node, value, drop) {
-  if (reducedMotion.matches) {
-    // eslint-disable-next-line no-param-reassign
-    node.textContent = `+${format(value)}`;
-    return;
-  }
+  // eslint-disable-next-line no-param-reassign
+  node.textContent = `+${format(value)}`;
+  if (reducedMotion.matches) return;
+  // eslint-disable-next-line no-param-reassign
+  node.style.minWidth = `${node.getBoundingClientRect().width}px`;
   const start = performance.now();
   let last = start;
   let splashed = false;
