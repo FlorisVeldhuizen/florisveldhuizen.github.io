@@ -38,7 +38,7 @@ import { PEACH_CONFIG, FABRIC } from "./config";
 import { RING } from "./scene";
 import { RibbonBows } from "./ribbon";
 import { Waistband } from "./band";
-import { raycastNearest } from "./raycast";
+import { boxesFor, raycastNearest } from "./raycast";
 import peachyModel from "./assets/peachy.glb?url";
 
 const HIT_LIFE = 3.0;
@@ -1328,6 +1328,7 @@ export class Peach {
     };
     mesh.material = this.material;
     mesh.raycast = raycastNearest;
+    boxesFor(mesh.geometry);
     Object.assign(mesh, {
       castShadow: true,
       receiveShadow: true,

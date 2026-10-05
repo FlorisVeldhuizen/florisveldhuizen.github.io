@@ -7,29 +7,75 @@ const a = new Vector3();
 const b = new Vector3();
 const c = new Vector3();
 const CHUNK = 64;
+const BITS = 10;
 const chunkBoxes = new WeakMap();
 
-function boxesFor(geometry) {
-  let boxes = chunkBoxes.get(geometry);
-  if (boxes) return boxes;
+function curveKey(cell) {
+  let key = 0;
+  for (let bit = 0; bit < BITS; bit += 1) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      key += (Math.floor(cell[axis] / 2 ** bit) % 2) * 2 ** (bit * 3 + axis);
+    }
+  }
+  return key;
+}
+
+// Triangles are sorted along a space-filling curve so each chunk box stays tight.
+function spatialOrder(p, index) {
+  const lo = [Infinity, Infinity, Infinity];
+  const hi = [-Infinity, -Infinity, -Infinity];
+  for (let v = 0; v < p.length; v += 3) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      lo[axis] = Math.min(lo[axis], p[v + axis]);
+      hi[axis] = Math.max(hi[axis], p[v + axis]);
+    }
+  }
+  const count = index.length / 3;
+  const keys = new Float64Array(count);
+  const cell = [0, 0, 0];
+  for (let f = 0; f < count; f += 1) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      const centre =
+        (p[index[f * 3] * 3 + axis] +
+          p[index[f * 3 + 1] * 3 + axis] +
+          p[index[f * 3 + 2] * 3 + axis]) /
+        3;
+      cell[axis] = Math.floor(
+        ((centre - lo[axis]) / (hi[axis] - lo[axis] || 1)) * (2 ** BITS - 1),
+      );
+    }
+    keys[f] = curveKey(cell);
+  }
+  const order = new Uint32Array(count).map((_, f) => f);
+  order.sort((f, g) => keys[f] - keys[g]);
+  return order.map((f) => f * 3);
+}
+
+export function boxesFor(geometry) {
+  let found = chunkBoxes.get(geometry);
+  if (found) return found;
   const p = geometry.attributes.position.array;
   const index = geometry.index.array;
-  const chunks = Math.ceil(index.length / 3 / CHUNK);
-  boxes = new Float32Array(chunks * 6);
+  const order = spatialOrder(p, index);
+  const chunks = Math.ceil(order.length / CHUNK);
+  const boxes = new Float32Array(chunks * 6);
   for (let n = 0; n < chunks; n += 1) {
     const box = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
-    const end = Math.min(index.length, (n + 1) * CHUNK * 3);
-    for (let t = n * CHUNK * 3; t < end; t += 1) {
-      const v = index[t] * 3;
-      for (let axis = 0; axis < 3; axis += 1) {
-        box[axis] = Math.min(box[axis], p[v + axis]);
-        box[axis + 3] = Math.max(box[axis + 3], p[v + axis]);
+    const end = Math.min(order.length, (n + 1) * CHUNK);
+    for (let f = n * CHUNK; f < end; f += 1) {
+      for (let corner = 0; corner < 3; corner += 1) {
+        const v = index[order[f] + corner] * 3;
+        for (let axis = 0; axis < 3; axis += 1) {
+          box[axis] = Math.min(box[axis], p[v + axis]);
+          box[axis + 3] = Math.max(box[axis + 3], p[v + axis]);
+        }
       }
     }
     boxes.set(box, n * 6);
   }
-  chunkBoxes.set(geometry, boxes);
-  return boxes;
+  found = { boxes, order };
+  chunkBoxes.set(geometry, found);
+  return found;
 }
 
 export function raycastNearest(raycaster, intersects) {
@@ -44,7 +90,7 @@ export function raycastNearest(raycaster, intersects) {
   const plant = geometry.attributes.plant?.array;
   const { x: ox, y: oy, z: oz } = localRay.origin;
   const { x: dx, y: dy, z: dz } = localRay.direction;
-  const boxes = boxesFor(geometry);
+  const { boxes, order } = boxesFor(geometry);
   const ix = 1 / dx;
   const iy = 1 / dy;
   const iz = 1 / dz;
@@ -65,8 +111,9 @@ export function raycastNearest(raycaster, intersects) {
     );
     const exit = Math.min(Math.max(x1, x2), Math.max(y1, y2), Math.max(z1, z2));
     if (exit < 0 || enter > exit || enter > nearest) continue;
-    const end = Math.min(index.length, (n + 1) * CHUNK * 3);
-    for (let t = n * CHUNK * 3; t < end; t += 3) {
+    const end = Math.min(order.length, (n + 1) * CHUNK);
+    for (let f = n * CHUNK; f < end; f += 1) {
+      const t = order[f];
       if (plant && plant[index[t]] > 0.5) continue;
       const i = index[t] * 3;
       const j = index[t + 1] * 3;

@@ -285,7 +285,8 @@ export class Lens {
     this.renderer.render(this.scene, this.camera);
     const { autoClear } = this.renderer;
     this.renderer.autoClear = false;
-    if (liquids.some((liquid) => liquid.isActive())) {
+    const juicy = liquids.some((liquid) => liquid.isActive());
+    if (juicy) {
       const u = juiceMaterial.uniforms;
       u.tBehind.value = this.captureFrame();
       u.uResolution.value.copy(this.size);
@@ -294,7 +295,8 @@ export class Lens {
       this.camera.layers.set(0);
     }
     if (this.drops.length > 0 && !this.reach.isEmpty()) {
-      this.captureFrame();
+      // Reuse the juice copy to skip a second full-frame copy; drops then miss flying juice.
+      if (!juicy) this.captureFrame();
       const scale = window.innerWidth / this.canvas.width;
       const { min, max } = this.reach;
       this.renderer.setScissor(

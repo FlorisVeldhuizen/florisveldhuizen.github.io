@@ -225,8 +225,7 @@ class Disco {
     const free =
       i.phase === "live" &&
       !i.grab &&
-      !i.carrying &&
-      !i.pointer.pressed &&
+      (i.carrying || !i.pointer.pressed) &&
       !reducedMotion.matches;
     this.weight += ((free ? 1 : 0) - this.weight) * (1 - Math.exp(-dt * 3));
     const index = Math.floor(beat);
