@@ -143,7 +143,7 @@ export function createIdle({
     }, 60);
   });
   game.on("discover", (seed) => {
-    popups.toast("New peach", seed.name, seed.about, "seed");
+    popups.toast("New tree", seed.name, seed.about, "seed");
     playNotes([659, 880, 1109], { gap: 0.09, volume: 0.06 });
   });
   game.on("harvest", () => playNotes([523, 784], { gap: 0.06, volume: 0.06 }));

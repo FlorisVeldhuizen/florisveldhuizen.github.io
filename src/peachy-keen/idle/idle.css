@@ -592,6 +592,14 @@ body.is-storm::after {
   height: 14px;
 }
 
+.seed-balance {
+  margin-bottom: 8px;
+  color: var(--peach);
+  font-size: 15px;
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+}
+
 .seeds {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));

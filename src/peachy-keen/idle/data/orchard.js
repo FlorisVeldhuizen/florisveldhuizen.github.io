@@ -3,7 +3,7 @@ export const RIPE_FOR = 2;
 export const SEEDS = [
   {
     id: "cling",
-    name: "Clingstone",
+    name: "Cling tree",
     about: "A dependable peach. Holds on tight.",
     color: "#ff9a6b",
     leaf: "#5f9a45",
@@ -15,7 +15,7 @@ export const SEEDS = [
   },
   {
     id: "free",
-    name: "Freestone",
+    name: "Free tree",
     about: "Lets go of its pit easily. No commitment issues.",
     color: "#ffc36b",
     leaf: "#6aa84a",
@@ -27,7 +27,7 @@ export const SEEDS = [
   },
   {
     id: "donut",
-    name: "Donut peach",
+    name: "Donut tree",
     about: "Flat, sweet, and smug about it.",
     color: "#f7b58a",
     leaf: "#5f9a45",
@@ -41,7 +41,7 @@ export const SEEDS = [
   },
   {
     id: "white",
-    name: "White Lady",
+    name: "White Lady tree",
     about: "Pale, delicate, and cool to the touch.",
     color: "#ffe6d6",
     leaf: "#7fae62",
@@ -55,7 +55,7 @@ export const SEEDS = [
   },
   {
     id: "nectarine",
-    name: "Nectarine",
+    name: "Nectarine tree",
     about: "A peach that shaved. Smooth operator.",
     color: "#ff6b5a",
     leaf: "#4f8f3c",
@@ -73,7 +73,7 @@ export const SEEDS = [
   },
   {
     id: "saturn",
-    name: "Saturn peach",
+    name: "Saturn tree",
     about: "Has a ring around it. Nobody knows why.",
     color: "#e8a16b",
     leaf: "#6a9a4a",
@@ -87,7 +87,7 @@ export const SEEDS = [
   },
   {
     id: "blood",
-    name: "Blood peach",
+    name: "Blood tree",
     about: "Red all the way through. A little dramatic.",
     color: "#c0243c",
     leaf: "#56703a",
@@ -101,7 +101,7 @@ export const SEEDS = [
   },
   {
     id: "jubilee",
-    name: "Golden Jubilee",
+    name: "Golden Jubilee tree",
     about: "Glows faintly. Worth a fortune on the black market.",
     color: "#ffd24a",
     leaf: "#7aa84a",
@@ -115,7 +115,7 @@ export const SEEDS = [
   },
   {
     id: "ghost",
-    name: "Ghost peach",
+    name: "Ghost tree",
     about: "Grows only where a peach rotted. Cold. Translucent. Watching.",
     color: "#cfd8ff",
     leaf: "#9fb3c8",
@@ -128,7 +128,7 @@ export const SEEDS = [
   },
   {
     id: "cosmic",
-    name: "Cosmic peach",
+    name: "Cosmic tree",
     about: "Contains a small galaxy. Do not eat.",
     color: "#b46bff",
     leaf: "#5a3a8a",

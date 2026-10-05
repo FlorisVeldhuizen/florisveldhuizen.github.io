@@ -3,8 +3,11 @@ import { plantFx } from "./plant";
 import { renders } from "../renders";
 
 const VARIANTS = 5;
-import { el, setDetail, toggle } from "../dom";
+import { el, setDetail, setText, toggle } from "../dom";
 import { format, formatTime } from "../numbers";
+
+const pitCount = (n) =>
+  `${format(n, { whole: true })} ${n === 1 ? "pit" : "pits"}`;
 
 const LAYER_ANIMATIONS = [
   "is-sprouting",
@@ -46,8 +49,9 @@ export class OrchardView {
       "p",
       "shop-intro",
       root,
-      "Plant pits and wait. Ripe trees can be harvested. Leave them too long and they rot. Trees that grow next to each other sometimes cross-breed in empty plots.",
+      "Spend pits to plant trees, then wait. Ripe trees can be harvested. Leave them too long and they rot. Trees that grow next to each other sometimes cross-breed in empty plots.",
     );
+    this.balance = el("p", "seed-balance", root);
     this.seeds = el("div", "seeds", root);
     this.seeds.setAttribute("role", "group");
     this.seeds.setAttribute("aria-label", "Seed to plant");
@@ -69,7 +73,7 @@ export class OrchardView {
     SEEDS.filter((seed) => discovered.includes(seed.id)).forEach((seed) => {
       const b = el("button", "seed", this.seeds);
       b.type = "button";
-      b.innerHTML = `<i style="background:${seed.color}"></i><span>${seed.name}</span><small>${seed.pits} pit${seed.pits > 1 ? "s" : ""}</small>`;
+      b.innerHTML = `<i style="background:${seed.color}"></i><span>${seed.name}</span><small>costs ${pitCount(seed.pits)}</small>`;
       b.addEventListener("click", () => {
         this.selected = seed.id;
         this.describeSeed(seed);
@@ -161,7 +165,7 @@ export class OrchardView {
     const rot = seed.fromRot ? " Sprouts on rotten plots." : "";
     setDetail(this.info, seed.name, [
       seed.about,
-      `While growing: ${seed.passive.text}. Harvest: ${seed.harvest.text}. Ripens in ${formatTime(seed.grow / this.game.model.growth)}.${recipe}${rot}`,
+      `Costs ${pitCount(seed.pits)} to plant. While growing: ${seed.passive.text}. Harvest: ${seed.harvest.text}. Ripens in ${formatTime(seed.grow / this.game.model.growth)}.${recipe}${rot}`,
     ]);
   }
 
@@ -210,7 +214,7 @@ export class OrchardView {
       if (!this.orchard.plant(index, this.selected)) {
         const seed = SEED_BY_ID[this.selected];
         setDetail(this.info, seed.name, [
-          `You need ${seed.pits} pits to plant one. Bursts drop pits.`,
+          `It costs ${pitCount(seed.pits)}. You have ${pitCount(this.game.state.pits)}. Bursts drop pits.`,
         ]);
       }
     } else {
@@ -227,7 +231,11 @@ export class OrchardView {
         const amount = reward.value
           ? `${format(reward.value)} juice`
           : reward.text;
-        setDetail(this.info, `Harvested a ${info.seed.name}`, [`${amount}.`]);
+        setDetail(
+          this.info,
+          `Harvested ${info.seed.name.replace(/ tree$/, " peaches")}`,
+          [`${amount}.`],
+        );
         this.game.emit("harvest", {
           seed: info.seed,
           reward,
@@ -250,7 +258,7 @@ export class OrchardView {
     if (!info) {
       const seed = SEED_BY_ID[this.selected];
       setDetail(this.info, "Empty plot", [
-        `Tap to plant a ${seed.name} for ${seed.pits} pit${seed.pits > 1 ? "s" : ""}.`,
+        `Tap to plant a ${seed.name} for ${pitCount(seed.pits)}.`,
       ]);
       return;
     }
@@ -271,6 +279,7 @@ export class OrchardView {
     const { state } = this.game;
     if (this.shownSeeds !== state.orchard.discovered.join()) this.buildSeeds();
     if (this.shownSize !== this.orchard.size) this.buildGrid();
+    setText(this.balance, `You have ${pitCount(state.pits)}`);
     this.seedButtons.forEach((b, id) => {
       b.setAttribute("aria-pressed", String(id === this.selected));
       toggle(b, "is-short", state.pits < SEED_BY_ID[id].pits);
