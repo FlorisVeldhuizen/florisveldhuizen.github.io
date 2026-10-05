@@ -324,8 +324,7 @@ export class GoldenPeach {
     h.scale.setScalar(SIZE * Math.max(0.001, pop));
     this.spin.rotation.set(
       Math.sin(g.age * 0.8) * 0.2 * motion,
-      (Math.sin(g.age * 0.9) * 0.45 + Math.sin(g.age * 7) * 0.2 * this.hover) *
-        motion,
+      g.age * 0.7 * motion + Math.sin(g.age * 7) * 0.2 * this.hover * motion,
       Math.sin(g.age * 1.6) * 0.15 * motion,
     );
     const { material } = this.gold;

@@ -70,6 +70,7 @@ const WINDUP_FROM = 0.72;
 const BEAT_LENGTH = 0.32;
 const GRAB_OVERREACH = 1.25;
 const GRAB_BODY_PULL = 4;
+const GRAB_YAW_GAIN = 1.8;
 const GRAB_FOLLOW_MAX = 2;
 
 function spring(x, v, k, c, h) {
@@ -780,7 +781,9 @@ export class Interaction {
     }
     this.velocity.addScaledVector(g.pull, GRAB_BODY_PULL * delta);
     const lever = this.tempB.copy(world).sub(this.group.position);
-    this.spin.addScaledVector(lever.cross(g.pull), GRAB_BODY_PULL * delta);
+    const torque = lever.cross(g.pull);
+    torque.y *= GRAB_YAW_GAIN;
+    this.spin.addScaledVector(torque, GRAB_BODY_PULL * delta);
     this.addHeat(2 * delta * (0.2 + length), 99);
     this.wake();
     if (!tune.grabFadePointer) return;
