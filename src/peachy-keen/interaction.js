@@ -70,6 +70,7 @@ const WINDUP_FROM = 0.72;
 const BEAT_LENGTH = 0.32;
 const GRAB_OVERREACH = 1.25;
 const GRAB_BODY_PULL = 4;
+const GRAB_FOLLOW_MAX = 2;
 
 function spring(x, v, k, c, h) {
   v.addScaledVector(x, -k * h).multiplyScalar(1 - c * h);
@@ -119,6 +120,8 @@ export class Interaction {
     this.phase = "hidden";
     this.phaseTime = 0;
     this.clock = 0;
+    this.sway = 0;
+    this.swayRate = 1;
     this.idle = 0;
     this.twerk = null;
 
@@ -279,6 +282,12 @@ export class Interaction {
       const hit = this.raycastAt(e.clientX, e.clientY);
       p.downOnPeach = !!hit;
       p.onWaistband = this.onWaistband(hit);
+      p.downSpot = hit && {
+        local: this.peach.toLocal(hit.point, new Vector3()),
+        normal: hit.face.normal.clone().normalize(),
+      };
+      if (hit && e.pointerType === "mouse")
+        document.documentElement.setPointerCapture(e.pointerId);
     });
     const release = (e) => {
       const tapped =
@@ -630,11 +639,14 @@ export class Interaction {
   }
 
   startGrab(hit) {
-    const normal = hit.face.normal.clone().normalize();
+    const spot = (tune.grabFromPress && this.pointer.downSpot) || {
+      local: this.peach.toLocal(hit.point, new Vector3()),
+      normal: hit.face.normal.clone().normalize(),
+    };
     this.recoil = null;
     this.grab = {
-      local: this.peach.toLocal(hit.point, new Vector3()),
-      normal,
+      local: spot.local,
+      normal: spot.normal,
       pull: new Vector3(),
       pullVelocity: new Vector3(),
       localPull: new Vector3(),
@@ -689,6 +701,19 @@ export class Interaction {
     const target = this.grabTarget.sub(world);
     const give = this.firmness.grab;
     const limit = CFG.GRAB_REACH * give;
+    const reach = target.length() / limit;
+    const excess = Math.min(reach - 1, GRAB_FOLLOW_MAX);
+    if (excess > 0)
+      this.velocity.addScaledVector(
+        target,
+        (tune.grabFollow *
+          excess *
+          limit *
+          PHYSICS_CONFIG.POSITION_STIFFNESS *
+          this.firmness.stiffness *
+          delta) /
+          target.length(),
+      );
     target.divideScalar(
       Math.hypot(1, target.length() / (limit * GRAB_OVERREACH)),
     );
@@ -758,6 +783,11 @@ export class Interaction {
     this.spin.addScaledVector(lever.cross(g.pull), GRAB_BODY_PULL * delta);
     this.addHeat(2 * delta * (0.2 + length), 99);
     this.wake();
+    if (!tune.grabFadePointer) return;
+    const tip = this.toScreen(this.tempB.copy(world).add(g.pull));
+    this.ui.setPointerGap(
+      Math.hypot(this.pointer.x - tip.x, this.pointer.y - tip.y),
+    );
   }
 
   trackTurn(g, delta) {
@@ -2051,6 +2081,16 @@ export class Interaction {
     }
   }
 
+  updateSway(delta) {
+    const p = this.pointer;
+    const held =
+      tune.grabHoldSway &&
+      (this.grab || this.recoil || (p.pressed && p.downOnPeach));
+    this.swayRate +=
+      ((held ? 0 : 1) - this.swayRate) * (1 - Math.exp(-delta * 8));
+    this.sway += delta * this.swayRate;
+  }
+
   stepPhysics(delta) {
     if (this.hitStop > 0) {
       this.hitStop -= delta;
@@ -2096,15 +2136,15 @@ export class Interaction {
         ? ((this.heat - 70) / 30) * 0.02
         : 0;
 
-    const { pose } = this;
+    const { pose, sway } = this;
     g.position.set(
       this.offset.x + pose.x,
-      this.offset.y + Math.sin(t * 1.4) * 0.12 * calm + pose.lift,
+      this.offset.y + Math.sin(sway * 1.4) * 0.12 * calm + pose.lift,
       this.offset.z,
     );
     g.rotation.set(
       this.tilt.x,
-      Math.sin(t * 0.45) * 0.25 * calm + this.tilt.y + pose.yaw,
+      Math.sin(sway * 0.45) * 0.25 * calm + this.tilt.y + pose.yaw,
       this.tilt.z + Math.sin(t * 43) * tremble + pose.roll,
     );
 
@@ -2197,6 +2237,8 @@ export class Interaction {
     }
 
     this.handlePointer(delta);
+    if (!this.grab) this.ui.setPointerGap(0);
+    this.updateSway(delta);
     this.updateTips(delta);
     const holding = this.grab && this.markerSpot === this.grab;
     this.marker.update(

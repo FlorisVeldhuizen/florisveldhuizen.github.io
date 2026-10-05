@@ -65,7 +65,7 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  body {
+  html {
     cursor: none;
   }
 }
@@ -357,8 +357,7 @@ button:focus-visible {
   opacity: 0;
 }
 
-.cursor[data-state="carry"] span,
-.cursor[data-state="hold"] span {
+.cursor[data-state="carry"] span {
   opacity: 0;
 }
 
@@ -366,6 +365,15 @@ button:focus-visible {
   .cursor {
     display: none;
   }
+}
+
+.cursor[data-state="hold"] span {
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-width: 2px;
+  border-color: var(--peach);
+  opacity: calc(var(--far, 0) * 0.7);
 }
 
 .cursor[data-state="grab"] span {

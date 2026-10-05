@@ -1,4 +1,4 @@
-import { reducedMotion } from "./util";
+import { clamp, reducedMotion } from "./util";
 
 export class UI {
   constructor() {
@@ -17,6 +17,7 @@ export class UI {
     this.hintTip = document.getElementById("hint-tip");
     this.cursor = document.getElementById("cursor");
     this.ring = this.cursor.firstElementChild;
+    this.shownFar = 0;
     this.comboLayer = document.getElementById("combos");
     this.vignette = document.getElementById("vignette");
     this.shownTension = 0;
@@ -90,6 +91,13 @@ export class UI {
     if (rounded === this.shownTension) return;
     this.shownTension = rounded;
     this.cursor.style.setProperty("--tension", rounded);
+  }
+
+  setPointerGap(gap) {
+    const far = Math.round(clamp((gap - 90) / 170, 0, 1) * 50) / 50;
+    if (far === this.shownFar) return;
+    this.shownFar = far;
+    this.cursor.style.setProperty("--far", far);
   }
 
   onSnapback(x, y, amount) {

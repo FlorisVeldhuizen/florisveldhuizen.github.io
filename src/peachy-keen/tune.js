@@ -61,6 +61,33 @@ const KNOBS = [
     subtle: 0.45,
     lively: 0.8,
   },
+  {
+    key: "grabHoldSway",
+    label: "Grab: stop the idle sway while holding",
+    value: true,
+  },
+  {
+    key: "grabFromPress",
+    label: "Grab: hold the spot you pressed",
+    value: true,
+  },
+  {
+    key: "grabFadePointer",
+    label: "Grab: fade in the pointer when it is far",
+    value: true,
+  },
+  {
+    key: "grabFollow",
+    label: "Grab: body follows past full stretch",
+    min: 0,
+    max: 1,
+    step: 0.05,
+    value: 0.3,
+    low: "stays put",
+    high: "follows far",
+    subtle: 0.15,
+    lively: 0.5,
+  },
 ];
 
 function load() {
