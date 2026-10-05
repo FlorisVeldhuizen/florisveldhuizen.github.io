@@ -2,13 +2,13 @@ import {
   AdditiveBlending,
   BufferGeometry,
   CapsuleGeometry,
+  CylinderGeometry,
   CanvasTexture,
   Color,
   ExtrudeGeometry,
   Float32BufferAttribute,
   IcosahedronGeometry,
   Group,
-  LatheGeometry,
   Matrix4,
   Mesh,
   MeshPhysicalMaterial,
@@ -21,7 +21,6 @@ import {
   Sprite,
   SpriteMaterial,
   SRGBColorSpace,
-  Vector2,
   Vector3,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils";
@@ -47,13 +46,17 @@ const LETTERS_AT = 0.39;
 const GRIP_TOP = -0.11;
 const GRIP_BOTTOM = -0.47;
 const GRIP_TURNS = 9;
+const PONG_X = 0.38;
+const PONG_Y = 0.56;
+const PONG_H = 0.4;
+const PONG_HANDLE = 0.11;
 const Z = new Vector3(0, 0, 1);
 const UP = new Vector3(0, 1, 0);
 const deg = (d) => (d * Math.PI) / 180;
 const smooth = (k) => k * k * (3 - 2 * k);
 const clamp01 = (k) => Math.min(1, Math.max(0, k));
 const backOut = (k) => 1 + 2.7 * (k - 1) ** 3 + 1.7 * (k - 1) ** 2;
-const centreOf = (look) => (look.round ? 0.5 : 0.62);
+const centreOf = (look) => (look.round ? PONG_Y : 0.62);
 
 const LOOKS = [
   { wood: "maple" },
@@ -263,29 +266,32 @@ function classicShape() {
   return s;
 }
 
+const onPong = (a, inset = 0) => {
+  const c = Math.cos(a);
+  const sn = Math.sin(a);
+  const square = (k) => Math.sign(k) * Math.abs(k) ** 0.86;
+  const narrow = sn < 0 ? 1 - 0.14 * sn * sn : 1;
+  return [
+    (PONG_X - inset) * square(c) * narrow,
+    PONG_Y + (PONG_H - inset) * square(sn),
+  ];
+};
+
+function traceRim(shape, from, to, inset = 0) {
+  for (let k = 1; k <= 64; k += 1)
+    shape.lineTo(...onPong(from + ((to - from) * k) / 64, inset));
+}
+
 function roundShape() {
-  const r = 0.4;
-  const cy = 0.5;
-  const a = deg(242);
+  const a = deg(246);
+  const [x, y] = onPong(a);
   const s = new Shape();
-  s.moveTo(-0.07, 0);
-  s.bezierCurveTo(
-    -0.07,
-    0.07,
-    r * Math.cos(a) + 0.04,
-    cy + r * Math.sin(a) - 0.02,
-    r * Math.cos(a),
-    cy + r * Math.sin(a),
-  );
-  s.absarc(0, cy, r, a, deg(-62), true);
-  s.bezierCurveTo(
-    -r * Math.cos(a) - 0.04,
-    cy + r * Math.sin(a) - 0.02,
-    0.07,
-    0.07,
-    0.07,
-    0,
-  );
+  s.moveTo(-0.05, -0.1);
+  s.lineTo(-0.05, 0.08);
+  s.bezierCurveTo(-0.05, 0.13, x + 0.05, y - 0.03, x, y);
+  traceRim(s, a, deg(-66));
+  s.bezierCurveTo(-x - 0.05, y - 0.03, 0.05, 0.13, 0.05, 0.08);
+  s.lineTo(0.05, -0.1);
   s.closePath();
   return s;
 }
@@ -304,6 +310,15 @@ function holes(shape) {
     shape.holes.push(p);
   });
   return shape;
+}
+
+function readBothSides(geometry) {
+  const caps = geometry.groups[0];
+  const p = geometry.attributes.position;
+  const { uv } = geometry.attributes;
+  for (let n = caps.start; n < caps.start + caps.count; n += 1)
+    if (p.getZ(n) < 0) uv.setX(n, 1 - uv.getX(n));
+  return geometry;
 }
 
 function fitUV(geometry) {
@@ -332,21 +347,26 @@ function bladeGeometry(round, drilled) {
       curveSegments: 28,
     });
     g.translate(0, 0, -THICK / 2);
-    return fitUV(g);
+    return readBothSides(fitUV(g));
   });
 }
 
 function rubberGeometry() {
   return once("rubber", () => {
+    const inset = 0.006;
+    const a = deg(232);
+    const [x, y] = onPong(a, inset);
     const s = new Shape();
-    s.absarc(0, 0.5, 0.39, 0, Math.PI * 2, false);
+    s.moveTo(x, y);
+    traceRim(s, a, deg(-52), inset);
+    s.quadraticCurveTo(0, y - 0.07, x, y);
     const g = new ExtrudeGeometry(s, {
       depth: 0.012,
       bevelEnabled: true,
       bevelThickness: 0.004,
-      bevelSize: 0.006,
+      bevelSize: 0.004,
       bevelSegments: 2,
-      curveSegments: 40,
+      curveSegments: 48,
     });
     return fitUV(g);
   });
@@ -354,23 +374,33 @@ function rubberGeometry() {
 
 function handleGeometry() {
   return once("handle", () => {
-    const g = new LatheGeometry(
-      [
-        [0.0, 0.02],
-        [0.055, 0.02],
-        [0.058, -0.1],
-        [0.064, -0.3],
-        [0.078, -0.42],
-        [0.07, -0.45],
-        [0, -0.455],
-      ]
-        .map(([x, y]) => new Vector2(x, y))
-        .reverse(),
-      24,
-    );
-    g.scale(1, 1, 0.72);
-    return g;
+    const s = new Shape();
+    s.moveTo(-0.05, 0.1);
+    s.lineTo(-0.05, -0.05);
+    s.bezierCurveTo(-0.05, -0.2, -0.07, -0.25, -0.07, -0.31);
+    s.quadraticCurveTo(-0.07, -0.355, 0, -0.36);
+    s.quadraticCurveTo(0.07, -0.355, 0.07, -0.31);
+    s.bezierCurveTo(0.07, -0.25, 0.05, -0.2, 0.05, -0.05);
+    s.lineTo(0.05, 0.1);
+    s.closePath();
+    const depth = PONG_HANDLE - 0.04;
+    const g = new ExtrudeGeometry(s, {
+      depth,
+      bevelEnabled: true,
+      bevelThickness: 0.02,
+      bevelSize: 0.015,
+      bevelSegments: 5,
+      curveSegments: 20,
+    });
+    g.translate(0, 0, -depth / 2);
+    return fitUV(g);
   });
+}
+
+function badgeGeometry() {
+  return once("badge", () =>
+    new CylinderGeometry(0.036, 0.036, 0.008, 28).rotateX(Math.PI / 2),
+  );
 }
 
 const handleHalf = (y) => 0.057 + clamp01((-0.12 - y) / 0.36) * 0.003;
@@ -512,6 +542,13 @@ const fittingMaterials = {
       clearcoat: 0.4,
     }),
   gold: () => bladeMaterial({ wood: "gold" }),
+  badge: () =>
+    new MeshPhysicalMaterial({
+      color: 0xc81e3a,
+      roughness: 0.25,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+    }),
   gem: () =>
     new MeshPhysicalMaterial({
       color: 0xff6fa8,
@@ -565,12 +602,28 @@ export function paddleModel() {
     gem.position.set(0, -0.12, side * 0.058);
     return gem;
   });
+  const badges = [1, -1].map((side) => {
+    const badge = new Mesh(badgeGeometry());
+    badge.position.set(0, -0.02, side * (PONG_HANDLE / 2 + 0.002));
+    return badge;
+  });
   const front = new Mesh(rubberGeometry(), rubberMaterial(0xb8102a));
   const back = new Mesh(rubberGeometry(), rubberMaterial(0x1a1a1e));
   front.position.z = FACE - 0.004;
   back.position.z = -FACE + 0.004;
   back.rotation.y = Math.PI;
-  model.add(blade, handle, grip, ...collars, cap, guard, ...gems, front, back);
+  model.add(
+    blade,
+    handle,
+    grip,
+    ...collars,
+    cap,
+    guard,
+    ...gems,
+    ...badges,
+    front,
+    back,
+  );
   model.traverse((o) => {
     // eslint-disable-next-line no-param-reassign
     o.castShadow = o.isMesh;
@@ -605,6 +658,12 @@ export function paddleModel() {
       /* eslint-disable no-param-reassign */
       gem.visible = guard.visible;
       gem.material = once("fit-gem", fittingMaterials.gem);
+      /* eslint-enable no-param-reassign */
+    });
+    badges.forEach((badge) => {
+      /* eslint-disable no-param-reassign */
+      badge.visible = !!look.round;
+      badge.material = once("fit-badge", fittingMaterials.badge);
       /* eslint-enable no-param-reassign */
     });
     front.visible = !!look.round;
