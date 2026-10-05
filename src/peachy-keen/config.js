@@ -18,7 +18,6 @@ import kiss2Sound from "./assets/kiss2.m4a?url";
 import kiss3Sound from "./assets/kiss3.m4a?url";
 import kiss4Sound from "./assets/kiss4.m4a?url";
 import kiss5Sound from "./assets/kiss5.m4a?url";
-import kiss6Sound from "./assets/kiss6.m4a?url";
 import kiss7Sound from "./assets/kiss7.m4a?url";
 import kiss8Sound from "./assets/kiss8.m4a?url";
 import kiss9Sound from "./assets/kiss9.m4a?url";
@@ -209,7 +208,6 @@ export const AUDIO_CONFIG = {
     kiss3Sound,
     kiss4Sound,
     kiss5Sound,
-    kiss6Sound,
     kiss7Sound,
     kiss8Sound,
     kiss9Sound,
