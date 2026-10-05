@@ -135,7 +135,7 @@ const interaction = new Interaction({
 const naughty = new Naughty(interaction, talk);
 const wild = new Wild({ scene, camera, interaction, talk, backdrop });
 const shock = new Shock(renderer, interaction);
-const skinRings = new SkinRings(interaction);
+const skinRings = new SkinRings(scene, interaction);
 settings.applyAll();
 let idle = null;
 

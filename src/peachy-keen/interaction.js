@@ -1062,6 +1062,7 @@ export class Interaction {
     this.emit("snapback", {
       local: r.local,
       normal: r.normal,
+      direction: this.tempB.copy(pull).negate(),
       amount: Math.min(1, length / CFG.GRAB_REACH),
     });
     if (this.heat >= 100) this.charge();
@@ -1572,6 +1573,7 @@ export class Interaction {
     this.juice.update(1 / 30);
     this.freeze = 0.05;
     if (!reducedMotion.matches) {
+      this.freeze = Math.max(this.freeze, 0.06);
       this.slowmo = Math.min(0.5, 0.35 * power);
       this.trauma = Math.max(this.trauma, 0.8);
       this.zoomVelocity -= 2;

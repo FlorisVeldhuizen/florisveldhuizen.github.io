@@ -4,8 +4,11 @@ import {
   Mesh,
   PlaneGeometry,
   ShaderMaterial,
+  Sprite,
+  SpriteMaterial,
   Vector3,
 } from "three";
+import { twinkleTexture } from "./idle/scenery/shapes";
 import { reducedMotion } from "./util";
 
 const ringGrow = (t) => 1 - (1 - t) ** 3;
@@ -78,47 +81,113 @@ export function showRing(mesh, t, from, to, opacity) {
 const POOL = 3;
 const Z = new Vector3(0, 0, 1);
 
+const SPARKS = 3;
+const SPARK_LIFE = 0.3;
+
+const glow = (map, color) =>
+  new SpriteMaterial({
+    map,
+    color,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    transparent: true,
+    opacity: 0,
+  });
+
 export class SkinRings {
-  constructor(interaction) {
+  constructor(scene, interaction) {
     this.peach = interaction.peach;
-    this.rings = Array.from({ length: POOL }, () => {
+    this.n = new Vector3();
+    this.out = new Vector3();
+    this.side = new Vector3();
+    const twinkle = twinkleTexture();
+    this.slots = Array.from({ length: POOL }, () => {
       const ring = new Mesh(
         new PlaneGeometry(1, 1),
         ringMaterial(0xffb8c8, { onTop: true }),
       );
-      ring.renderOrder = 3;
-      ring.visible = false;
-      ring.userData = { age: 1, life: 1, size: 1, power: 0 };
-      return ring;
+      const flash = new Sprite(glow(twinkle, 0xffc8d0));
+      const sparks = Array.from({ length: SPARKS }, () => {
+        const spark = new Sprite(glow(twinkle, 0xffe0d0));
+        spark.userData.v = new Vector3();
+        return spark;
+      });
+      [ring, flash, ...sparks].forEach((o) => {
+        /* eslint-disable no-param-reassign */
+        o.renderOrder = 3;
+        o.visible = false;
+        /* eslint-enable no-param-reassign */
+        scene.add(o);
+      });
+      return { ring, flash, sparks, age: 1, life: 1, size: 1, power: 0 };
     });
     interaction.on("snapback", (e) => this.add(e));
   }
 
-  add({ local, normal, amount }) {
+  add({ local, normal, direction, amount }) {
     if (reducedMotion.matches) return;
-    const ring = this.rings.reduce((a, b) =>
-      a.userData.age / a.userData.life >= b.userData.age / b.userData.life
-        ? a
-        : b,
+    const slot = this.slots.reduce((a, b) =>
+      a.age / a.life >= b.age / b.life ? a : b,
     );
-    const scale = this.peach.worldScale();
-    this.peach.mesh.add(ring);
-    ring.position.copy(local).addScaledVector(normal, 0.03 / scale);
-    ring.quaternion.setFromUnitVectors(Z, normal);
-    Object.assign(ring.userData, {
+    const { matrixWorld } = this.peach.mesh;
+    const n = this.n.copy(normal).transformDirection(matrixWorld);
+    const at = slot.ring.position
+      .copy(local)
+      .applyMatrix4(matrixWorld)
+      .addScaledVector(n, 0.03);
+    slot.ring.quaternion.setFromUnitVectors(Z, n);
+    slot.flash.position.copy(at).addScaledVector(n, 0.15);
+    const out = this.out.copy(direction).addScaledVector(n, -direction.dot(n));
+    if (out.lengthSq() < 1e-6) out.set(1, 0, 0).addScaledVector(n, -n.x);
+    out.normalize();
+    this.side.crossVectors(n, out);
+    slot.sparks.forEach((spark, k) => {
+      const a = ((k + Math.random() * 0.6 - 0.3) / SPARKS - 0.5) * 2.2;
+      spark.userData.v
+        .copy(out)
+        .multiplyScalar(Math.cos(a))
+        .addScaledVector(this.side, Math.sin(a))
+        .multiplyScalar((1.5 + Math.random()) * (0.6 + amount))
+        .addScaledVector(n, 0.8);
+      spark.position.copy(at).addScaledVector(n, 0.08);
+      // eslint-disable-next-line no-param-reassign
+      spark.visible = amount > 0.7;
+    });
+    Object.assign(slot, {
       age: 0,
       life: 0.4 + amount * 0.2,
-      size: (0.5 + amount * 1.1) / scale,
+      size: 0.5 + amount * 1.1,
       power: 0.35 + amount * 0.35,
     });
   }
 
   update(delta) {
-    this.rings.forEach((ring) => {
-      const d = ring.userData;
-      if (d.age >= d.life) return;
-      d.age = Math.min(d.life, d.age + delta);
-      showRing(ring, d.age / d.life, d.size * 0.25, d.size, d.power);
+    this.slots.forEach((slot) => {
+      if (slot.age >= slot.life) return;
+      /* eslint-disable no-param-reassign */
+      slot.age = Math.min(slot.life, slot.age + delta);
+      const { age, flash } = slot;
+      showRing(
+        slot.ring,
+        age / slot.life,
+        slot.size * 0.25,
+        slot.size,
+        slot.power,
+      );
+      flash.scale.setScalar((0.2 + Math.min(1, age / 0.05) * 0.35) * slot.size);
+      flash.material.opacity = (1 - Math.min(1, age / 0.14)) * 0.4;
+      flash.visible = age < 0.14;
+      const k = Math.min(1, age / SPARK_LIFE);
+      slot.sparks.forEach((spark) => {
+        if (!spark.visible) return;
+        spark.userData.v.multiplyScalar(Math.exp(-delta * 7));
+        spark.position.addScaledVector(spark.userData.v, delta);
+        spark.scale.setScalar(0.12 * (1 - k * 0.6));
+        spark.material.opacity = (1 - k) * 0.7;
+        spark.visible = k < 1;
+      });
+      /* eslint-enable no-param-reassign */
     });
   }
 }
