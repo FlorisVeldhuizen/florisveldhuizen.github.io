@@ -27,7 +27,6 @@ import {
 } from "./config";
 import { Bottle } from "./bottle";
 import { clamp, reducedMotion, viewHeight } from "./util";
-import { tune, tuneLog } from "./tune";
 import SurfaceMarker, { MARKERS, surfaceNormal } from "./marker";
 
 const DROP_STEP_PX = 12;
@@ -72,6 +71,9 @@ const GRAB_OVERREACH = 1.25;
 const GRAB_BODY_PULL = 4;
 const GRAB_YAW_GAIN = 1.8;
 const GRAB_FOLLOW_MAX = 2;
+// While held, the body and turn run this much faster so they land with the skin stretch, not after it.
+const GRAB_QUICKEN = 2;
+const GRAB_SETTLE = 2;
 
 function spring(x, v, k, c, h) {
   v.addScaledVector(x, -k * h).multiplyScalar(1 - c * h);
@@ -640,7 +642,7 @@ export class Interaction {
   }
 
   startGrab(hit) {
-    const spot = (tune.grabFromPress && this.pointer.downSpot) || {
+    const spot = this.pointer.downSpot || {
       local: this.peach.toLocal(hit.point, new Vector3()),
       normal: hit.face.normal.clone().normalize(),
     };
@@ -707,7 +709,8 @@ export class Interaction {
     if (excess > 0)
       this.velocity.addScaledVector(
         target,
-        (tune.grabFollow *
+        (GRAB_QUICKEN ** 2 *
+          CFG.GRAB_FOLLOW *
           excess *
           limit *
           PHYSICS_CONFIG.POSITION_STIFFNESS *
@@ -779,14 +782,14 @@ export class Interaction {
         1,
       );
     }
-    this.velocity.addScaledVector(g.pull, GRAB_BODY_PULL * delta);
+    const push = GRAB_QUICKEN ** 2 * GRAB_BODY_PULL * delta;
+    this.velocity.addScaledVector(g.pull, push);
     const lever = this.tempB.copy(world).sub(this.group.position);
     const torque = lever.cross(g.pull);
     torque.y *= GRAB_YAW_GAIN;
-    this.spin.addScaledVector(torque, GRAB_BODY_PULL * delta);
+    this.spin.addScaledVector(torque, push);
     this.addHeat(2 * delta * (0.2 + length), 99);
     this.wake();
-    if (!tune.grabFadePointer) return;
     const tip = this.toScreen(this.tempB.copy(world).add(g.pull));
     this.ui.setPointerGap(
       Math.hypot(this.pointer.x - tip.x, this.pointer.y - tip.y),
@@ -842,7 +845,7 @@ export class Interaction {
     w.pathToFar = w.path;
     w.since = w.farAt;
     w.farAt = this.clock;
-    const from = tune.turnFrom / this.jiggle();
+    const from = CFG.WIGGLE_PAT_FROM / this.jiggle();
     if (
       swing < from ||
       half > CFG.WIGGLE_HALF_MAX ||
@@ -858,21 +861,18 @@ export class Interaction {
     const ramp = Math.min(1, g.streak / CFG.WIGGLE_RAMP) ** 2;
     const size = clamp((swing - from) / (CFG.WIGGLE_FULL - from), 0, 1);
     const fast = clamp(
-      (pace - CFG.WIGGLE_PACE) / (tune.turnPaceFull - CFG.WIGGLE_PACE),
+      (pace - CFG.WIGGLE_PACE) / (CFG.WIGGLE_PACE_FULL - CFG.WIGGLE_PACE),
       0,
       1,
     );
     // A half circle travels about 1.57x its diameter; a back-and-forth swing about 1x.
     const sharp = clamp((straight - 0.68) / 0.22, 0, 1);
     const gain =
-      tune.turnVolume *
+      CFG.WIGGLE_VOLUME *
       ramp *
       (0.15 + 0.85 * size) ** 2 *
       (0.1 + 0.9 * fast) ** 2 *
       (0.3 + 0.7 * sharp);
-    tuneLog(
-      `wiggle pat  pull swing ${swing.toFixed(2)} half ${half.toFixed(2)}s pace ${pace.toFixed(1)} straight ${straight.toFixed(2)} row ${g.streak} vol ${gain.toFixed(2)}`,
-    );
     playPat(
       size * (0.3 + 0.7 * fast),
       clamp(g.pull.x / limit, -0.6, 0.6),
@@ -1045,14 +1045,14 @@ export class Interaction {
     this.releaseSound(r);
     const stretch = length / CFG.GRAB_REACH;
     const jiggle = this.jiggle();
-    const from = Math.min(0.95, tune.wobbleFrom / jiggle);
+    const from = Math.min(0.95, CFG.WOBBLE_FROM / jiggle);
     if (stretch > from)
       playWobble(
         Math.min(1, (stretch - from) / (1 - from)),
         Math.PI / (this.firmness.dentFrequency * 0.85),
         this.oil,
         {
-          gain: tune.wobbleVolume * jiggle,
+          gain: CFG.WOBBLE_VOLUME * jiggle,
           most: Math.max(1, Math.round(2 * jiggle ** 2)),
           decay: 0.375 ** (this.firmness.dentDecay / FIRMNESS.ripe.dentDecay),
         },
@@ -1072,9 +1072,6 @@ export class Interaction {
       flam: false,
     });
     const slap = clamp((stretch - CFG.RELEASE_SLAP_FROM) / 0.35, 0, 1);
-    tuneLog(
-      `release  stretch ${stretch.toFixed(2)} pat ${(0.35 + 0.75 * weight).toFixed(2)} slap ${slap > 0 ? (slap ** 1.5).toFixed(2) : "none"}`,
-    );
     if (slap > 0)
       playSlap(slap, this.heat / 100, this.oil, 1.1, 0, slap ** 1.5);
   }
@@ -2087,7 +2084,6 @@ export class Interaction {
   updateSway(delta) {
     const p = this.pointer;
     const held =
-      tune.grabHoldSway &&
       !this.carrying &&
       (this.grab || this.recoil || (p.pressed && p.downOnPeach));
     this.swayRate +=
@@ -2103,19 +2099,23 @@ export class Interaction {
     this.accumulator += delta;
     const h = PHYSICS_CONFIG.SUBSTEP;
     let steps = 0;
+    const quick = this.grab ? GRAB_QUICKEN : 1;
+    const settle = this.grab ? GRAB_QUICKEN * GRAB_SETTLE : 1;
     while (this.accumulator >= h && steps < 10) {
       spring(
         this.offset,
         this.velocity,
-        PHYSICS_CONFIG.POSITION_STIFFNESS * this.firmness.stiffness,
-        PHYSICS_CONFIG.POSITION_DAMPING,
+        quick ** 2 *
+          PHYSICS_CONFIG.POSITION_STIFFNESS *
+          this.firmness.stiffness,
+        settle * PHYSICS_CONFIG.POSITION_DAMPING,
         h,
       );
       spring(
         this.tilt,
         this.spin,
-        PHYSICS_CONFIG.ROTATION_STIFFNESS,
-        PHYSICS_CONFIG.ROTATION_DAMPING,
+        quick ** 2 * PHYSICS_CONFIG.ROTATION_STIFFNESS,
+        settle * PHYSICS_CONFIG.ROTATION_DAMPING,
         h,
       );
       spring(
