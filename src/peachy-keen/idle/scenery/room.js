@@ -35,6 +35,7 @@ import {
   makeLotus,
 } from "./shapes";
 import { Toucher } from "./touches";
+import { Paddles } from "./paddle";
 import { glowingJuiceMaterial } from "../../juice";
 import { OilDrips } from "./oil";
 import { moonMesh, setMoonPhase, ShootingStars, usePeachShape } from "./sky";
@@ -50,6 +51,7 @@ import {
   discoBeat,
 } from "../../audio";
 import { reducedMotion, ease } from "../../util";
+import { PRINT_KIND } from "../../peach";
 
 const level = (owned, full = 100) =>
   owned > 0 ? Math.min(1, Math.log10(1 + owned) / Math.log10(1 + full)) : 0;
@@ -201,6 +203,7 @@ export class Room {
     this.group = new Group();
     scene.add(this.group);
     this.group.matrixAutoUpdate = false;
+    this.paddles = new Paddles(game, interaction, this.toucher, this.group);
     this.time = 0;
     this.dummy = new Object3D();
     this.drifter = new Object3D();
@@ -879,8 +882,21 @@ export class Room {
     /* eslint-disable no-param-reassign */
     h.pop = 0;
     const hit = this.toucher.hitFrom(h.at);
-    if (hit) this.i.peach.addJiggle(hit.point, this.toucher.dir, 0.03, 0.5);
-    if (this.game.state.options.castSound && this.toucher.soundTimer <= 0) {
+    if (!hit) return;
+    const { peach, settings } = this.i;
+    peach.addJiggle(hit.point, this.toucher.dir, 0.03, 0.5);
+    if (settings.handprints)
+      peach.addHandprint(
+        hit.point,
+        hit.face.normal,
+        rand(-0.4, 0.4),
+        false,
+        0.8,
+        1,
+        0.7,
+        PRINT_KIND.kiss,
+      );
+    if (this.game.state.options.castSound) {
       this.toucher.soundTimer = 0.3;
       playKiss();
     }
@@ -1059,9 +1075,10 @@ export class Room {
       .due(delta)
       .filter((id) => id !== "coach")
       .forEach((id) => {
-        const hit = this.toucher.randomHit();
-        this.toucher.touch(id, hit);
+        if (id === "paddle") this.paddles.swing(id);
+        else this.toucher.touch(id, this.toucher.randomHit());
       });
+    this.paddles.update(delta);
 
     this.drift(
       this.feathers,

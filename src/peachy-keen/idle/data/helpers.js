@@ -48,7 +48,7 @@ export const HELPERS = [
   },
   {
     id: "paddle",
-    room: "Invisible paddles give the peach a smack now and then.",
+    room: "Paddles swing in and give the peach a smack now and then.",
     name: "Paddle",
     plural: "Paddles",
     cost: 1100,

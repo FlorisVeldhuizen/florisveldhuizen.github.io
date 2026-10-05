@@ -420,6 +420,9 @@ const FRAGMENT_HEADER = `
   uniform vec4 uPrintUps[${PEACH_CONFIG.MAX_PRINTS}];
   uniform float uPrintDefinitions[${PEACH_CONFIG.MAX_PRINTS}];
   uniform sampler2D uPrintTexture;
+  uniform sampler2D uPaddleTexture;
+  uniform sampler2D uKissTexture;
+  uniform float uPrintKind[${PEACH_CONFIG.MAX_PRINTS}];
   uniform float uPrintInk;
   varying vec3 vRestPosition;
   varying float vFabricPush;
@@ -462,8 +465,8 @@ const FRAGMENT_HEADER = `
     return normalize(abs(det) * n - grad);
   }
 
-  float handprintMask() {
-    float m = 0.0;
+  vec2 handprintMask() {
+    vec2 m = vec2(0.0);
     for (int i = 0; i < ${PEACH_CONFIG.MAX_PRINTS}; i++) {
       float age = uTime - uPrints[i].w;
       if (age < 0.0 || age > ${PEACH_CONFIG.PRINT_LIFE.toFixed(1)}) continue;
@@ -476,12 +479,15 @@ const FRAGMENT_HEADER = `
       float wrap = 1.0 - smoothstep(0.15, 0.45, abs(dot(q, n)) / abs(size));
       float rise = smoothstep(0.0, 0.15, age);
       float fade = 1.0 - smoothstep(${(PEACH_CONFIG.PRINT_LIFE * 0.3).toFixed(1)}, ${PEACH_CONFIG.PRINT_LIFE.toFixed(1)}, age);
-      vec3 print = texture2D(uPrintTexture, uv).rgb;
+      float kind = uPrintKind[i];
+      vec3 print = kind > 1.5 ? texture2D(uKissTexture, uv).rgb : kind > 0.5 ? texture2D(uPaddleTexture, uv).rgb : texture2D(uPrintTexture, uv).rgb;
+      float lips = kind > 1.5 ? 1.0 : kind > 0.5 ? 0.0 : uPrintInk;
       float definition = uPrintDefinitions[i] * smoothstep(0.15, 1.8, age);
       float shape = mix(print.b * 0.8, print.r, definition);
-      m += shape * wrap * rise * fade * uPrintNormals[i].w;
+      float mark = shape * wrap * rise * fade * uPrintNormals[i].w;
+      m += vec2(mark, mark * lips);
     }
-    return min(m, 1.0);
+    return vec2(min(m.x, 1.0), m.x > 0.0 ? m.y / m.x : 0.0);
   }
 
   ${LINGERIE_COMMON}
@@ -725,9 +731,10 @@ const FRAGMENT_COLOR = `
     vec3 glaze = diffuseColor.rgb * mix(vec3(1.0, 0.8, 0.45), uSkinDeep * 1.5, thick) + uSkinDeep * 0.06 * thick;
     diffuseColor.rgb = mix(diffuseColor.rgb, glaze, skinHoney);
   }
-  float welt = handprintMask() * (1.0 - leaf);
-  vec3 ink = mix(diffuseColor.rgb * vec3(1.02, 0.42, 0.46), vec3(0.62, 0.0, 0.08), uPrintInk);
-  diffuseColor.rgb = mix(diffuseColor.rgb, ink, welt * mix(0.55, 0.95, uPrintInk));
+  vec2 marks = handprintMask();
+  float welt = marks.x * (1.0 - leaf);
+  vec3 ink = mix(diffuseColor.rgb * vec3(1.02, 0.42, 0.46), vec3(0.62, 0.0, 0.08), marks.y);
+  diffuseColor.rgb = mix(diffuseColor.rgb, ink, welt * mix(0.55, 0.95, marks.y));
   diffuseColor.rgb *= mix(vec3(1.0), vec3(1.08, 0.7, 0.72), uHeat * 0.6);
   if (uLingerie.x > 0.5 && uLingerie.z > 0.0) {
     diffuseColor.rgb *= 1.0 - fabricShadow(vRestPosition, uCutPlane) * uLingerie.z * (1.0 - leaf);
@@ -736,6 +743,8 @@ const FRAGMENT_COLOR = `
     diffuseColor.rgb *= mix(vec3(1.0), vec3(1.03, 0.72, 0.75), squeeze * 0.8) * mix(vec3(1.0), vec3(1.05, 0.95, 0.94), swell * 0.5);
   }
 `;
+
+export const PRINT_KIND = { tool: 0, paddle: 1, kiss: 2 };
 
 const PRINT_SHAPES = {
   hand: {
@@ -1151,6 +1160,9 @@ export class Peach {
       uPrintUps: { value: this.emptySlots(PEACH_CONFIG.MAX_PRINTS) },
       uPrintDefinitions: { value: new Array(PEACH_CONFIG.MAX_PRINTS).fill(0) },
       uPrintTexture: { value: null },
+      uPaddleTexture: { value: null },
+      uKissTexture: { value: null },
+      uPrintKind: { value: new Array(PEACH_CONFIG.MAX_PRINTS).fill(0) },
       uPrintInk: { value: 0 },
       uGrab: { value: new Vector4(0, 0, 0, 1) },
       uGrabPull: { value: new Vector4() },
@@ -1183,6 +1195,7 @@ export class Peach {
     };
     this.printTextures = {};
     this.setTool("hand");
+    this.uniforms.uKissTexture.value = drawPrint(PRINT_SHAPES.lips);
     this.uniforms.uCutPlane = { value: this.uniforms.uCrease.value };
     this.uniforms.uCutSide = { value: 0 };
     this.uniforms.uStemY = { value: 1e4 };
@@ -2134,6 +2147,11 @@ export class Peach {
     this.uniforms.uPrints.value.forEach((v) => v.setW(-1e4));
   }
 
+  setPaddlePrint(key, shape) {
+    this.printTextures[key] = this.printTextures[key] || drawPrint(shape);
+    this.uniforms.uPaddleTexture.value = this.printTextures[key];
+  }
+
   setGrab(localPoint, localPull, radius, localDent, dentRadius) {
     const scale = this.worldScale();
     this.uniforms.uGrab.value.set(
@@ -2163,6 +2181,7 @@ export class Peach {
     strength,
     definition,
     printSize,
+    kind = 0,
   ) {
     if (!this.mesh) return;
     const slot = this.printSlot;
@@ -2185,6 +2204,7 @@ export class Peach {
     );
     this.uniforms.uPrintNormals.value[slot].set(n.x, n.y, n.z, strength);
     this.uniforms.uPrintDefinitions.value[slot] = definition;
+    this.uniforms.uPrintKind.value[slot] = kind;
     this.uniforms.uPrintUps.value[slot].set(up.x, up.y, up.z, size);
   }
 

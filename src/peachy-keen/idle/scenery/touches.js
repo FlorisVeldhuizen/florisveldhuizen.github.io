@@ -9,14 +9,13 @@ import {
 
 export const TOUCH = {
   feather: { every: 1.6, jiggle: 0.025, radius: 0.5 },
-  admirer: { every: 2.6, jiggle: 0.05, radius: 0.7, sound: "kiss" },
+  admirer: { every: 2.6, jiggle: 0.05, radius: 0.7 },
   paddle: {
     every: 3,
     jiggle: 0.1,
     radius: 0.85,
     sound: "slap",
     knock: 0.35,
-    blush: 1.8,
   },
   masseuse: { every: 3.2, jiggle: 0.06, radius: 0.9 },
   baron: { every: 3.6, jiggle: 0.03, radius: 0.6, sound: "glug", oil: 0.04 },
@@ -111,7 +110,7 @@ export class Toucher {
     );
   }
 
-  touch(id, hit) {
+  touch(id, hit, seen = false) {
     const i = this.i;
     const t = TOUCH[id];
     const push = this.dir.setZ(Math.min(this.dir.z, -0.4)).normalize();
@@ -138,7 +137,11 @@ export class Toucher {
     if (t.oil && this.game.model.dare !== "dry")
       i.oil = Math.min(1, i.oil + t.oil);
 
-    if (t.sound && this.soundTimer <= 0 && this.game.state.options.castSound) {
+    if (
+      t.sound &&
+      (seen || this.soundTimer <= 0) &&
+      this.game.state.options.castSound
+    ) {
       this.soundTimer = SOUND_GAP;
       if (t.sound === "slap") playSlap(0.25, i.heat / 100, i.oil, 1.15);
       else if (t.sound === "squish") playSquish(0.15);

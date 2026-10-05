@@ -29,8 +29,13 @@ const FIRST = [45, 90];
 const EVERY = [90, 240];
 const FLASH = 0.6;
 const SPARKS = 6;
+const SPIN = 11;
+const KICK = 5;
+const ROCK = 0.5;
+const TAU = Math.PI * 2;
 
 const rand = ([lo, hi]) => lo + Math.random() * (hi - lo);
+const wrap = (a) => a - TAU * Math.round(a / TAU);
 const additive = (map, extra) =>
   new SpriteMaterial({
     map,
@@ -96,10 +101,13 @@ export class GoldenPeach {
     this.press = 0;
     this.flash = -1;
     this.bounce = 9;
+    this.turn = 0;
+    this.turnSpeed = 0;
     const setHover = (on) => {
       if (on && !this.hovered && this.live) {
         playNotes([1568, 2093], { gap: 0.05, length: 0.3, volume: 0.03 });
         this.bounce = 0;
+        this.turnSpeed += KICK;
       }
       this.hovered = on;
     };
@@ -169,6 +177,7 @@ export class GoldenPeach {
   claim() {
     if (!this.live) return;
     const { x, y } = this.position();
+    this.claimedAt = { x, y };
     this.burst();
     this.despawn();
     this.flash = 0;
@@ -220,6 +229,8 @@ export class GoldenPeach {
     this.hovered = false;
     this.hover = 0;
     this.press = 0;
+    this.turn = 0;
+    this.turnSpeed = 0;
     const m = this.game.model;
     this.timer = rand(EVERY) / m.goldenRate;
   }
@@ -289,6 +300,19 @@ export class GoldenPeach {
     showRing(this.ring, t / FLASH, 2, 10, 0.6);
   }
 
+  updateTurn(delta, age) {
+    if (this.hovered) {
+      this.turnSpeed += (SPIN - this.turnSpeed) * (1 - Math.exp(-delta * 3));
+    } else {
+      // The spring grips only after friction slows the spin, so it coasts before it settles.
+      const grip = Math.max(0, 1 - Math.abs(this.turnSpeed) / 5);
+      const off = wrap(this.turn - Math.sin(age * 1.3) * ROCK);
+      this.turnSpeed +=
+        (-off * 14 * grip - this.turnSpeed * (1.6 + 3.4 * grip)) * delta;
+    }
+    this.turn = wrap(this.turn + this.turnSpeed * delta);
+  }
+
   update(delta) {
     this.fadeDust(delta);
     if (this.flash >= 0) this.updateFlash(delta);
@@ -325,9 +349,11 @@ export class GoldenPeach {
       (1 + Math.sin(g.age * 3) * 0.03) *
       (1 + (this.hover * 0.15 + wobble - this.press * 0.2) * motion);
     h.scale.setScalar(SIZE * Math.max(0.001, pop));
+    this.updateTurn(delta, g.age);
+    const fast = Math.min(1, Math.abs(this.turnSpeed) / SPIN);
     this.spin.rotation.set(
-      Math.sin(g.age * 0.8) * 0.2 * motion,
-      g.age * 0.7 * motion + Math.sin(g.age * 7) * 0.2 * this.hover * motion,
+      (Math.sin(g.age * 0.8) * 0.2 * (1 - fast) - fast * 0.25) * motion,
+      this.turn * motion,
       Math.sin(g.age * 1.6) * 0.15 * motion,
     );
     const { material } = this.gold;
