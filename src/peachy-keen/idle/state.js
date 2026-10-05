@@ -91,7 +91,7 @@ function merge(base, saved) {
 export function decode(text) {
   const saved = JSON.parse(text);
   if (!saved || typeof saved !== "object" || typeof saved.juice !== "number")
-    throw new Error("Not a Peachy Keen save");
+    throw new Error("Not a Jiggle Peach save");
   const state = merge(freshState(), saved);
   if (state.version < 2 && state.toys.includes("talk")) state.toys.push("shy");
   if (state.options.helperStyle === "props") state.options.helperStyle = "room";

@@ -123,7 +123,7 @@ export class OptionsView {
         game.importCode(this.code.value);
         setText(this.message, "Save imported.");
       } catch {
-        setText(this.message, "That code is not a Peachy Keen save.");
+        setText(this.message, "That code is not a Jiggle Peach save.");
       }
     });
     button("Start over", () =>
