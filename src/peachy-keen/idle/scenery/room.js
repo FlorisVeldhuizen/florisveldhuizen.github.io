@@ -6,6 +6,7 @@ import {
   Color,
   DoubleSide,
   Group,
+  InstancedBufferAttribute,
   InstancedMesh,
   Mesh,
   MeshBasicMaterial,
@@ -22,6 +23,7 @@ import {
   Vector3,
 } from "three";
 import {
+  FEATHER_LOOKS,
   featherGeometry,
   featherMaterial,
   petalGeometry,
@@ -232,6 +234,10 @@ export class Room {
         .rotateZ(-Math.PI / 2),
       featherMaterial(),
       36,
+    );
+    this.feathers.geometry.setAttribute(
+      "aLook",
+      new InstancedBufferAttribute(new Float32Array(36), 1),
     );
     this.featherData = Array.from({ length: 36 }, () => this.spawnDrift({}));
     this.petals = new InstancedMesh(
@@ -502,6 +508,7 @@ export class Room {
       flutter: rand(1.3, 1.9),
       drag: rand(0.6, 1.4),
       seed: Math.random() * 10,
+      look: undefined,
     });
     /* eslint-enable no-param-reassign */
     return d;
@@ -525,7 +532,14 @@ export class Room {
         );
       if (p.born === undefined || p.born < 0) p.born = this.time; // eslint-disable-line no-param-reassign
       const grow = Math.min(1, (this.time - p.born) / 0.8);
-      d.scale.setScalar(scale * grow * grow * (3 - 2 * grow));
+      const size = scale * grow * grow * (3 - 2 * grow);
+      if (petal) d.scale.setScalar(size);
+      else {
+        if (p.look === undefined) p.look = this.featherLook(); // eslint-disable-line no-param-reassign
+        const [length, width] = FEATHER_LOOKS[p.look].size;
+        d.scale.set(size * length, size * width, size);
+        mesh.geometry.attributes.aLook.setX(n, p.look);
+      }
       d.updateMatrix();
       mesh.setMatrixAt(n, d.matrix);
     }
@@ -533,6 +547,17 @@ export class Room {
     mesh.count = count;
     // eslint-disable-next-line no-param-reassign
     mesh.instanceMatrix.needsUpdate = true;
+    // eslint-disable-next-line no-param-reassign
+    if (!petal) mesh.geometry.attributes.aLook.needsUpdate = true;
+  }
+
+  featherLook() {
+    const { upgrades } = this.game.state;
+    let tier = 0;
+    for (let n = 0; n < FEATHER_LOOKS.length; n += 1)
+      if (upgrades.includes(`feather-${n}`)) tier = n + 1;
+    if (tier === 7) return 1 + Math.floor(Math.random() * 6);
+    return Math.min(tier, FEATHER_LOOKS.length - 1);
   }
 
   fallStep(p, delta, still, petal) {
