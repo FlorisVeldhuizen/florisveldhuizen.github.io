@@ -1,5 +1,6 @@
 import {
   AdditiveBlending,
+  BoxGeometry,
   BufferGeometry,
   CapsuleGeometry,
   CylinderGeometry,
@@ -11,9 +12,11 @@ import {
   Group,
   Matrix4,
   Mesh,
+  MeshBasicMaterial,
   MeshPhysicalMaterial,
   Object3D,
   Path,
+  Plane,
   PlaneGeometry,
   RepeatWrapping,
   Shape,
@@ -27,6 +30,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils";
 import { twinkleTexture } from "./shapes";
 import { ringMaterial, showRing } from "../../rings";
 import { reducedMotion } from "../../util";
+import { playNotes } from "../../audio";
 import { PRINT_KIND } from "../../peach";
 
 const THICK = 0.05;
@@ -796,6 +800,20 @@ function additive(map, color) {
   });
 }
 
+function endMorph(slot) {
+  if (!slot.morph) return;
+  slot.morph.forEach(([mesh, original]) => {
+    mesh.material.dispose();
+    // eslint-disable-next-line no-param-reassign
+    mesh.material = original;
+  });
+  /* eslint-disable no-param-reassign */
+  slot.morph = null;
+  slot.ghost.visible = false;
+  slot.seam.visible = false;
+  /* eslint-enable no-param-reassign */
+}
+
 export class Paddles {
   constructor(game, interaction, toucher, parent) {
     Object.assign(this, { game, i: interaction, toucher });
@@ -806,11 +824,27 @@ export class Paddles {
     this.markN = new Vector3();
     this.markUp = new Vector3();
     this.markSide = new Vector3();
+    this.edgeNormal = new Vector3();
+    this.shownLevel = paddleLevel(game.state.upgrades);
+    const seamMaterial = new MeshBasicMaterial({
+      color: 0xffd9a0,
+      blending: AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+    });
     const twinkle = twinkleTexture();
     this.slots = Array.from({ length: POOL }, () => {
       const arm = new Object3D();
       const model = paddleModel();
       arm.add(model);
+      const ghost = paddleModel();
+      ghost.visible = false;
+      const seam = new Mesh(
+        new BoxGeometry(0.76, 0.03, FACE * 2 + 0.012),
+        seamMaterial,
+      );
+      seam.visible = false;
+      model.add(ghost, seam);
       const flash = new Sprite(additive(twinkle, 0xffc8d0));
       const ripple = new Mesh(
         new PlaneGeometry(1, 1),
@@ -831,6 +865,11 @@ export class Paddles {
       return {
         arm,
         model,
+        ghost,
+        seam,
+        clipNew: new Plane(),
+        clipOld: new Plane(),
+        morph: null,
         flash,
         ripple,
         sparks,
@@ -895,8 +934,59 @@ export class Paddles {
     slot.local.copy(hit.point);
     this.i.peach.mesh.worldToLocal(slot.local);
     slot.normal.copy(hit.face.normal);
-    this.dress(slot, paddleLevel(this.game.state.upgrades));
+    const level = paddleLevel(this.game.state.upgrades);
+    const from = level > this.shownLevel ? this.shownLevel : null;
+    this.shownLevel = level;
+    this.dress(slot, level);
+    if (from !== null) this.startMorph(slot, from);
     slot.arm.visible = true;
+  }
+
+  startMorph(slot, from) {
+    const { model, ghost, seam } = slot;
+    ghost.userData.dress(from);
+    ghost.visible = true;
+    seam.visible = true;
+    const clip = (meshes, plane) =>
+      meshes.map((mesh) => {
+        const original = mesh.material;
+        // eslint-disable-next-line no-param-reassign
+        mesh.material = original.clone();
+        // eslint-disable-next-line no-param-reassign
+        mesh.material.clippingPlanes = [plane];
+        return [mesh, original];
+      });
+    // eslint-disable-next-line no-param-reassign
+    slot.morph = [
+      ...clip(
+        model.children.filter((c) => c.isMesh && c !== seam),
+        slot.clipNew,
+      ),
+      ...clip(
+        ghost.children.filter((c) => c.isMesh),
+        slot.clipOld,
+      ),
+    ];
+    if (this.game.state.options.castSound)
+      playNotes([784, 1047, 1319], { gap: 0.06, volume: 0.05 });
+  }
+
+  updateMorph(slot, t) {
+    if (!slot.morph) return;
+    const k = Math.min(1, t / COCK);
+    if (k >= 1) {
+      endMorph(slot);
+      return;
+    }
+    const edge = 1.25 - 2.05 * k * k * (3 - 2 * k);
+    slot.seam.position.y = edge; // eslint-disable-line no-param-reassign
+    slot.arm.updateMatrixWorld(true);
+    const normal = this.edgeNormal
+      .setFromMatrixColumn(slot.model.matrixWorld, 1)
+      .normalize();
+    const point = slot.model.localToWorld(this.tmp.set(0, edge, 0));
+    slot.clipNew.setFromNormalAndCoplanarPoint(normal, point);
+    slot.clipOld.setFromNormalAndCoplanarPoint(normal.negate(), point);
   }
 
   mark(hit, along, point) {
@@ -978,8 +1068,10 @@ export class Paddles {
         this.impact(slot);
       }
       place(slot, pose(t));
+      this.updateMorph(slot, t);
       effects(slot, t, delta);
       if (t >= END) {
+        endMorph(slot);
         slot.busy = false;
         [slot.arm, ...slot.fx].forEach((o) => {
           o.visible = false;

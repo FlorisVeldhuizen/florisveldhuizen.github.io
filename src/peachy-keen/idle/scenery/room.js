@@ -51,6 +51,7 @@ import {
   playKiss,
   playKnead,
   discoBeat,
+  playNotes,
 } from "../../audio";
 import { reducedMotion, ease } from "../../util";
 import { PRINT_KIND } from "../../peach";
@@ -58,6 +59,8 @@ import { PRINT_KIND } from "../../peach";
 const level = (owned, full = 100) =>
   owned > 0 ? Math.min(1, Math.log10(1 + owned) / Math.log10(1 + full)) : 0;
 const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+
+const SWEEP = 0.7;
 
 const TRAIL = 26;
 const STREAKS = 6;
@@ -235,9 +238,11 @@ export class Room {
       featherMaterial(),
       36,
     );
-    this.feathers.geometry.setAttribute(
-      "aLook",
-      new InstancedBufferAttribute(new Float32Array(36), 1),
+    ["aLook", "aFrom", "aFade"].forEach((name) =>
+      this.feathers.geometry.setAttribute(
+        name,
+        new InstancedBufferAttribute(new Float32Array(36), 1),
+      ),
     );
     this.featherData = Array.from({ length: 36 }, () => this.spawnDrift({}));
     this.petals = new InstancedMesh(
@@ -509,6 +514,7 @@ export class Room {
       drag: rand(0.6, 1.4),
       seed: Math.random() * 10,
       look: undefined,
+      sweepAt: undefined,
     });
     /* eslint-enable no-param-reassign */
     return d;
@@ -536,9 +542,19 @@ export class Room {
       if (petal) d.scale.setScalar(size);
       else {
         if (p.look === undefined) p.look = this.featherLook(); // eslint-disable-line no-param-reassign
-        const [length, width] = FEATHER_LOOKS[p.look].size;
+        const fade =
+          p.sweepAt === undefined
+            ? 0
+            : Math.min(1, Math.max(0, 1 - (this.time - p.sweepAt) / SWEEP));
+        const from = FEATHER_LOOKS[p.from ?? p.look].size;
+        const to = FEATHER_LOOKS[p.look].size;
+        const length = to[0] + (from[0] - to[0]) * fade;
+        const width = to[1] + (from[1] - to[1]) * fade;
         d.scale.set(size * length, size * width, size);
-        mesh.geometry.attributes.aLook.setX(n, p.look);
+        const { aLook, aFrom, aFade } = mesh.geometry.attributes;
+        aLook.setX(n, p.look);
+        aFrom.setX(n, p.from ?? p.look);
+        aFade.setX(n, fade);
       }
       d.updateMatrix();
       mesh.setMatrixAt(n, d.matrix);
@@ -547,17 +563,42 @@ export class Room {
     mesh.count = count;
     // eslint-disable-next-line no-param-reassign
     mesh.instanceMatrix.needsUpdate = true;
-    // eslint-disable-next-line no-param-reassign
-    if (!petal) mesh.geometry.attributes.aLook.needsUpdate = true;
+    if (!petal)
+      ["aLook", "aFrom", "aFade"].forEach((name) => {
+        // eslint-disable-next-line no-param-reassign
+        mesh.geometry.attributes[name].needsUpdate = true;
+      });
   }
 
-  featherLook() {
+  featherTier() {
     const { upgrades } = this.game.state;
     let tier = 0;
     for (let n = 0; n < FEATHER_LOOKS.length; n += 1)
       if (upgrades.includes(`feather-${n}`)) tier = n + 1;
+    return tier;
+  }
+
+  featherLook() {
+    const tier = this.featherTier();
     if (tier === 7) return 1 + Math.floor(Math.random() * 6);
     return Math.min(tier, FEATHER_LOOKS.length - 1);
+  }
+
+  sweepFeathers() {
+    const tier = this.featherTier();
+    const changed = this.shownTier !== undefined && tier > this.shownTier;
+    this.shownTier = tier;
+    if (!changed) return;
+    this.featherData.forEach((p) => {
+      if (p.look === undefined) return;
+      /* eslint-disable no-param-reassign */
+      p.from = p.look;
+      p.look = this.featherLook();
+      p.sweepAt = this.time + ((p.at.x + 6) / 12) * 0.9 + Math.random() * 0.15;
+      /* eslint-enable no-param-reassign */
+    });
+    if (this.game.state.options.castSound)
+      playNotes([784, 1047, 1319], { gap: 0.06, volume: 0.05 });
   }
 
   fallStep(p, delta, still, petal) {
@@ -1090,6 +1131,7 @@ export class Room {
     const own = (id) => helpers[id] || 0;
     const center = i.group.position;
     this.measure(delta);
+    this.sweepFeathers();
     this.steady();
     if (!this.anchor) this.anchor = center.clone();
     this.anchor.lerp(center, ease(0.5, delta));

@@ -375,14 +375,40 @@ export function featherMaterial() {
     iridescenceIOR: 1.35,
     iridescenceThicknessRange: [120, 420],
   });
+  const looks = `${FEATHER_LOOKS.length}.0`;
   material.onBeforeCompile = (shader) => {
-    // eslint-disable-next-line no-param-reassign
+    /* eslint-disable no-param-reassign */
     shader.vertexShader = shader.vertexShader
-      .replace("void main() {", "attribute float aLook;\nvoid main() {")
+      .replace(
+        "void main() {",
+        "attribute float aLook;\nattribute float aFrom;\nattribute float aFade;\nvarying vec2 vFromUv;\nvarying float vFade;\nvoid main() {",
+      )
       .replace(
         "#include <uv_vertex>",
-        `#include <uv_vertex>\n  vMapUv.x = (vMapUv.x + aLook) / ${FEATHER_LOOKS.length}.0;\n  vIridescenceMapUv.x = (vIridescenceMapUv.x + aLook) / ${FEATHER_LOOKS.length}.0;`,
+        `#include <uv_vertex>
+  vFromUv = vec2((vMapUv.x + aFrom) / ${looks}, vMapUv.y);
+  vFade = aFade;
+  vMapUv.x = (vMapUv.x + aLook) / ${looks};
+  vIridescenceMapUv.x = (vIridescenceMapUv.x + aLook) / ${looks};`,
       );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "void main() {",
+        "varying vec2 vFromUv;\nvarying float vFade;\nvoid main() {\n  float sweepGlow = 0.0;",
+      )
+      .replace(
+        "#include <map_fragment>",
+        `float edge = 1.0 - (1.0 - vFade) * 1.15;
+  float reveal = smoothstep(edge - 0.015, edge + 0.015, vMapUv.y);
+  vec4 sampledDiffuseColor = mix(texture2D(map, vFromUv), texture2D(map, vMapUv), reveal);
+  diffuseColor *= sampledDiffuseColor;
+  sweepGlow = (1.0 - smoothstep(0.0, 0.05, abs(vMapUv.y - edge))) * step(0.001, vFade);`,
+      )
+      .replace(
+        "#include <emissivemap_fragment>",
+        "#include <emissivemap_fragment>\n  totalEmissiveRadiance += vec3(1.0, 0.78, 0.5) * sweepGlow * 2.5;",
+      );
+    /* eslint-enable no-param-reassign */
   };
   return material;
 }
