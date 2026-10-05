@@ -41,6 +41,7 @@ export function raycastNearest(raycaster, intersects) {
 
   const p = geometry.attributes.position.array;
   const index = geometry.index.array;
+  const plant = geometry.attributes.plant?.array;
   const { x: ox, y: oy, z: oz } = localRay.origin;
   const { x: dx, y: dy, z: dz } = localRay.direction;
   const boxes = boxesFor(geometry);
@@ -66,6 +67,7 @@ export function raycastNearest(raycaster, intersects) {
     if (exit < 0 || enter > exit || enter > nearest) continue;
     const end = Math.min(index.length, (n + 1) * CHUNK * 3);
     for (let t = n * CHUNK * 3; t < end; t += 3) {
+      if (plant && plant[index[t]] > 0.5) continue;
       const i = index[t] * 3;
       const j = index[t + 1] * 3;
       const k = index[t + 2] * 3;

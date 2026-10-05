@@ -31,6 +31,7 @@ import {
   ReplaceStencilOp,
   RepeatWrapping,
   Vector2,
+  Quaternion,
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { PEACH_CONFIG, FABRIC } from "./config";
@@ -49,6 +50,18 @@ const BRIDGE_BINS = 25;
 const BRIDGE_SPAN = "0.25";
 
 const SKIN_FADE_SECONDS = 2.4;
+const LEAF = {
+  HZ: 1.8,
+  DAMPING: 0.16,
+  PUSH: 1.4,
+  LAG: 0.2,
+  DRAG: 3.5,
+  FLING: 0.15,
+  MAX_TORQUE: 400,
+  MAX_BEND: 0.6,
+  BREEZE: 0.03,
+  FLUTTER_AT: 6,
+};
 const SKIN_UNIFORMS = ["uSkinLook", "uSkinGlint", "uSkinPattern", "uSkinDeep"];
 const SKIN_PROPS = [
   "metalness",
@@ -220,6 +233,16 @@ const VERTEX_HEADER = `
   uniform vec4 uGrabPull;
   uniform vec4 uGrabDent;
   attribute float stiffness;
+  attribute float plant;
+  uniform vec3 uStemBase;
+  uniform vec3 uLeafBend;
+  uniform vec4 uLeafAxis;
+  vec3 turnBy(vec3 v, vec3 th) {
+    float a = length(th);
+    if (a < 1e-5) return v;
+    vec3 k = th / a;
+    return v * cos(a) + cross(k, v) * sin(a) + k * dot(k, v) * (1.0 - cos(a));
+  }
   varying vec3 vRestPosition;
   varying vec4 vRubTilt;
   ${LINGERIE_COMMON}
@@ -295,6 +318,15 @@ const VERTEX_NORMAL = `
     vec3 da = pa + jiggle(pa, normal) * give - jiggled;
     vec3 db = pb + jiggle(pb, normal) * give - jiggled;
     objectNormal = normalize(cross(da, db));
+  }
+  if (plant > 0.5) {
+    vec3 rel = position - uStemBase;
+    float reach = length(rel) / uBounds.w;
+    float w = pow(smoothstep(0.1, 0.62, reach), 1.4);
+    vec3 th = uLeafBend * w + uLeafAxis.xyz * sin(uTime * 9.0 + reach * 14.0) * 0.05 * uLeafAxis.w * w;
+    vec3 follow = uJiggleActive > 0.5 ? jiggle(uStemBase, vec3(0.0, 1.0, 0.0)) : vec3(0.0);
+    jiggled = uStemBase + turnBy(rel, th) + follow;
+    objectNormal = turnBy(normal, th);
   }
   vRubTilt = vec4(0.0);
   if (uGrabPull.w > 0.0) {
@@ -681,7 +713,7 @@ const FRAGMENT_COLOR = `
   #endif
   float skinLum = dot(sampledDiffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuse * (0.55 + skinLum * 1.2), uSkinLook.x * (1.0 - leaf));
-  diffuseColor.rgb = mix(diffuseColor.rgb, sampledDiffuseColor.rgb, leaf * uSkinPattern.z);
+  diffuseColor.rgb = mix(diffuseColor.rgb, sampledDiffuseColor.rgb, leaf);
   float skinHoney = 0.0;
   float skinHoneyHeight = 0.0;
   if (uSkinPattern.x > 1.5) {
@@ -1036,8 +1068,42 @@ function computeStiffness(geometry, map, stemY) {
   }
 
   const stiffness = new Float32Array(pos.count);
-  for (let i = 0; i < pos.count; i += 1) stiffness[i] = current[slotOf[i]];
+  const plant = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i += 1) {
+    stiffness[i] = current[slotOf[i]];
+    plant[i] = base[slotOf[i]];
+  }
   geometry.setAttribute("stiffness", new BufferAttribute(stiffness, 1));
+  geometry.setAttribute("plant", new BufferAttribute(plant, 1));
+  const stemBase = new Vector3();
+  let count = 0;
+  for (let i = 0; i < pos.count; i += 1) {
+    if (plant[i] && pos.getY(i) < floor + 0.01 * (rim - floor)) {
+      stemBase.x += pos.getX(i);
+      stemBase.y += pos.getY(i);
+      stemBase.z += pos.getZ(i);
+      count += 1;
+    }
+  }
+  if (!count) return null;
+  stemBase.divideScalar(count);
+  const reach = 0.3 * (rim - floor);
+  const leafCenter = new Vector3();
+  let leafCount = 0;
+  for (let i = 0; i < pos.count; i += 1) {
+    if (plant[i]) {
+      const dx = pos.getX(i) - stemBase.x;
+      const dy = pos.getY(i) - stemBase.y;
+      const dz = pos.getZ(i) - stemBase.z;
+      if (Math.hypot(dx, dy, dz) > reach) {
+        leafCenter.x += dx;
+        leafCenter.y += dy;
+        leafCenter.z += dz;
+        leafCount += 1;
+      }
+    }
+  }
+  return { stemBase, leafAxis: leafCount ? leafCenter.normalize() : null };
 }
 
 export class Peach {
@@ -1120,6 +1186,9 @@ export class Peach {
     this.uniforms.uCutPlane = { value: this.uniforms.uCrease.value };
     this.uniforms.uCutSide = { value: 0 };
     this.uniforms.uStemY = { value: 1e4 };
+    this.uniforms.uStemBase = { value: new Vector3(0, 1e4, 0) };
+    this.uniforms.uLeafBend = { value: new Vector3() };
+    this.uniforms.uLeafAxis = { value: new Vector4(1, 0, 0, 0) };
     this.inverseWorld = new Matrix4();
     this.tempA = new Vector3();
     this.tempB = new Vector3();
@@ -1181,7 +1250,16 @@ export class Peach {
     mesh.geometry = subdivide(mesh.geometry);
     computeSmoothNormals(mesh.geometry);
     this.findCrease(mesh.geometry);
-    computeStiffness(mesh.geometry, map, this.uniforms.uStemY.value);
+    const stemBase = computeStiffness(
+      mesh.geometry,
+      map,
+      this.uniforms.uStemY.value,
+    );
+    if (stemBase) {
+      this.uniforms.uStemBase.value.copy(stemBase.stemBase);
+      if (stemBase.leafAxis)
+        this.uniforms.uLeafAxis.value.set(...stemBase.leafAxis.toArray(), 0);
+    }
     const fuzz = generateFuzzNormalMap();
     this.material = new MeshPhysicalMaterial({
       map,
@@ -1215,7 +1293,7 @@ export class Peach {
         .replace("#include <map_fragment>", FRAGMENT_COLOR)
         .replace(
           "#include <roughnessmap_fragment>",
-          "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.08, skinHoney);\nfloat oilF = oilField();\nfloat oilSpot = smoothstep(0.19, 0.22, oilF);\nfloat oilHeight = sqrt(clamp((oilF - 0.2) / 0.3, 0.0, 1.0));\nroughnessFactor = mix(roughnessFactor, 0.12, oilSpot);\nvec3 oilWet = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.15)) * 0.88;\noilWet *= 1.0 - (1.0 - smoothstep(0.0, 0.35, oilHeight)) * 0.14;\ndiffuseColor.rgb = mix(diffuseColor.rgb, oilWet, oilSpot * 0.65 * (1.0 - metalness));",
+          "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.6 * roughnessFactor, leaf);\nroughnessFactor = mix(roughnessFactor, 0.08, skinHoney);\nfloat oilF = oilField();\nfloat oilSpot = smoothstep(0.19, 0.22, oilF);\nfloat oilHeight = sqrt(clamp((oilF - 0.2) / 0.3, 0.0, 1.0));\nroughnessFactor = mix(roughnessFactor, 0.12, oilSpot);\nvec3 oilWet = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.15)) * 0.88;\noilWet *= 1.0 - (1.0 - smoothstep(0.0, 0.35, oilHeight)) * 0.14;\ndiffuseColor.rgb = mix(diffuseColor.rgb, oilWet, oilSpot * 0.65 * (1.0 - metalness));",
         )
         .replace(
           "#include <metalnessmap_fragment>",
@@ -1223,7 +1301,7 @@ export class Peach {
         )
         .replace(
           "#include <lights_physical_fragment>",
-          "#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat = max(material.clearcoat, oilSpot * (1.0 - uSkinPattern.w));\nmaterial.clearcoatRoughness = mix(material.clearcoatRoughness, 0.1, oilSpot);\nmaterial.clearcoat = max(material.clearcoat, skinHoney);\nmaterial.clearcoatRoughness = mix(material.clearcoatRoughness, 0.04, skinHoney);\n#endif\n#ifdef USE_IRIDESCENCE\nmaterial.iridescence = max(oilSpot * 0.7 * (1.0 - uSkinPattern.w), uSkinLook.z);\n#endif",
+          "#include <lights_physical_fragment>\n#ifdef USE_SHEEN\nmaterial.sheenColor *= 1.0 - leaf;\n#endif\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat = max(material.clearcoat, oilSpot * (1.0 - uSkinPattern.w));\nmaterial.clearcoatRoughness = mix(material.clearcoatRoughness, 0.1, oilSpot);\nmaterial.clearcoat = max(material.clearcoat, skinHoney);\nmaterial.clearcoatRoughness = mix(material.clearcoatRoughness, 0.04, skinHoney);\n#endif\n#ifdef USE_IRIDESCENCE\nmaterial.iridescence = max(oilSpot * 0.7 * (1.0 - uSkinPattern.w), uSkinLook.z);\n#endif",
         )
         .replace(
           "#include <lights_fragment_maps>",
@@ -2201,6 +2279,96 @@ export class Peach {
     fade.beats = [...beats];
   }
 
+  updateLeaf(delta) {
+    if (!this.mesh || delta <= 0) return;
+    const dt = Math.min(delta, 1 / 30);
+    if (!this.leaf) {
+      this.leaf = {
+        at: null,
+        vel: new Vector3(),
+        quat: null,
+        spin: new Vector3(),
+        bend: new Vector3(),
+        bendVel: new Vector3(),
+        a: new Vector3(),
+        b: new Vector3(),
+        q: new Quaternion(),
+        dq: new Quaternion(),
+        calm: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? 0.3
+          : 1,
+      };
+    }
+    const L = this.leaf;
+    const { uStemBase, uLeafBend, uLeafAxis, uBounds } = this.uniforms;
+    this.mesh.updateWorldMatrix(true, false);
+    const anchor = L.a
+      .copy(uStemBase.value)
+      .applyMatrix4(this.mesh.matrixWorld);
+    this.mesh.getWorldQuaternion(L.q);
+    if (!L.at) {
+      L.at = anchor.clone();
+      L.quat = L.q.clone();
+    }
+    const unit = uBounds.value.w * this.mesh.matrixWorld.getMaxScaleOnAxis();
+    const vel = L.b
+      .copy(anchor)
+      .sub(L.at)
+      .divideScalar(dt * unit);
+    L.at.copy(anchor);
+    const acc = vel.clone().sub(L.vel).divideScalar(dt);
+    L.vel.copy(vel);
+    L.dq.copy(L.q).multiply(L.quat.invert());
+    L.quat.copy(L.q);
+    const angle = 2 * Math.acos(Math.min(1, Math.abs(L.dq.w)));
+    const spin = new Vector3(L.dq.x, L.dq.y, L.dq.z);
+    if (spin.lengthSq() > 1e-12)
+      spin.normalize().multiplyScalar((Math.sign(L.dq.w || 1) * angle) / dt);
+    const spinAcc = spin.clone().sub(L.spin).divideScalar(dt);
+    L.spin.copy(spin);
+    const toLocal = L.q.clone().invert();
+    acc.applyQuaternion(toLocal);
+    spinAcc.applyQuaternion(toLocal);
+    const turn = spin.applyQuaternion(toLocal);
+    const axis = L.b.set(
+      uLeafAxis.value.x,
+      uLeafAxis.value.y,
+      uLeafAxis.value.z,
+    );
+    const torque = axis
+      .clone()
+      .cross(acc)
+      .multiplyScalar(-LEAF.PUSH)
+      .addScaledVector(spinAcc, -LEAF.LAG);
+    const sweep = turn.clone().cross(axis);
+    torque.addScaledVector(axis.clone().cross(sweep), -LEAF.DRAG);
+    torque.addScaledVector(
+      axis.clone().cross(turn.clone().cross(sweep)),
+      -LEAF.FLING,
+    );
+    torque.clampLength(0, LEAF.MAX_TORQUE);
+    const k = (2 * Math.PI * LEAF.HZ) ** 2;
+    const c = 2 * LEAF.DAMPING * Math.sqrt(k);
+    L.bendVel
+      .addScaledVector(torque, dt)
+      .addScaledVector(L.bend, -k * dt)
+      .multiplyScalar(1 - c * dt);
+    L.bend.addScaledVector(L.bendVel, dt);
+    const size = L.bend.length();
+    if (size > LEAF.MAX_BEND) L.bend.multiplyScalar(LEAF.MAX_BEND / size);
+    const t = this.uniforms.uTime.value;
+    const breeze = L.a
+      .set(
+        Math.sin(t * 1.3) * 0.6 + Math.sin(t * 2.1 + 1.7) * 0.4,
+        0,
+        Math.sin(t * 0.9 + 0.5) * 0.7 + Math.sin(t * 1.7 + 2.3) * 0.3,
+      )
+      .multiplyScalar(LEAF.BREEZE);
+    uLeafBend.value.copy(L.bend).add(breeze).multiplyScalar(L.calm);
+    uLeafAxis.value.w =
+      Math.min(1, L.bendVel.length() / LEAF.FLUTTER_AT) * L.calm;
+  }
+
   updateFade(delta) {
     const { fade } = this;
     if (!fade?.mesh.visible) return;
@@ -2226,6 +2394,7 @@ export class Peach {
         : 0;
     this.updateFabricWobble(delta);
     this.updateFabricSpring(delta);
+    this.updateLeaf(delta);
   }
 
   updateFabricWobble(delta) {
