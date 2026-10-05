@@ -100,7 +100,7 @@ export class UI {
     this.cursor.style.setProperty("--far", far);
   }
 
-  onSnapback(x, y, amount) {
+  onSnapback() {
     if (reducedMotion.matches) return;
     this.ring.animate(
       [
@@ -109,21 +109,6 @@ export class UI {
       ],
       { duration: 280, easing: "cubic-bezier(.2,.9,.3,1.4)" },
     );
-    const shock = document.createElement("span");
-    shock.className = "shock";
-    shock.style.left = `${x}px`;
-    shock.style.top = `${y}px`;
-    this.comboLayer.appendChild(shock);
-    const size = 1.5 + amount * 3;
-    shock
-      .animate(
-        [
-          { opacity: 0.9, transform: "translate(-50%, -50%) scale(0.3)" },
-          { opacity: 0, transform: `translate(-50%, -50%) scale(${size})` },
-        ],
-        { duration: 420, easing: "cubic-bezier(.1,.7,.3,1)" },
-      )
-      .finished.then(() => shock.remove());
   }
 
   onCharge() {

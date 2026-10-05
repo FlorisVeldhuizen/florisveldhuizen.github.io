@@ -8,6 +8,7 @@ import {
   ShaderMaterial,
   Vector2,
 } from "three";
+import { RING_GLSL } from "./rings";
 import { clamp, reducedMotion, viewHeight } from "./util";
 
 const RING_TIME = 0.9;
@@ -43,14 +44,14 @@ const material = new ShaderMaterial({
     uniform float uFlash;
     uniform float uTime;
     varying vec2 vUv;
+    ${RING_GLSL}
 
     void main() {
       vec2 d = (vUv - uCenter) * vec2(uAspect, 1.0);
       float r = length(d);
       vec2 dir = r > 1e-4 ? d / r : vec2(0.0);
       float w = 0.05 + uRing * 0.08;
-      float ringOffset = (r - uRing) / w;
-      float band = exp(-ringOffset * ringOffset) * uRingPower;
+      float band = ringCrest(r - uRing, w * 1.2) * uRingPower;
       vec2 uv = vUv - dir / vec2(uAspect, 1.0) * band * 0.045;
       float near = 1.0 - smoothstep(0.1, 0.75, r);
       uv += vec2(sin(vUv.y * 38.0 + uTime * 7.0), cos(vUv.x * 31.0 + uTime * 6.0)) * 0.003 * uHaze * near;

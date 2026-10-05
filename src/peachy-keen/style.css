@@ -406,15 +406,6 @@ button:focus-visible {
   );
 }
 
-.shock {
-  position: absolute;
-  width: 60px;
-  height: 60px;
-  border: 3px solid var(--blush);
-  border-radius: 50%;
-  opacity: 0;
-}
-
 .talk {
   position: fixed;
   top: 0;

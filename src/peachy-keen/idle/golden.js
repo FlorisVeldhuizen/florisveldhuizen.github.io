@@ -7,6 +7,7 @@ import {
   Mesh,
   MeshPhysicalMaterial,
   Plane,
+  PlaneGeometry,
   Raycaster,
   Sprite,
   SpriteMaterial,
@@ -14,7 +15,8 @@ import {
   Vector3,
 } from "three";
 import { el } from "./dom";
-import { ringTexture, softTexture, twinkleTexture } from "./scenery/shapes";
+import { softTexture, twinkleTexture } from "./scenery/shapes";
+import { ringMaterial, showRing } from "../rings";
 import { format } from "./numbers";
 import { playNotes } from "../audio";
 import { reducedMotion, viewHeight } from "../util";
@@ -53,7 +55,10 @@ export class GoldenPeach {
     );
     this.glow.scale.setScalar(1.3);
     this.holder.add(this.glow);
-    this.ring = new Sprite(additive(ringTexture(), { color: 0xffd27a }));
+    this.ring = new Mesh(
+      new PlaneGeometry(1, 1),
+      ringMaterial(0xffd27a, { billboard: true }),
+    );
     this.ring.visible = false;
     this.holder.add(this.ring);
     const twinkle = twinkleTexture();
@@ -281,9 +286,7 @@ export class GoldenPeach {
     const out = 1 - (1 - t / FLASH) ** 3;
     this.glow.scale.setScalar(2 + out * 4);
     this.glow.material.opacity = Math.max(0, 1 - t / 0.3) ** 2;
-    this.ring.visible = true;
-    this.ring.scale.setScalar(2 + out * 8);
-    this.ring.material.opacity = (1 - t / FLASH) ** 1.5 * 0.5;
+    showRing(this.ring, t / FLASH, 2, 10, 0.6);
   }
 
   update(delta) {

@@ -12,6 +12,7 @@ import { Naughty } from "./naughty";
 import { MoodLight } from "./mood";
 import { Wild } from "./wild";
 import { Shock } from "./shock";
+import { SkinRings } from "./rings";
 import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
 
@@ -134,6 +135,7 @@ const interaction = new Interaction({
 const naughty = new Naughty(interaction, talk);
 const wild = new Wild({ scene, camera, interaction, talk, backdrop });
 const shock = new Shock(renderer, interaction);
+const skinRings = new SkinRings(interaction);
 settings.applyAll();
 let idle = null;
 
@@ -325,6 +327,7 @@ renderer.setAnimationLoop(() => {
   juice.splatHalf.set(halfHeight * camera.aspect, halfHeight);
   droplets.update(delta);
   lens.update(delta);
+  skinRings.update(delta);
   shock.update(realDelta);
   backdrop.render();
   lens.render([juice, droplets]);

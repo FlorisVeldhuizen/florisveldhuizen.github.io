@@ -1011,7 +1011,6 @@ export class Interaction {
     const world = this.tempA
       .copy(r.local)
       .applyMatrix4(this.peach.mesh.matrixWorld);
-    const at = this.toScreen(world);
     this.peach.addJiggle(
       world,
       this.tempB.copy(pull).normalize().negate(),
@@ -1059,7 +1058,12 @@ export class Interaction {
       );
     this.talk.say("release", 0.6);
     this.addHeat(5 * length);
-    this.ui.onSnapback(at.x, at.y, length / CFG.GRAB_REACH);
+    this.ui.onSnapback();
+    this.emit("snapback", {
+      local: r.local,
+      normal: r.normal,
+      amount: Math.min(1, length / CFG.GRAB_REACH),
+    });
     if (this.heat >= 100) this.charge();
   }
 
