@@ -267,6 +267,7 @@ export class Interaction {
 
     window.addEventListener("pointermove", (e) => {
       p.present = !isUi(e);
+      p.touch = e.pointerType !== "mouse";
       record(e);
     });
     window.addEventListener("pointerdown", (e) => {
@@ -1849,6 +1850,9 @@ export class Interaction {
     }
     const hit = this.raycastAt(p.x, p.y);
     p.inside = !!hit;
+    const fullSwipe = p.touch
+      ? CFG.FULL_SWIPE_SPEED / CFG.TOUCH_SWIPE_BOOST
+      : CFG.FULL_SWIPE_SPEED;
     const swiping =
       p.armed &&
       !(p.pressed && p.grabbed) &&
@@ -1860,7 +1864,7 @@ export class Interaction {
           crossed,
           motion.vx,
           motion.vy,
-          clamp(motion.speed / CFG.FULL_SWIPE_SPEED, 0.3, 2),
+          clamp(motion.speed / fullSwipe, 0.3, 2),
         );
       p.armed = !p.rubbing;
     } else if (swiping) {
@@ -1869,7 +1873,7 @@ export class Interaction {
         hit,
         motion.vx,
         motion.vy,
-        clamp(motion.speed / CFG.FULL_SWIPE_SPEED, 0.3, 2),
+        clamp(motion.speed / fullSwipe, 0.3, 2),
       );
     } else if (p.pressed) {
       if (this.canStrip() && this.isStripPull()) {

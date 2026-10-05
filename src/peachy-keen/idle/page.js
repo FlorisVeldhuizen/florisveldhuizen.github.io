@@ -1,13 +1,15 @@
 import "./idle.css";
+import { installSyrup } from "./syrup";
 
 export function preparePage() {
   const score = document.querySelector(".score");
-  document.getElementById("count-unit").textContent = "juice";
+  installSyrup();
+  document.getElementById("count-unit").replaceChildren();
   document.getElementById("bursts").remove();
   score.querySelector(".score-count").insertAdjacentHTML(
     "afterend",
     `<p id="rate" class="score-rate">0 per second</p>
-    <p id="pits" class="score-pits" hidden></p>
+    <p id="pits" class="score-pits" role="img" hidden></p>
     <p id="dare" class="score-dare" hidden></p>`,
   );
   score.insertAdjacentHTML("beforeend", '<div id="buffs" class="buffs"></div>');

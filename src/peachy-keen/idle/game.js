@@ -162,6 +162,7 @@ export class IdleGame {
     if (edged) s.seen.edged = true;
     this.gain(value, "burst");
     this.pendingBurst = { value, pits, lucky };
+    this.emit("split", this.pendingBurst);
   }
 
   popAtPeach(value, kind) {

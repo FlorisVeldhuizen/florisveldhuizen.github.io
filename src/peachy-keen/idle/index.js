@@ -20,6 +20,8 @@ import { playDing, playBuy, playNotes } from "../audio";
 import { PHYSICS_CONFIG } from "../config";
 import { clamp, reducedMotion } from "../util";
 
+const BEADS = { smack: 4, crit: 5.2, other: 4.6 };
+
 const SHEET_SQUASH = 0.012;
 
 export function createIdle({
@@ -83,7 +85,7 @@ export function createIdle({
     room.setActive(wanted === "room");
   };
   const toys = new Toys(game, settings);
-  showHarvests(game);
+  showHarvests(game, hud);
   let started = false;
   let skin = null;
 
@@ -113,7 +115,13 @@ export function createIdle({
   };
 
   game.on("pop", ({ x, y, value, kind }) => {
-    if (value > 0) popups.juice(x, y, value, kind);
+    if (!(value > 0)) return;
+    popups.juice(x, y, value, kind);
+    hud.drip(value, BEADS[kind] ?? BEADS.other);
+  });
+  game.on("split", ({ value, pits }) => {
+    hud.hold("juice", value);
+    hud.hold("pits", pits);
   });
   game.on("burst", ({ value, pits, lucky }) => {
     const at = interaction.toScreen(
@@ -121,7 +129,8 @@ export function createIdle({
     );
     const pitText = `+${pits} ${pits === 1 ? "pit" : "pits"}${lucky ? ", lucky!" : ""}`;
     popups.big(at.x, at.y - 30, `+${format(value)}`, pitText);
-    hud.bump();
+    hud.burst(value);
+    if (pits > 0) hud.flyPits({ x: at.x, y: at.y - 30 }, pits);
   });
   let trophies = [];
   game.on("trophy", (t) => {
@@ -177,7 +186,12 @@ export function createIdle({
       "seed",
     );
   });
-  game.on("golden", () => talk.say("golden", 0.8));
+  game.on("golden", ({ effect, pits }) => {
+    talk.say("golden", 0.8);
+    if (effect !== "pits") return;
+    hud.hold("pits", pits);
+    hud.flyPits(golden.claimedAt, pits);
+  });
   game.on("toy", (toy) =>
     popups.toast(
       "New toy",

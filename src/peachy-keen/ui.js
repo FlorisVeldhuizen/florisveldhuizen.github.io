@@ -39,10 +39,11 @@ export class UI {
     this.meters.classList.add("is-visible");
     if (total >= 4) this.hintSwipe.classList.add("is-learned");
     if (!reducedMotion.matches) {
-      this.count.animate(
-        [{ transform: "scale(1.12)" }, { transform: "scale(1)" }],
-        { duration: 260, easing: "cubic-bezier(.2,.9,.3,1.4)" },
-      );
+      if (this.scoreboard)
+        this.count.animate(
+          [{ transform: "scale(1.12)" }, { transform: "scale(1)" }],
+          { duration: 260, easing: "cubic-bezier(.2,.9,.3,1.4)" },
+        );
       this.ring.animate(
         [
           { transform: "scale(0.5)", borderWidth: "12px" },

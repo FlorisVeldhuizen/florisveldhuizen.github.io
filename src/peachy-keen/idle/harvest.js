@@ -8,14 +8,42 @@ const FRUIT = 5;
 const STAGGER = 70;
 const NOTES = [659, 784, 880, 988, 1175];
 
-function targetFor(reward) {
-  if (reward.kind === "pits") return document.getElementById("pits");
-  if (reward.kind === "nectar") return document.getElementById("tab-ripen");
-  return document.getElementById("count");
+function shown(node) {
+  return node?.getClientRects().length ? node : null;
+}
+
+function centerOf(node) {
+  const box = node.getBoundingClientRect();
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+}
+
+function targetFor(reward, i) {
+  const { kind } = reward;
+  if (kind === "heat" || kind === "golden")
+    return { at: i.toScreen(i.group.position), node: null };
+  const node =
+    (kind === "pits" && shown(document.querySelector("#pits .pit-icon"))) ||
+    (kind === "nectar" && shown(document.getElementById("tab-ripen"))) ||
+    (kind === "frenzy" && shown(document.querySelector(".buff-frenzy"))) ||
+    shown(document.getElementById("count-unit"));
+  return node && { at: centerOf(node), node };
+}
+
+function heldAmount(reward) {
+  if (reward.kind === "juice") return ["juice", reward.value];
+  if (reward.kind === "pits") return ["pits", reward.amount];
+  return null;
+}
+
+function share(kind, amount, n) {
+  if (kind === "juice") return amount / FRUIT;
+  return Math.floor(amount / FRUIT) + (n < amount % FRUIT ? 1 : 0);
 }
 
 class HarvestFx {
-  constructor() {
+  constructor(interaction, hud) {
+    this.i = interaction;
+    this.hud = hud;
     this.layer = el("div", "harvest-layer", document.body);
     this.layer.setAttribute("aria-hidden", "true");
   }
@@ -37,19 +65,26 @@ class HarvestFx {
     this.label(cx, box.top + box.height * 0.3, reward);
     if (reducedMotion.matches) return;
     this.burst(cx, cy, seed.color);
-    const target = targetFor(reward);
-    const end = target?.getBoundingClientRect();
+    const target = targetFor(reward, this.i);
+    const end = target?.at;
+    const held = heldAmount(reward);
+    if (held) this.hud.hold(...held);
     renders.fruitIcon(seed, (url) => {
       for (let n = 0; n < FRUIT; n += 1)
         setTimeout(
           () =>
             this.fly(url, cx, cy, box.width, end, () => {
               playNotes([NOTES[n]], { length: 0.18, volume: 0.045 });
-              if (target && n === FRUIT - 1)
-                animate(target, [{ scale: 1 }, { scale: 1.12 }, { scale: 1 }], {
-                  duration: 260,
-                  easing: "ease-out",
-                });
+              if (held) this.hud.release(held[0], share(...held, n));
+              else if (target?.node && n === FRUIT - 1)
+                animate(
+                  target.node,
+                  [{ scale: 1 }, { scale: 1.12 }, { scale: 1 }],
+                  {
+                    duration: 260,
+                    easing: "ease-out",
+                  },
+                );
             }),
           n * STAGGER,
         );
@@ -59,8 +94,8 @@ class HarvestFx {
   fly(url, cx, cy, spread, end, land) {
     const x0 = cx + (Math.random() - 0.5) * spread * 0.5;
     const y0 = cy + (Math.random() - 0.5) * spread * 0.25;
-    const tx = end ? end.left + end.width / 2 : x0;
-    const ty = end ? end.top + end.height / 2 : y0 - 160;
+    const tx = end ? end.x : x0;
+    const ty = end ? end.y : y0 - 160;
     const lift = 60 + Math.random() * 40;
     const outer = el("div", "harvest-fruit", this.layer);
     const inner = el("img", "", outer);
@@ -146,7 +181,7 @@ class HarvestFx {
   }
 }
 
-export function showHarvests(game) {
-  const fx = new HarvestFx();
+export function showHarvests(game, hud) {
+  const fx = new HarvestFx(game.i, hud);
   game.on("harvest", (e) => fx.play(e));
 }

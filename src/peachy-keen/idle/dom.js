@@ -20,7 +20,7 @@ export function toggle(node, name, on) {
 
 export function setDetail(node, title, lines = []) {
   toggle(node, "is-hidden", false);
-  const key = [title, ...lines].join("\n");
+  const key = [title, ...lines.map((l) => l.textContent ?? l)].join("\n");
   if (node.dataset.key === key) return;
   // eslint-disable-next-line no-param-reassign
   node.dataset.key = key;
