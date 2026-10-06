@@ -234,6 +234,8 @@ const VERTEX_HEADER = `
   uniform vec4 uGrabDent;
   attribute float stiffness;
   attribute float plant;
+  attribute float stretch;
+  varying float vStretch;
   uniform vec3 uStemBase;
   uniform vec3 uLeafBend;
   uniform vec4 uLeafAxis;
@@ -304,6 +306,7 @@ const VERTEX_NORMAL = `
   vec3 objectNormal = vec3(normal);
   vec3 jiggled = position;
   vRestPosition = position;
+  vStretch = stretch;
   vFabricPush = 0.0;
   if (uJiggleActive > 0.5) {
     float give = 1.0 - stiffness;
@@ -389,6 +392,9 @@ const FRAGMENT_HEADER = `
   uniform float uCutSide;
   uniform float uStemY;
   uniform float uEnvSpecular;
+  uniform vec3 uStemBase;
+  uniform mat3 normalMatrix;
+  varying float vStretch;
   varying vec4 vRubTilt;
 
   vec3 ringSparkle(vec3 viewPosition, vec3 n, float rough) {
@@ -708,6 +714,23 @@ const CUT_TEST = `
   #endif
 `;
 
+// Where the UVs stretch (stem hole, filled side crease) the fuzz comes from the rest position instead.
+const HOLE_FUZZ = `
+  float holeFuzz = max(1.0 - smoothstep(0.1, 0.14, length(vRestPosition - uStemBase) / uBounds.w), vStretch);
+  if (holeFuzz > 0.0) {
+    vec3 objectNormal = normalize(oilBase * normalMatrix);
+    vec3 facing = pow(abs(objectNormal), vec3(4.0));
+    facing /= facing.x + facing.y + facing.z;
+    vec3 q = vRestPosition / uBounds.w * 0.42;
+    vec2 tx = texture2D(normalMap, q.zy).xy * 2.0 - 1.0;
+    vec2 ty = texture2D(normalMap, q.xz).xy * 2.0 - 1.0;
+    vec2 tz = texture2D(normalMap, q.xy).xy * 2.0 - 1.0;
+    vec3 tilt = vec3(0.0, tx.y, tx.x) * facing.x + vec3(ty.x, 0.0, ty.y) * facing.y + vec3(tz, 0.0) * facing.z;
+    vec3 holeNormal = normalize(oilBase + normalMatrix * tilt * normalScale.x);
+    normal = normalize(mix(normal, holeNormal, holeFuzz));
+  }
+`;
+
 const FRAGMENT_COLOR = `
   ${CUT_TEST}
   #ifdef SKIN_FADE
@@ -992,6 +1015,84 @@ function sampleTexture(map) {
   };
 }
 
+function computeStretch(geometry) {
+  const pos = geometry.attributes.position;
+  const { uv } = geometry.attributes;
+  const plant = geometry.attributes.plant?.array;
+  const stretch = new Float32Array(pos.count);
+  if (uv) {
+    const index = geometry.index.array;
+    const slots = new Map();
+    const slotOf = new Uint32Array(pos.count);
+    for (let i = 0; i < pos.count; i += 1) {
+      const key = `${pos.getX(i).toFixed(5)},${pos.getY(i).toFixed(5)},${pos.getZ(i).toFixed(5)}`;
+      if (!slots.has(key)) slots.set(key, slots.size);
+      slotOf[i] = slots.get(key);
+    }
+    const worst = new Float32Array(slots.size);
+    const a = new Vector3();
+    const e1 = new Vector3();
+    const e2 = new Vector3();
+    const tu = new Vector3();
+    const tv = new Vector3();
+    for (let t = 0; t < index.length; t += 3) {
+      const [i, j, k] = [index[t], index[t + 1], index[t + 2]];
+      a.fromBufferAttribute(pos, i);
+      e1.fromBufferAttribute(pos, j).sub(a);
+      e2.fromBufferAttribute(pos, k).sub(a);
+      const du1 = uv.getX(j) - uv.getX(i);
+      const dv1 = uv.getY(j) - uv.getY(i);
+      const du2 = uv.getX(k) - uv.getX(i);
+      const dv2 = uv.getY(k) - uv.getY(i);
+      const det = du1 * dv2 - du2 * dv1;
+      if (Math.abs(det) > 1e-12) {
+        tu.copy(e1)
+          .multiplyScalar(dv2)
+          .addScaledVector(e2, -dv1)
+          .divideScalar(det);
+        tv.copy(e2)
+          .multiplyScalar(du1)
+          .addScaledVector(e1, -du2)
+          .divideScalar(det);
+        const p = tu.lengthSq();
+        const q = tu.dot(tv);
+        const r = tv.lengthSq();
+        const spread = Math.sqrt(((p - r) / 2) ** 2 + q * q);
+        const ratio = Math.sqrt(
+          ((p + r) / 2 + spread) / Math.max(1e-12, (p + r) / 2 - spread),
+        );
+        [i, j, k].forEach((v) => {
+          worst[slotOf[v]] = Math.max(worst[slotOf[v]], ratio);
+        });
+      }
+    }
+    let mask = worst.map((w) => Math.min(1, Math.max(0, (w - 1.08) / 0.2)));
+    for (let pass = 0; pass < 6; pass += 1) {
+      const sums = new Float32Array(slots.size);
+      const counts = new Uint16Array(slots.size);
+      const peaks = Float32Array.from(mask);
+      for (let f = 0; f < index.length; f += 3) {
+        for (let k = 0; k < 3; k += 1) {
+          const p = slotOf[index[f + k]];
+          const q = slotOf[index[f + ((k + 1) % 3)]];
+          sums[p] += mask[q];
+          sums[q] += mask[p];
+          counts[p] += 1;
+          counts[q] += 1;
+          peaks[p] = Math.max(peaks[p], mask[q]);
+          peaks[q] = Math.max(peaks[q], mask[p]);
+        }
+      }
+      mask =
+        pass < 3 ? peaks : sums.map((s, n) => (counts[n] ? s / counts[n] : 0));
+    }
+    for (let i = 0; i < pos.count; i += 1) {
+      stretch[i] = plant?.[i] > 0.5 ? 0 : mask[slotOf[i]];
+    }
+  }
+  geometry.setAttribute("stretch", new BufferAttribute(stretch, 1));
+}
+
 function computeStiffness(geometry, map, stemY) {
   const pos = geometry.attributes.position;
   const { uv } = geometry.attributes;
@@ -1273,6 +1374,7 @@ export class Peach {
       if (stemBase.leafAxis)
         this.uniforms.uLeafAxis.value.set(...stemBase.leafAxis.toArray(), 0);
     }
+    computeStretch(mesh.geometry);
     const fuzz = generateFuzzNormalMap();
     this.material = new MeshPhysicalMaterial({
       map,
@@ -1322,7 +1424,7 @@ export class Peach {
         )
         .replace(
           "#include <normal_fragment_maps>",
-          "vec3 oilBase = normal;\n#include <normal_fragment_maps>\nif (uSkinPattern.x > 0.5 && uSkinPattern.x < 1.5) {\n  float facing = clamp(dot(oilBase, normalize(vViewPosition)), 0.0, 1.0);\n  diffuseColor.rgb = mix(diffuseColor.rgb, uSkinDeep, smoothstep(0.05, 1.0, facing) * uSkinPattern.y * (1.0 - leaf));\n}\nif (uSkinPattern.x > 1.5) {\n  vec3 honeyNormal = oilBump(-vViewPosition, oilBase, skinHoneyHeight * uOilDepth * 0.6, faceDirection);\n  normal = normalize(mix(normal, honeyNormal, skinHoney));\n}\nif (oilSpot > 0.0) {\n  vec3 oilNormal = oilBump(-vViewPosition, oilBase, oilHeight * uOilDepth, faceDirection);\n  normal = normalize(mix(normal, oilNormal, oilSpot));\n}",
+          `vec3 oilBase = normal;\n#include <normal_fragment_maps>\n${HOLE_FUZZ}\nif (uSkinPattern.x > 0.5 && uSkinPattern.x < 1.5) {\n  float facing = clamp(dot(oilBase, normalize(vViewPosition)), 0.0, 1.0);\n  diffuseColor.rgb = mix(diffuseColor.rgb, uSkinDeep, smoothstep(0.05, 1.0, facing) * uSkinPattern.y * (1.0 - leaf));\n}\nif (uSkinPattern.x > 1.5) {\n  vec3 honeyNormal = oilBump(-vViewPosition, oilBase, skinHoneyHeight * uOilDepth * 0.6, faceDirection);\n  normal = normalize(mix(normal, honeyNormal, skinHoney));\n}\nif (oilSpot > 0.0) {\n  vec3 oilNormal = oilBump(-vViewPosition, oilBase, oilHeight * uOilDepth, faceDirection);\n  normal = normalize(mix(normal, oilNormal, oilSpot));\n}`,
         )
         .replace(
           "#include <opaque_fragment>",
