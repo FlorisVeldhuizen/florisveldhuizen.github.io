@@ -193,9 +193,11 @@ export class OrchardView {
       ? ` Cross-breeds from ${SEED_BY_ID[seed.parents[0]].name} and ${SEED_BY_ID[seed.parents[1]].name}.`
       : "";
     const rot = seed.fromRot ? " Sprouts on rotten plots." : "";
+    const short = seed.pits - this.game.state.pits;
+    const need = short > 0 ? ` You need ${morePits(short)}.` : "";
     setDetail(this.info, seed.name, [
       seed.about,
-      `Costs ${pitCount(seed.pits)} to plant. While growing: ${seed.passive.text}. Harvest: ${seed.harvest.text}. Ripens in ${formatTime(seed.grow / this.game.model.growth)}.${recipe}${rot}`,
+      `Costs ${pitCount(seed.pits)} to plant. While growing: ${seed.passive.text}. Harvest: ${seed.harvest.text}. Ripens in ${formatTime(seed.grow / this.game.model.growth)}.${recipe}${rot}${need}`,
     ]);
   }
 
@@ -318,11 +320,7 @@ export class OrchardView {
         const short = seed.pits - state.pits;
         toggle(b, "is-short", short > 0);
         const cost = b.querySelector("small");
-        cost.innerHTML = pitTag(
-          short > 0
-            ? `Need ${format(short, { whole: true })} more`
-            : `Costs ${format(seed.pits, { whole: true })}`,
-        );
+        cost.innerHTML = pitTag(`Costs ${format(seed.pits, { whole: true })}`);
         b.setAttribute(
           "aria-label",
           short > 0
