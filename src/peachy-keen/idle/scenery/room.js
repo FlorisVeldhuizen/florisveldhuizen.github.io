@@ -57,6 +57,7 @@ import {
 } from "../../audio";
 import { reducedMotion, ease } from "../../util";
 import { PRINT_KIND } from "../../peach";
+import { ringMaterial, showRing } from "../../rings";
 
 const level = (owned, full = 100) =>
   owned > 0 ? Math.min(1, Math.log10(1 + owned) / Math.log10(1 + full)) : 0;
@@ -67,6 +68,16 @@ const SWEEP = 0.7;
 const TRAIL = 26;
 const STREAKS = 6;
 const HEARTS = 20;
+const LINE_GAP = 0.28;
+const LINE_UP = new Vector3(0, 1, 0);
+const LINE_TILT = new Vector3(1, 0, 0);
+const LINE_ROLL = new Vector3(0, 0, 1);
+const JOIN_LAG = 0.9;
+const PRESS_TIME = 0.16;
+const POP_TIME = 0.22;
+const KISS_RINGS = 3;
+const Z_AXIS = new Vector3(0, 0, 1);
+const KISS_SPARKS = 12;
 const NEAREST_DRIFT = 0.8;
 const FACING = new Vector3(0, 0, 1);
 const LIE_FLAT = new Quaternion().setFromAxisAngle(
@@ -77,9 +88,7 @@ const FACE_CAMERA = 0.6;
 const SLIDE_PULL = 1.2;
 const GRIP = 0.6;
 const STEADY = 0.85;
-const RING_TILT = 0.32;
 const MOON_CROSSING = 300;
-const RING_ROLL = 0.18;
 const HEART_FAR = new Color(0.62, 0.5, 0.9);
 const HEART_NEAR = new Color(1.12, 1.02, 1);
 const WHITE = new Color(1, 1, 1);
@@ -225,6 +234,8 @@ export class Room {
     this.middle = new Vector3();
     this.drifter.rotation.order = "YZX";
     this.bounds = new Vector3(1.7, 1.5, 1.5);
+    this.home = interaction.group.position.clone();
+    this.homeBlend = 1;
     this.measureTimer = 0;
     this.tmp = new Vector3();
     this.probe = new Vector3();
@@ -334,19 +345,48 @@ export class Room {
       n.sprite.material.map = glyphs[k % 2];
     });
     this.hearts = sprites(HEARTS, heartTexture(), 0xffffff);
+    this.kissSparks = sprites(KISS_SPARKS, softTexture(), 0xffc8dc, true);
+    this.kissSparks.forEach((s) => {
+      Object.assign(s, { age: 1, v: new Vector3() });
+    });
+    this.kissRings = Array.from({ length: KISS_RINGS }, () => {
+      const ring = new Mesh(
+        new PlaneGeometry(1, 1),
+        ringMaterial(0xffb8c8, { onTop: true }),
+      );
+      const flash = new Sprite(
+        new SpriteMaterial({
+          map: softTexture(),
+          color: 0xffd6e2,
+          blending: AdditiveBlending,
+          transparent: true,
+          depthWrite: false,
+          opacity: 0,
+        }),
+      );
+      [ring, flash].forEach((o) => {
+        /* eslint-disable no-param-reassign */
+        o.renderOrder = 3;
+        o.visible = false;
+        /* eslint-enable no-param-reassign */
+        this.group.add(o);
+      });
+      return { ring, flash, age: 1 };
+    });
     this.diveTimer = 2;
     this.heartGate = 0;
-    const tilt = new Object3D();
-    tilt.rotation.set(RING_TILT, 0, RING_ROLL);
-    tilt.updateMatrix();
-    this.ringU = new Vector3();
-    this.ringN = new Vector3();
-    this.ringW = new Vector3();
-    tilt.matrix.extractBasis(this.ringU, this.ringN, this.ringW);
-    this.ringDir = new Vector3();
-    this.align = new Vector3();
-    this.steer = new Vector3();
-    [...this.notes, ...this.hearts].forEach((p) => {
+    this.heartOrder = 0;
+    this.lineClock = 0;
+    this.lineTrail = [];
+    this.lead = { a: Math.PI * 0.3, at: new Vector3() };
+    this.lineSpot = new Vector3();
+    this.lineVel = new Vector3();
+    this.lineBack = new Vector3();
+    this.lineBase = new Vector3();
+    this.lineAnchor = null;
+    this.anchorV = new Vector3();
+    this.lineRadius = 0;
+    [...this.notes, ...this.hearts, ...this.kissSparks].forEach((p) => {
       // eslint-disable-next-line no-param-reassign
       p.sprite.material.toneMapped = false;
     });
@@ -429,7 +469,7 @@ export class Room {
       this.droplets,
       this.candles,
       this.flames,
-      ...[this.fog, this.notes, this.hearts].flatMap((list) =>
+      ...[this.fog, this.notes, this.hearts, this.kissSparks].flatMap((list) =>
         list.map((p) => p.sprite),
       ),
       this.sparks,
@@ -470,6 +510,12 @@ export class Room {
 
   land(p, delta, still) {
     /* eslint-disable no-param-reassign */
+    if (!this.peachHere()) {
+      p.land = null;
+      p.shell = undefined;
+      p.bumped = this.time;
+      return;
+    }
     const l = p.land;
     const center = this.i.group.position;
     const at = this.tmp
@@ -725,7 +771,7 @@ export class Room {
       this.touchPeach(p);
       return;
     }
-    const center = this.i.group.position;
+    const center = this.home;
     const dx = p.at.x - center.x;
     const dy = p.at.y - center.y;
     const ex = dx / (this.bounds.x + 0.25);
@@ -762,6 +808,10 @@ export class Room {
 
   touchPeach(p) {
     /* eslint-disable no-param-reassign */
+    if (!this.peachHere()) {
+      p.shell = undefined;
+      return;
+    }
     const center = this.i.group.position;
     const off = this.from.copy(p.at).sub(center);
     const s = this.ellipse(off);
@@ -866,7 +916,7 @@ export class Room {
 
   aroundPeach(at, air) {
     /* eslint-disable no-param-reassign */
-    const center = this.i.group.position;
+    const center = this.home;
     const rx = this.bounds.x + 0.25;
     const ry = this.bounds.y + 0.25;
     const ex = (at.x - center.x) / rx;
@@ -911,9 +961,28 @@ export class Room {
     if (this.game.state.options.castSound) playThump(0.35 + 0.65 * lvl);
   }
 
+  peachHere() {
+    const { phase } = this.i;
+    return phase === "live" || phase === "charging";
+  }
+
+  // Holds still while the peach is gone or flying back in, so helpers do not chase it.
+  followPeach(delta) {
+    const at = this.i.group.position;
+    if (!this.peachHere()) {
+      this.homeBlend = 0;
+      return this.home;
+    }
+    this.homeBlend = Math.min(1, this.homeBlend + delta / 0.6);
+    if (this.homeBlend < 1) this.home.lerp(at, Math.min(1, delta * 6));
+    else this.home.copy(at);
+    return this.home;
+  }
+
   measure(delta) {
     this.measureTimer -= delta;
-    if (this.measureTimer > 0 || !this.i.peach.mesh) return;
+    if (this.measureTimer > 0 || !this.i.peach.mesh || !this.peachHere())
+      return;
     this.measureTimer = 0.25;
     const { mesh } = this.i.peach;
     const pos = mesh.geometry.attributes.position;
@@ -1035,37 +1104,128 @@ export class Room {
       });
   }
 
-  spawnHeart(h, center, radius) {
+  stepLead(delta, radius) {
+    const L = this.lead;
+    L.a += delta * 0.7 * (1 + 0.4 * Math.sin(L.a));
+    const t = this.lineClock;
+    L.at
+      .set(Math.cos(L.a) * radius, 0, Math.sin(L.a) * radius * 0.9)
+      .applyAxisAngle(LINE_TILT, 0.42 + 0.18 * Math.sin(t * 0.09))
+      .applyAxisAngle(LINE_ROLL, 0.28 * Math.sin(t * 0.061 + 1))
+      .applyAxisAngle(LINE_UP, t * 0.05);
+    L.at.y += 0.4;
+    this.lineTrail.unshift({ t: this.lineClock, at: L.at.clone() });
+    const tr = this.lineTrail;
+    while (tr.length > 2 && this.lineClock - tr[tr.length - 1].t > 10) tr.pop();
+  }
+
+  // Sampled between recorded points so hearts never step from frame to frame.
+  lineAt(delay, out) {
+    const tr = this.lineTrail;
+    const want = this.lineClock - delay;
+    if (want <= tr[tr.length - 1].t) return out.copy(tr[tr.length - 1].at);
+    for (let n = 0; n < tr.length - 1; n += 1) {
+      const a = tr[n];
+      const b = tr[n + 1];
+      if (b.t <= want)
+        return out
+          .copy(b.at)
+          .lerp(a.at, (want - b.t) / Math.max(a.t - b.t, 1e-6));
+    }
+    return out.copy(tr[0].at);
+  }
+
+  lineVelAt(delay, out) {
+    this.lineAt(Math.max(0, delay - 0.03), out);
+    return out.sub(this.lineAt(delay + 0.03, this.lineBack)).divideScalar(0.06);
+  }
+
+  spawnHeart(h, center, tail) {
     /* eslint-disable no-param-reassign */
-    const front = this.from.copy(this.ringW).multiplyScalar(radius);
-    const z = center.z + front.z;
-    const wide = this.halfHeight(z) * this.camera.aspect + 0.6;
-    h.at ??= new Vector3();
+    const spot = this.lineAt(tail + JOIN_LAG, this.lineSpot);
+    const z = center.z + Math.max(-0.5, Math.min(1.4, spot.z));
+    const wide = this.halfHeight(z) * this.camera.aspect + 0.5;
+    const side = Math.sign(spot.x) || -1;
+    h.off ??= new Vector3();
     h.v ??= new Vector3();
-    h.at.set(
-      this.camera.position.x - wide,
-      center.y + front.y + rand(-0.2, 0.2),
-      z + rand(-0.2, 0.2),
+    h.vs ??= new Vector3();
+    h.at ??= new Vector3();
+    h.from ??= new Vector3();
+    h.fromV ??= new Vector3();
+    h.to ??= new Vector3();
+    h.push ??= new Vector3();
+    h.pushV ??= new Vector3();
+    h.off.set(
+      this.camera.position.x + side * wide - center.x,
+      spot.y + rand(-0.3, 0.3),
+      z - center.z,
     );
-    h.v.set(1.8, rand(-0.1, 0.1), 0);
+    h.v.set(-side * 2, rand(-0.2, 0.2), 0);
+    h.vs.copy(h.v);
+    h.span = Math.max(1.3, Math.min(2.4, h.off.distanceTo(spot) / 1.7));
+    // The approach is kept as an offset from the moving join point, so it fades out onto the line.
+    h.from.copy(h.off).sub(spot);
+    h.fromV.copy(h.v).sub(this.lineVelAt(tail + JOIN_LAG, this.lineVel));
+    h.at.copy(center).add(h.off);
+    h.push.set(0, 0, 0);
+    h.pushV.set(0, 0, 0);
     Object.assign(h, {
       live: true,
-      flocking: true,
-      joining: true,
-      dive: -1,
-      born: this.time,
-      pop: -1,
+      phase: "join",
+      order: this.heartOrder,
+      born: this.lineClock,
+      since: this.lineClock,
+      delay: tail + JOIN_LAG,
+      delayV: 0,
+      bank: 0,
+      aim: 0,
     });
+    this.heartOrder += 1;
     /* eslint-enable no-param-reassign */
   }
 
-  kiss(h) {
+  startKiss(h, center, radius) {
     /* eslint-disable no-param-reassign */
-    h.pop = 0;
+    const hit = this.toucher.hitFrom(h.at);
+    if (hit) h.to.copy(hit.point).sub(center);
+    else h.to.copy(h.off).setLength(radius * 0.5);
+    const n = this.lineBack.copy(h.to).normalize();
+    h.out ??= new Vector3();
+    h.out.copy(n);
+    h.to.addScaledVector(n, 0.06);
+    const point = Math.atan2(-n.y, -n.x) + Math.PI / 2;
+    let turn = point - h.bank;
+    turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI));
+    h.aim = h.bank + Math.max(-0.7, Math.min(0.7, turn));
+    h.bankFrom = h.bank;
+    h.span = Math.max(1.3, Math.min(1.8, h.off.distanceTo(h.to) / 0.9));
+    h.slide ??= new Vector3();
+    h.phase = "dive";
+    h.since = this.lineClock;
+    /* eslint-enable no-param-reassign */
+  }
+
+  skinBelow(h, spot, peach, radius) {
+    const dir = this.lineBack.copy(spot).normalize();
+    const hit = this.toucher.hitFrom(
+      this.lineVel.copy(peach).addScaledVector(dir, radius + 0.5),
+    );
+    if (!hit) return;
+    h.out.copy(dir);
+    h.to.copy(hit.point).sub(peach).addScaledVector(dir, 0.06);
+  }
+
+  kiss(h) {
     const hit = this.toucher.hitFrom(h.at);
     if (!hit) return;
     const { peach, settings } = this.i;
-    peach.addJiggle(hit.point, this.toucher.dir, 0.03, 0.5);
+    peach.addJiggle(hit.point, this.toucher.dir, 0.045, 0.5);
+    const slot = this.kissRings.find((r) => r.age >= 1) || this.kissRings[0];
+    const out = this.lineBack.copy(this.toucher.dir).negate();
+    slot.ring.position.copy(hit.point).addScaledVector(out, 0.03);
+    slot.ring.quaternion.setFromUnitVectors(Z_AXIS, out);
+    slot.flash.position.copy(hit.point).addScaledVector(out, 0.1);
+    slot.age = 0;
     if (settings.handprints)
       peach.addHandprint(
         hit.point,
@@ -1081,131 +1241,228 @@ export class Room {
       this.toucher.soundTimer = 0.3;
       playKiss();
     }
-    /* eslint-enable no-param-reassign */
   }
 
-  ringCoords(at, center, radius) {
-    const rel = this.from.copy(at).sub(center);
-    return {
-      a: rel.dot(this.ringU) / radius,
-      b: rel.dot(this.ringW) / radius,
-      off: rel.dot(this.ringN),
-    };
+  kissBurst(at, out) {
+    let made = 0;
+    this.kissSparks.forEach((s) => {
+      /* eslint-disable no-param-reassign */
+      if (made >= 5 || s.age < 1) return;
+      made += 1;
+      s.v
+        .set(rand(-1, 1), rand(-1, 1), rand(-1, 1))
+        .normalize()
+        .addScaledVector(out, 1.4)
+        .setLength(rand(0.5, 0.9));
+      s.age = 0;
+      s.sprite.position.copy(at);
+      /* eslint-enable no-param-reassign */
+    });
   }
 
   heartFlock(delta, count, still) {
     /* eslint-disable no-param-reassign */
-    const center = this.i.group.position;
-    const radius = this.bounds.x + 1;
-    const surface = this.bounds.x / radius + 0.04;
-    const t = this.time;
-    this.heartGate -= delta;
+    const peach = this.i.group.position;
+    const here = this.peachHere();
+    const center = this.home;
+    // The measured bounds swing with every jiggle, so the orbit eases toward them.
+    const reach = this.bounds.x + 1;
+    this.lineRadius = this.lineRadius
+      ? this.lineRadius + (reach - this.lineRadius) * Math.min(1, delta * 0.6)
+      : reach;
+    const radius = this.lineRadius;
+    // The line follows a soft spring behind the peach instead of every jolt.
+    this.lineAnchor ??= center.clone();
+    const anchor = this.lineAnchor;
+    this.anchorV.addScaledVector(
+      this.lineBase
+        .copy(center)
+        .sub(anchor)
+        .multiplyScalar(25)
+        .addScaledVector(this.anchorV, -10),
+      delta,
+    );
+    anchor.addScaledVector(this.anchorV, delta);
+    const d = delta * still;
+    this.lineClock += d;
+    const clock = this.lineClock;
+    this.stepLead(d, radius);
+    const leaving = (h) =>
+      h.phase === "dive" || h.phase === "press" || h.phase === "pop";
     this.hearts.forEach((h, n) => {
-      if (n >= count) {
-        h.live = false;
-        h.flocking = false;
-      } else if (!h.live && this.heartGate <= 0) {
-        this.spawnHeart(h, center, radius);
-        this.heartGate = rand(0.22, 0.34);
-      }
-      h.sprite.visible = n < count && h.live;
+      if (n >= count && !leaving(h)) h.live = false;
     });
-    this.diveTimer -= delta;
-    if (this.diveTimer <= 0 && count) {
-      this.diveTimer = rand(1.2, 3) / (1 + level(count, HEARTS));
-      const ready = this.hearts.filter((h) => {
-        if (!h.live || !h.flocking || h.joining || t - h.born < 4) return false;
-        const { a, b } = this.ringCoords(h.at, center, radius);
-        return a < 0 && b > 0 && Math.hypot(a, b) < 1.3;
-      });
-      const h = ready[Math.floor(Math.random() * ready.length)];
-      if (h) {
-        h.flocking = false;
-        h.dive = 0;
-      }
-    }
-    for (let n = 0; n < count; n += 1) {
-      const h = this.hearts[n];
-      const { sprite } = h;
-      const { steer, ringDir } = this;
-      if (!h.live) continue; // eslint-disable-line no-continue
-      if (h.pop >= 0) {
-        h.pop += delta;
-        const k = h.pop / 0.25;
-        sprite.scale.setScalar(0.22 + k * 0.3);
-        sprite.material.opacity = (1 - Math.min(1, k)) * 0.9;
-        if (k >= 1) {
-          h.live = false;
-          h.flocking = false;
-        }
-        continue; // eslint-disable-line no-continue
-      }
-      const { a, b, off } = this.ringCoords(h.at, center, radius);
-      const r = Math.max(Math.hypot(a, b), 0.05);
-      let ring = 1;
-      let pace = 1.6;
-      if (h.dive >= 0) {
-        h.dive += delta;
-        const k = Math.min(1, h.dive / 1.1);
-        ring = 1 - (1.1 - surface) * k * k * (3 - 2 * k);
-        pace = 1.6 - k * 0.5;
-        if (r <= surface + 0.03 || h.dive > 3) {
-          this.kiss(h);
-          continue; // eslint-disable-line no-continue
-        }
-      }
-      const reel = h.dive >= 0 ? 3 : 1.2;
-      const merge = h.joining ? Math.min(1, Math.max(0, (1.7 - r) / 0.6)) : 1;
-      if (merge >= 1) h.joining = false;
-      ringDir
-        .copy(this.ringU)
-        .multiplyScalar(a / r)
-        .addScaledVector(this.ringW, b / r);
-      steer
-        .copy(this.ringU)
-        .multiplyScalar(b)
-        .addScaledVector(this.ringW, -a)
-        .normalize()
-        .multiplyScalar(pace * merge)
-        .addScaledVector(
-          ringDir,
-          Math.max(-reel, Math.min(reel, (ring - r) * 6)) * merge,
-        )
-        .addScaledVector(
-          this.ringN,
-          (Math.sin(t * 0.7 + h.seed) * 0.15 - off * 2) * merge,
-        );
-      steer.x += 1.8 * (1 - merge);
-      steer.sub(h.v).multiplyScalar(h.dive >= 0 ? 2.4 : 1.2);
-      if (h.flocking)
-        steer.addScaledVector(
-          this.wind.align(this.hearts, n, count, this.align),
-          1.6,
-        );
-      steer.addScaledVector(this.wind.sample(h.at, this.air), 0.4);
-      h.v.addScaledVector(steer, delta);
-      this.wind.kick(h.at, h.v, delta);
-      const speed = h.v.length();
-      if (speed > 3.2) h.v.multiplyScalar(3.2 / speed);
-      else if (speed < 0.7) h.v.multiplyScalar(0.7 / Math.max(speed, 1e-3));
-      h.at.addScaledVector(h.v, delta * still);
-      sprite.position.copy(h.at);
-      const g = Math.min(1, (t - h.born) / 0.8) - 1;
-      const grow = 1 + 2.7 * g * g * g + 1.7 * g * g;
-      const depth = Math.max(-1, Math.min(1, (h.at.z - center.z) / radius));
-      const near = (depth + 1) / 2;
-      sprite.scale.setScalar(
-        (0.22 + Math.max(0, Math.sin(t * 6 + h.seed)) * 0.03) *
-          grow *
-          (0.8 + 0.35 * near),
+    const line = this.hearts
+      .filter((h) => h.live && !leaving(h))
+      .sort((a, b) => a.order - b.order);
+    this.heartGate -= delta;
+    const free = this.hearts.find((h, n) => n < count && !h.live);
+    if (free && this.heartGate <= 0) {
+      const last = line[line.length - 1];
+      const tail = Math.max(
+        0.2 + line.length * LINE_GAP,
+        last ? last.delay + LINE_GAP : 0,
       );
+      this.spawnHeart(free, anchor, tail);
+      line.push(free);
+      this.heartGate = rand(0.22, 0.34);
+    }
+
+    this.diveTimer -= d;
+    const head = line[0];
+    if (this.diveTimer <= 0 && head) {
+      const ready =
+        here &&
+        head.phase === "line" &&
+        clock - head.born > 3 &&
+        head.off.z > 0.5 &&
+        Math.abs(head.off.x) < radius * 0.85;
+      if (ready) {
+        this.diveTimer = rand(1.2, 3) / (1 + level(count, HEARTS));
+        this.startKiss(head, peach, radius);
+        line.shift();
+      } else this.diveTimer = 0.1;
+    }
+
+    const settle = (u) => u * u * u * (u * (u * 6 - 15) + 10);
+    const spot = this.lineSpot;
+    line.forEach((h, rank) => {
+      const goal = 0.2 + rank * LINE_GAP;
+      h.delayV += (6.8 * (goal - h.delay) - 5.2 * h.delayV) * d;
+      h.delay += h.delayV * d;
+      this.lineAt(h.delay, spot);
+      if (h.phase === "join") {
+        const age = clock - h.since;
+        const u = Math.min(1, age / h.span);
+        spot
+          .addScaledVector(h.from, 1 - settle(u))
+          .addScaledVector(h.fromV, age * (1 - settle(u)));
+        if (u >= 1) h.phase = "line";
+      }
+      h.v.copy(spot).sub(h.off).divideScalar(Math.max(d, 1e-4));
+      h.off.copy(spot);
+    });
+    this.hearts.forEach((h) => {
+      if (!h.live || !leaving(h)) return;
+      if (!here && h.phase !== "pop") {
+        h.phase = "pop";
+        h.since = clock;
+        h.off.copy(h.at).sub(peach);
+        h.to.copy(h.off);
+        h.out.copy(h.off).normalize();
+      }
+      const age = clock - h.since;
+      if (h.phase === "dive") {
+        const u = Math.min(1, age / h.span);
+        h.delay += d * 0.65 * u * u * (3 - 2 * u);
+        this.lineAt(h.delay, spot);
+        this.skinBelow(h, spot, peach, radius);
+        spot.lerp(h.to, settle(u));
+        h.v.copy(spot).sub(h.off).divideScalar(Math.max(d, 1e-4));
+        h.off.copy(spot);
+        if (u >= 1) {
+          h.slide.copy(h.v).addScaledVector(h.out, -h.v.dot(h.out));
+          h.phase = "press";
+          h.since = clock;
+          h.at.copy(peach).add(h.off);
+          this.kiss(h);
+        }
+      } else if (h.phase === "press") {
+        h.off.copy(h.to).addScaledVector(h.slide, (1 - Math.exp(-6 * age)) / 6);
+        if (age < PRESS_TIME) return;
+        h.to.copy(h.off);
+        h.phase = "pop";
+        h.since = clock;
+        this.kissBurst(h.at, h.out);
+      } else if (h.phase === "pop") {
+        const k = Math.min(1, age / POP_TIME);
+        h.off.copy(h.to).addScaledVector(h.out, 0.28 * (1 - (1 - k) ** 3));
+        if (k >= 1) h.live = false;
+      }
+    });
+
+    this.hearts.forEach((h) => {
+      const { sprite } = h;
+      sprite.visible = !!h.live;
+      if (!h.live) return;
+      const age = clock - h.since;
+      const base = this.lineBase.copy(anchor);
+      if (h.phase === "dive")
+        base.lerp(peach, settle(Math.min(1, age / h.span)));
+      else if (leaving(h)) base.copy(peach);
+      this.wind.kick(h.at, h.pushV, delta);
+      h.pushV
+        .addScaledVector(h.push, -18 * delta)
+        .multiplyScalar(Math.exp(-delta * 6));
+      h.push.addScaledVector(h.pushV, delta);
+      if (leaving(h)) h.push.multiplyScalar(Math.exp(-delta * 8));
+      h.at.copy(base).add(h.off).add(h.push);
+      sprite.position.copy(h.at);
+      const depth = Math.max(-1, Math.min(1, h.off.z / radius));
+      const near = (depth + 1) / 2;
+      const life = clock - h.born;
+      const g = Math.min(1, life / 0.8) - 1;
+      const grow = 1 + 2.7 * g * g * g + 1.7 * g * g;
+      let scale = 0.22 * grow * (0.8 + 0.35 * near);
+      let opacity = Math.min(1, life / 0.5) * (0.5 + 0.45 * near);
+      let wide = 1;
+      let tall = 1;
+      let rock = 0;
+      if (h.phase === "pop") {
+        const k = Math.min(1, age / POP_TIME);
+        scale *= 1 + 0.45 * (1 - (1 - k) ** 3);
+        opacity *= (1 - k) ** 1.6;
+      } else if (h.phase === "press") {
+        const s =
+          Math.exp(-14 * age) *
+          Math.cos(26 * age) *
+          Math.sin(Math.min(1, age / 0.04) * (Math.PI / 2));
+        wide = 1 + 0.4 * s;
+        tall = 1 - 0.32 * s;
+        rock = 0.12 * Math.exp(-10 * age) * Math.sin(22 * age);
+      }
+      const before = this.lineVel.copy(h.vs);
+      h.vs.lerp(h.v, Math.min(1, delta * 6));
+      const turn =
+        (before.x * h.vs.y - before.y * h.vs.x) /
+        Math.max(h.vs.x * h.vs.x + h.vs.y * h.vs.y, 0.2) /
+        Math.max(delta, 1e-4);
+      const bank = Math.max(-0.6, Math.min(0.6, turn * 0.18 - h.vs.x * 0.08));
+      if (leaving(h)) {
+        const u = h.phase === "dive" ? Math.min(1, age / h.span) : 1;
+        h.bank = h.bankFrom + (h.aim - h.bankFrom) * settle(u);
+      } else h.bank += (bank - h.bank) * Math.min(1, delta * 6);
+      sprite.scale.set(scale * wide, scale * tall, 1);
+      sprite.material.rotation = h.bank + rock;
       sprite.material.color
         .copy(depth < 0 ? HEART_FAR : WHITE)
         .lerp(depth < 0 ? WHITE : HEART_NEAR, depth < 0 ? depth + 1 : depth);
-      sprite.material.opacity =
-        Math.min(1, (t - h.born) / 0.5) * (0.5 + 0.45 * near);
-      sprite.material.rotation = Math.max(-0.4, Math.min(0.4, -h.v.x * 0.12));
-    }
+      sprite.material.opacity = opacity;
+    });
+
+    this.kissSparks.forEach((s) => {
+      const { sprite } = s;
+      sprite.visible = s.age < 1;
+      if (s.age >= 1) return;
+      s.age += delta / 0.42;
+      s.v.multiplyScalar(Math.exp(-delta * 3));
+      s.v.y += 0.3 * delta;
+      sprite.position.addScaledVector(s.v, delta);
+      sprite.scale.setScalar(0.1 * (1 - s.age * 0.6));
+      sprite.material.opacity = Math.max(0, 1 - s.age) ** 1.5 * 0.8;
+    });
+    this.kissRings.forEach((r) => {
+      r.flash.visible = r.age < 0.5;
+      if (r.age >= 1) {
+        r.ring.visible = false;
+        return;
+      }
+      r.age = Math.min(1, r.age + delta / 0.34);
+      showRing(r.ring, r.age, 0.15, 0.6, 0.22);
+      const k = Math.min(1, r.age * 2);
+      r.flash.scale.setScalar(0.25 + 0.3 * (1 - (1 - k) ** 3));
+      r.flash.material.opacity = (1 - k) ** 2 * 0.35;
+    });
     /* eslint-enable no-param-reassign */
   }
 
@@ -1244,7 +1501,7 @@ export class Room {
     const i = this.i;
     const still = reducedMotion.matches ? 0.15 : 1;
     const own = (id) => helpers[id] || 0;
-    const center = i.group.position;
+    const center = this.followPeach(delta);
     this.measure(delta);
     this.sweepFeathers();
     this.steady();

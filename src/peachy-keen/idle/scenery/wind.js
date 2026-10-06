@@ -7,7 +7,6 @@ const WAKE_MAX = 1.2;
 const RING_SPEED = 5;
 const RING_REACH = 3;
 const FRONT_SPEED = 3.2;
-const NEIGHBOURS = 7;
 
 export class Wind {
   constructor(camera, interaction) {
@@ -30,9 +29,6 @@ export class Wind {
     };
     this.rings = [];
     this.tmp = new Vector3();
-    this.steer = new Vector3();
-    this.nearQ = [];
-    this.nearD = new Float32Array(NEIGHBOURS);
   }
 
   blast(at, power) {
@@ -145,41 +141,5 @@ export class Wind {
         r.power;
       if (k > 0.01) velocity.addScaledVector(off, (k * delta * 6) / dist);
     });
-  }
-
-  align(list, n, count, out) {
-    const p = list[n];
-    const { nearQ, nearD } = this;
-    let seen = 0;
-    for (let m = 0; m < count; m += 1) {
-      const q = list[m];
-      if (m !== n && q.flocking) {
-        const d2 = q.at.distanceToSquared(p.at);
-        let k = Math.min(seen, NEIGHBOURS - 1);
-        if (seen < NEIGHBOURS || d2 < nearD[k]) {
-          while (k > 0 && nearD[k - 1] > d2) {
-            nearD[k] = nearD[k - 1];
-            nearQ[k] = nearQ[k - 1];
-            k -= 1;
-          }
-          nearD[k] = d2;
-          nearQ[k] = q;
-          seen = Math.min(seen + 1, NEIGHBOURS);
-        }
-      }
-    }
-    out.set(0, 0, 0);
-    if (!seen) return out;
-    for (let k = 0; k < seen; k += 1) {
-      const q = nearQ[k];
-      const d2 = nearD[k];
-      out.addScaledVector(q.v, 1 / seen);
-      if (d2 < 0.2)
-        out.addScaledVector(
-          this.steer.copy(p.at).sub(q.at),
-          0.6 / Math.max(d2, 0.02),
-        );
-    }
-    return out.sub(p.v);
   }
 }
