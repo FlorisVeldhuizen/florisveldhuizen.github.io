@@ -49,7 +49,7 @@ function countUp(node, value, drop) {
   let shown = 0;
   let end = Infinity;
   const land = (hz) => () => {
-    landed += DRIP_SHARE;
+    landed = Math.min(1, landed + DRIP_SHARE);
     playBloop(hz);
   };
   const step = (now) => {
@@ -59,8 +59,9 @@ function countUp(node, value, drop) {
     }
     if (!splashed && now - start >= SPLASH_MS) {
       splashed = true;
+      landed = 1;
       drop.drip(SPLASH_BEAD, () => {
-        landed = 1;
+        shown = 1;
         end = performance.now() + SETTLE_MS;
         drop.crown(SPLASH_POWER);
         playNotes([659, 880, 1320], { gap: 0.06, length: 0.22, volume: 0.05 });
@@ -75,7 +76,7 @@ function countUp(node, value, drop) {
     drop.step(dt);
     shown += (landed - shown) * (1 - Math.exp(-dt * COUNT_EASE));
     // eslint-disable-next-line no-param-reassign
-    node.textContent = `+${format(now < end ? value * shown : value)}`;
+    node.textContent = `+${format(shown === 1 ? value : value * shown)}`;
     if (now < end) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
