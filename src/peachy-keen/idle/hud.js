@@ -20,6 +20,19 @@ const PIT_DOCK = 14 / 22;
 const PIT_NOTES = [784, 880, 988, 1047, 1175];
 const HOLD_LIMIT_MS = 8000;
 
+function landFlier(f) {
+  const { trip } = f;
+  trip.landed += 1;
+  const last = trip.landed === trip.count;
+  const note = PIT_NOTES[trip.landed - 1];
+  trip.land(f, trip.landed / trip.count);
+  playNotes(last ? [note, note / 2] : [note], {
+    gap: 0.07,
+    length: 0.16,
+    volume: 0.04,
+  });
+}
+
 export class Hud {
   constructor(game) {
     this.game = game;
@@ -40,6 +53,7 @@ export class Hud {
     this.held = { juice: 0, pits: 0 };
     this.heldAt = 0;
     this.fliers = [];
+    this.flierFrame = 0;
     this.layer = el("div", "gain-layer", document.body);
     this.layer.setAttribute("aria-hidden", "true");
     game.on("buffs", () => this.buildBuffs());
@@ -102,30 +116,66 @@ export class Hud {
       return;
     }
     const count = Math.min(pits, PIT_FLIERS);
-    const toward = Math.sign(this.pitTarget().x - from.x) || 1;
-    const trip = { count, landed: 0 };
+    const carries = Array.from(
+      { length: count },
+      (_, n) => Math.floor(pits / count) + (n < pits % count ? 1 : 0),
+    );
+    this.launch(from, carries, {
+      make: () => pitIcon(),
+      target: () => this.pitTarget(),
+      pop: PIT_SIZE,
+      dock: PIT_DOCK,
+      land: (f, progress) => {
+        this.held.pits = Math.max(0, this.held.pits - f.carry);
+        this.pitWobble.thump(progress);
+      },
+    });
+  }
+
+  launch(
+    from,
+    carries,
+    {
+      make,
+      target,
+      pop,
+      dock,
+      land,
+      stagger = PIT_STAGGER,
+      spread = PIT_FAN,
+      hang = 0,
+      lift = 1,
+    },
+  ) {
+    const count = carries.length;
+    const start = target();
+    const toward = Math.sign((start ? start.x : from.x) - from.x) || 1;
+    const trip = { count, landed: 0, target, land, frame: -1, to: null };
     setTimeout(() => {
-      for (let n = 0; n < count; n += 1) {
-        const fan = count === 1 ? 0 : (n / (count - 1) - 0.5) * 2 * PIT_FAN;
+      carries.forEach((carry, n) => {
+        const fan = count === 1 ? 0 : (n / (count - 1) - 0.5) * 2 * spread;
         const a =
           -Math.PI / 2 + toward * 0.25 + fan + (Math.random() - 0.5) * 0.2;
-        const speed = PIT_POP_SPEED * (0.85 + Math.random() * 0.3);
-        const node = el("div", "pit-flier", this.layer, pitIcon());
+        const speed = PIT_POP_SPEED * lift * (0.85 + Math.random() * 0.3);
+        const node = el("div", "pit-flier", this.layer, make());
         node.style.visibility = "hidden";
         this.fliers.push({
           node,
           trip,
-          carry: Math.floor(pits / count) + (n < pits % count ? 1 : 0),
+          carry,
+          pop,
+          dock,
           x: from.x + (Math.random() - 0.5) * 30,
           y: from.y + (Math.random() - 0.5) * 20,
           vx: Math.cos(a) * speed,
           vy: Math.sin(a) * speed,
-          age: -n * PIT_STAGGER,
+          hang,
+          age: -n * stagger,
           popFor: 0.36 + Math.random() * 0.12,
           angle: Math.random() * 360,
           spin: (Math.random() < 0.5 ? -1 : 1) * (500 + Math.random() * 400),
         });
-      }
+      });
     }, PIT_DELAY_MS);
   }
 
@@ -136,16 +186,24 @@ export class Hud {
 
   stepFliers(dt) {
     if (!this.fliers.length) return;
-    const to = this.pitTarget();
+    this.flierFrame += 1;
     this.fliers = this.fliers.filter((f) => {
       /* eslint-disable no-param-reassign */
       f.age += dt;
       if (f.age < 0) return true;
-      const pull = f.age - f.popFor;
-      let dx = to.x - f.x;
-      let dy = to.y - f.y;
+      const { trip } = f;
+      if (trip.frame !== this.flierFrame) {
+        trip.frame = this.flierFrame;
+        trip.to = trip.target();
+      }
+      const { to } = trip;
+      const pull = to ? f.age - f.popFor : -1;
+      let dx = to ? to.x - f.x : 0;
+      let dy = to ? to.y - f.y : 0;
       let dist = Math.hypot(dx, dy);
-      if (pull < 0) f.vy += PIT_GRAVITY * dt;
+      if (pull < 0)
+        f.vy +=
+          PIT_GRAVITY * (1 - f.hang * Math.exp(-Math.abs(f.vy) / 220)) * dt;
       else {
         const rush = Math.min(2400, 250 + 3000 * pull);
         const steer = 1 - Math.exp(-(4 + 40 * pull) * dt);
@@ -155,13 +213,15 @@ export class Hud {
       }
       f.x += f.vx * dt;
       f.y += f.vy * dt;
-      dx = to.x - f.x;
-      dy = to.y - f.y;
-      dist = Math.hypot(dx, dy);
+      if (to) {
+        dx = to.x - f.x;
+        dy = to.y - f.y;
+        dist = Math.hypot(dx, dy);
+      }
       const passed = dist < 60 && f.vx * dx + f.vy * dy < 0;
-      if (pull > 0 && (dist < 12 || passed || f.age > 3)) {
+      if ((pull > 0 && (dist < 12 || passed)) || f.age > 3) {
         f.node.remove();
-        this.landPit(f);
+        landFlier(f);
         return false;
       }
       f.spin *= Math.exp(-1.2 * dt);
@@ -171,11 +231,8 @@ export class Hud {
       const grow = Math.min(1, f.age / 0.14);
       const pop =
         0.5 +
-        (PIT_SIZE - 0.5) *
-          grow *
-          (2 - grow) *
-          (1 + 0.25 * (1 - grow) * grow * 4);
-      const size = PIT_DOCK + (pop - PIT_DOCK) * near;
+        (f.pop - 0.5) * grow * (2 - grow) * (1 + 0.25 * (1 - grow) * grow * 4);
+      const size = f.dock + (pop - f.dock) * near;
       const speed = Math.hypot(f.vx, f.vy);
       const stretch = 1 + Math.min(0.4, speed / 3000);
       const heading = (Math.atan2(f.vy, f.vx) * 180) / Math.PI;
@@ -183,20 +240,6 @@ export class Hud {
       f.node.style.transform = `translate(${f.x}px, ${f.y}px) rotate(${heading}deg) scale(${size * stretch}, ${size / stretch}) rotate(${tilt - heading}deg)`;
       return true;
       /* eslint-enable no-param-reassign */
-    });
-  }
-
-  landPit(f) {
-    const { trip } = f;
-    trip.landed += 1;
-    const last = trip.landed === trip.count;
-    const note = PIT_NOTES[trip.landed - 1];
-    this.held.pits = Math.max(0, this.held.pits - f.carry);
-    this.pitWobble.thump(trip.landed / trip.count);
-    playNotes(last ? [note, note / 2] : [note], {
-      gap: 0.07,
-      length: 0.16,
-      volume: 0.04,
     });
   }
 

@@ -835,12 +835,6 @@ body.is-storm::after {
   pointer-events: none;
 }
 
-.harvest-fruit {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
 .pit-flier {
   position: absolute;
   top: 0;
@@ -854,7 +848,7 @@ body.is-storm::after {
   margin: -16px 0 0 -11px;
 }
 
-.harvest-fruit img {
+.pit-flier .harvest-fruit {
   display: block;
   width: 36px;
   height: 36px;

@@ -386,6 +386,7 @@ export class Panel {
     this.buttons.orchard.hidden = !state.orchard.open;
     this.buttons.ripen.hidden =
       state.nectarTotal === 0 &&
+      state.nectar === 0 &&
       this.game.pendingNectar() === 0 &&
       state.stats.ripens === 0;
     const badge = (id, count) => {
