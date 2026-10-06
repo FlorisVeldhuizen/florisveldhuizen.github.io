@@ -224,14 +224,14 @@ class Disco {
 
     const free =
       i.phase === "live" &&
-      !i.grab &&
-      (i.carrying || !i.pointer.pressed) &&
+      (i.carrying || i.grab || !i.pointer.pressed) &&
       !reducedMotion.matches;
     this.weight += ((free ? 1 : 0) - this.weight) * (1 - Math.exp(-dt * 3));
     const index = Math.floor(beat);
     if (index !== this.lastBeat && index >= 0) {
       this.lastBeat = index;
-      if (index % 16 === 15) this.spinning = this.on && this.weight > 0.95;
+      if (index % 16 === 15)
+        this.spinning = this.on && this.weight > 0.95 && !i.grab;
       if (free && this.on) this.hit(index);
     }
     const move = choreography(beat, this.move);
