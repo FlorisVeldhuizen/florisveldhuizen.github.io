@@ -12,6 +12,8 @@ const BEAD_MAX = 7.4;
 const BEAD_HANG = 0.13;
 const BEAD_GRAVITY = 1500;
 const BEADS_IN_AIR = 3;
+const GOO_MIN_BEAD = 3.4;
+const GOO_JOIN_Y = -2;
 const CROWN_SIZES = [4.6, 4.2, 3.9, 3.6, 3.4, 3.2, 3];
 const CROWN_SPREAD = 0.9;
 const CROWN_SPEED = 215;
@@ -76,15 +78,16 @@ export class SyrupDrop {
     this.svg.setAttribute("class", "syrup-drop");
     this.svg.setAttribute("viewBox", "-4 -14 40 64");
     this.svg.setAttribute("aria-hidden", "true");
-    this.svg.innerHTML = `<g><g filter="url(#syrup-goo)"><path d="${DROP}" fill="url(#syrup-drop-fill)"/></g>${DROP_SHINE}</g>`;
+    this.svg.innerHTML = `<g><g filter="url(#syrup-goo)"><path d="${DROP}" fill="url(#syrup-drop-fill)"/></g><g></g>${DROP_SHINE}</g>`;
     parent.appendChild(this.svg);
     this.body = this.svg.firstElementChild;
     this.pool = this.body.firstElementChild;
+    this.loose = this.pool.nextElementSibling;
     this.wobble = new Spring(120, 8);
     this.tilt = new Spring(90, 7);
     this.hop = new Spring(170, 11);
     this.pulse = new Spring(1900, 35);
-    this.shine = [...this.body.children].slice(1);
+    this.shine = [...this.body.children].slice(2);
     this.hold = 0;
     this.flash = 0;
     this.launches = [];
@@ -103,7 +106,7 @@ export class SyrupDrop {
     const node = document.createElementNS(SVG, "circle");
     node.setAttribute("cx", "16");
     node.setAttribute("fill", "#ffa078");
-    this.pool.appendChild(node);
+    (size < GOO_MIN_BEAD ? this.loose : this.pool).appendChild(node);
     this.beads.push({
       node,
       hanging: true,
@@ -176,6 +179,8 @@ export class SyrupDrop {
         b.node.remove();
         this.beads.splice(i, 1);
       } else {
+        if (b.y > GOO_JOIN_Y && b.node.parentNode === this.loose)
+          this.pool.appendChild(b.node);
         b.node.setAttribute("cy", (b.y - b.r * 0.4).toFixed(1));
         b.node.setAttribute("r", b.r.toFixed(2));
       }

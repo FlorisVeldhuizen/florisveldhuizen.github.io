@@ -1080,6 +1080,18 @@ export function playDing() {
   tone(now + 0.12, { from: 2093, to: 2093, length: 0.35, volume: 0.1 });
 }
 
+export function playBloop(hz) {
+  if (!running()) return;
+  tone(ctx.currentTime, {
+    from: hz * 0.55,
+    to: hz,
+    sweep: 0.05,
+    length: 0.16,
+    volume: 0.035,
+    attack: 0.008,
+  });
+}
+
 export function playNotes(
   notes,
   { gap = 0.08, length = 0.3, volume = 0.08 } = {},

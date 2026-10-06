@@ -4,7 +4,7 @@ import { format, formatTime } from "./numbers";
 import { HELPERS } from "./data/helpers";
 import { reducedMotion } from "../util";
 import { SyrupDrop } from "./syrup";
-import { playNotes } from "../audio";
+import { playBloop, playNotes } from "../audio";
 
 const LINES = [
   "Your peach missed you. The helpers didn't stop.",
@@ -13,10 +13,18 @@ const LINES = [
   "Everyone kept working. Mostly.",
 ];
 const CREW = 6;
-const COUNT_MS = 1100;
+const SPLASH_MS = 1100;
 const SETTLE_MS = 2400;
 const SPLASH_POWER = 1.6;
 const SPLASH_BEAD = 4.8;
+const COUNT_DRIPS = [
+  { ms: 0, bead: 1.9, hz: 494 },
+  { ms: 330, bead: 2.3, hz: 554 },
+  { ms: 600, bead: 2.7, hz: 659 },
+  { ms: 800, bead: 3.1, hz: 740 },
+];
+const DRIP_SHARE = 0.14;
+const COUNT_EASE = 9;
 
 function countUp(node, value, drop) {
   // eslint-disable-next-line no-param-reassign
@@ -26,15 +34,25 @@ function countUp(node, value, drop) {
   node.style.minWidth = `${node.getBoundingClientRect().width}px`;
   const start = performance.now();
   let last = start;
+  let drips = 0;
   let splashed = false;
+  let landed = 0;
+  let shown = 0;
+  let end = Infinity;
+  const land = (hz) => () => {
+    landed += DRIP_SHARE;
+    playBloop(hz);
+  };
   const step = (now) => {
-    const k = Math.min(1, (now - start) / COUNT_MS);
-    const eased = 1 - (1 - k) ** 3;
-    // eslint-disable-next-line no-param-reassign
-    node.textContent = `+${format(value * eased)}`;
-    if (k === 1 && !splashed) {
+    while (drips < COUNT_DRIPS.length && now - start >= COUNT_DRIPS[drips].ms) {
+      drop.drip(COUNT_DRIPS[drips].bead, land(COUNT_DRIPS[drips].hz));
+      drips += 1;
+    }
+    if (!splashed && now - start >= SPLASH_MS) {
       splashed = true;
       drop.drip(SPLASH_BEAD, () => {
+        landed = 1;
+        end = performance.now() + SETTLE_MS;
         drop.crown(SPLASH_POWER);
         playNotes([659, 880, 1320], { gap: 0.06, length: 0.22, volume: 0.05 });
         node.animate(
@@ -43,9 +61,13 @@ function countUp(node, value, drop) {
         );
       });
     }
-    drop.step(Math.min(0.05, (now - last) / 1000));
+    const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (now - start < COUNT_MS + SETTLE_MS) requestAnimationFrame(step);
+    drop.step(dt);
+    shown += (landed - shown) * (1 - Math.exp(-dt * COUNT_EASE));
+    // eslint-disable-next-line no-param-reassign
+    node.textContent = `+${format(now < end ? value * shown : value)}`;
+    if (now < end) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
