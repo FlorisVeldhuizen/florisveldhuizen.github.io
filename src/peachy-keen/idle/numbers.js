@@ -83,6 +83,32 @@ export function format(value, { whole = false } = {}) {
   return `${mantissa(scaled)}${gap}${names[group]}`;
 }
 
+export function rollParts(value, { whole = false } = {}) {
+  if (!Number.isFinite(value)) return { text: format(value), units: 0 };
+  let scaled = value;
+  let suffix = "";
+  if (value >= 1000) {
+    const group = Math.floor(Math.log10(value) / 3);
+    if (notation === "scientific" || group >= SHORT.length) {
+      const exponent = Math.floor(Math.log10(value));
+      scaled = value / 10 ** exponent;
+      suffix = `e${exponent}`;
+    } else {
+      scaled = value / 1000 ** group;
+      suffix = notation === "long" ? ` ${LONG[group]}` : SHORT[group];
+    }
+  }
+  let decimals = 2;
+  if ((whole && value < 1000) || scaled >= 100) decimals = 0;
+  else if (scaled >= 10) decimals = 1;
+  const units = scaled * 10 ** decimals;
+  const digits = String(Math.floor(units)).padStart(decimals + 1, "0");
+  const text = decimals
+    ? `${digits.slice(0, -decimals)}.${digits.slice(-decimals)}`
+    : digits;
+  return { text: text + suffix, units };
+}
+
 export function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return "forever";
   const s = Math.max(0, Math.round(seconds));

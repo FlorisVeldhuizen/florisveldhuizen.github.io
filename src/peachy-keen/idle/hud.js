@@ -8,7 +8,6 @@ import { playNotes } from "../audio";
 import { SyrupDrop, pitWobble, pitIcon } from "./syrup";
 import { RollingNumber } from "./rolling-number";
 
-const ROLL_RATE = 10;
 const PIT_FLIERS = 5;
 const PIT_STAGGER = 0.035;
 const PIT_DELAY_MS = 220;
@@ -36,19 +35,20 @@ function landFlier(f) {
 export class Hud {
   constructor(game) {
     this.game = game;
-    this.count = new RollingNumber(document.getElementById("count"), 120, 17);
+    this.count = new RollingNumber(document.getElementById("count"));
     this.drop = new SyrupDrop(document.getElementById("count-unit"));
     this.rate = document.getElementById("rate");
     this.pits = document.getElementById("pits");
     this.pits.innerHTML = `<span></span>${pitIcon()}`;
-    this.pitCount = new RollingNumber(this.pits.firstElementChild, 150, 18);
+    this.pitCount = new RollingNumber(this.pits.firstElementChild, {
+      whole: true,
+    });
     this.pitIcon = this.pits.querySelector(".pit-icon");
     this.pitWobble = pitWobble(this.pitIcon);
     this.buffs = document.getElementById("buffs");
     this.dare = document.getElementById("dare");
     this.buffRows = new Map();
     this.shownPits = -1;
-    this.shownJuice = game.state.juice;
     this.steppedAt = performance.now();
     this.held = { juice: 0, pits: 0 };
     this.heldAt = 0;
@@ -243,37 +243,25 @@ export class Hud {
     });
   }
 
-  rollJuice(juice, dt) {
-    const gap = juice - this.shownJuice;
-    if (gap < 0 && gap > -1e-6 * juice) return this.shownJuice;
-    if (reducedMotion.matches || gap <= 0 || gap < juice * 1e-4)
-      this.shownJuice = juice;
-    else this.shownJuice += gap * (1 - Math.exp(-dt * ROLL_RATE));
-    return this.shownJuice;
-  }
-
   update() {
     const { state } = this.game;
     const now = performance.now();
     const dt = Math.min(0.05, (now - this.steppedAt) / 1000);
     this.steppedAt = now;
     if (now - this.heldAt > HOLD_LIMIT_MS) this.held = { juice: 0, pits: 0 };
-    const juice = Math.max(0, state.juice - this.held.juice);
-    this.count.set(format(this.rollJuice(juice, dt)));
-    this.count.step(dt);
+    this.count.update(Math.max(0, state.juice - this.held.juice), dt);
     this.drop.step(dt);
     setText(this.rate, `${format(this.game.rate)} juice per second`);
     const pits = Math.max(0, state.pits - this.held.pits);
     if (pits !== this.shownPits) {
       this.shownPits = pits;
       this.pits.hidden = state.pitsTotal === 0;
-      this.pitCount.set(format(pits, { whole: true }));
       this.pits.setAttribute(
         "aria-label",
         `${format(pits, { whole: true })} ${pits === 1 ? "pit" : "pits"}`,
       );
     }
-    this.pitCount.step(dt);
+    this.pitCount.update(pits, dt);
     this.stepFliers(dt);
     this.pitWobble.step(dt);
     const clock = Date.now();
