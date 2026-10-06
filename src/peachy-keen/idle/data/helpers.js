@@ -1,7 +1,9 @@
 export const COST_GROWTH = 1.15;
 
-export const TIER_AT = [1, 5, 25, 50, 100, 150, 200, 250];
-export const TIER_PRICE = [10, 50, 500, 5e4, 5e6, 5e8, 5e10, 5e12];
+export const TIER_AT = [1, 5, 25, 50, 100, 150, 200, 250, 300, 350, 400, 450];
+export const TIER_PRICE = [
+  10, 50, 500, 5e4, 5e6, 5e8, 5e10, 5e12, 5e14, 5e16, 5e18, 5e20,
+];
 
 export const HELPERS = [
   {
@@ -23,6 +25,10 @@ export const HELPERS = [
       ["Phoenix quill", "It tickles, then it burns. Feathers ×2."],
       ["Feather storm", "Weather warning. Feathers ×2."],
       ["The last feather", "Everyone else went bald. Feathers ×2."],
+      ["Pillow fight", "Every pillow burst at once. Feathers ×2."],
+      ["Duck army", "They donated. Reluctantly. Feathers ×2."],
+      ["Tickle trunk", "An attic full of feathers. Feathers ×2."],
+      ["Featherweight champion", "Undefeated. Unbearable. Feathers ×2."],
     ],
   },
   {
@@ -44,6 +50,10 @@ export const HELPERS = [
       ["Fan convention", "Cosplay is mandatory. Admirers ×2."],
       ["Tattoo of your name", "Wrong spelling. Admirers ×2."],
       ["Eternal devotion", "Vows exchanged. Admirers ×2."],
+      ["Serenade", "Under the window, every night. Admirers ×2."],
+      ["Skywriting", "Your name, in smoke. Admirers ×2."],
+      ["Fan club", "Membership cards and a secret handshake. Admirers ×2."],
+      ["Proposal", "Down on one knee, mid-pat. Admirers ×2."],
     ],
   },
   {
@@ -65,6 +75,10 @@ export const HELPERS = [
       ["Ping-pong pro", "Topspin on every swing. Paddles ×2."],
       ["The Headmaster", "Retired, but not really. Paddles ×2."],
       ["Excalipaddle", "Pulled from a stone. Paddles ×2."],
+      ["Paddle steamer", "Full steam behind. Paddles ×2."],
+      ["Canoe club", "Rowing in rhythm. Paddles ×2."],
+      ["Gold medal", "Olympic-level paddling. Paddles ×2."],
+      ["Paddle of destiny", "It chose you. Paddles ×2."],
     ],
   },
   {
@@ -86,6 +100,10 @@ export const HELPERS = [
       ["Eight-handed", "Hired an octopus. Masseuses ×2."],
       ["Shiatsu sensei", "Found the pressure point. Masseuses ×2."],
       ["Liquid hands", "No bones left. Masseuses ×2."],
+      ["Couples suite", "Two tables, one peach. Masseuses ×2."],
+      ["Reflexology", "Pressed a toe, the cheeks felt it. Masseuses ×2."],
+      ["Thai stretch", "Bent into a pretzel. Masseuses ×2."],
+      ["Golden hands", "Insured for a billion. Masseuses ×2."],
     ],
   },
   {
@@ -107,6 +125,10 @@ export const HELPERS = [
       ["Slick cartel", "Price fixing. Oil Barons ×2."],
       ["Liquid gold", "Literally gold now. Oil Barons ×2."],
       ["Primordial ooze", "The oldest oil. Oil Barons ×2."],
+      ["Gusher", "Struck it rich. Oil Barons ×2."],
+      ["Oil tycoon", "Owns the next county too. Oil Barons ×2."],
+      ["Oil sheikh", "Rides a golden camel. Oil Barons ×2."],
+      ["Slick empire", "The sun never sets on the shine. Oil Barons ×2."],
     ],
   },
   {
@@ -128,6 +150,10 @@ export const HELPERS = [
       ["Gravity boots", "Bounce upside down. Twerk Coaches ×2."],
       ["Hall of fame", "Their cheeks, cast in bronze. Twerk Coaches ×2."],
       ["Perpetual motion", "Physics gave up. Twerk Coaches ×2."],
+      ["Dance battle", "Undefeated on the block. Twerk Coaches ×2."],
+      ["Music video", "Ten million views. Twerk Coaches ×2."],
+      ["Twerkout DVD", "Sold at every gas station. Twerk Coaches ×2."],
+      ["Twerk academy", "Accredited. Somehow. Twerk Coaches ×2."],
     ],
   },
   {
@@ -149,6 +175,10 @@ export const HELPERS = [
       ["Angelic backing", "Real angels, union rates. Peach Choirs ×2."],
       ["Choir of choirs", "Recursive hymns. Peach Choirs ×2."],
       ["Music of the spheres", "The planets hum along. Peach Choirs ×2."],
+      ["Encore hymn", "One more verse. Peach Choirs ×2."],
+      ["Holy remix", "Hymns with a bass drop. Peach Choirs ×2."],
+      ["World tour", "Every cathedral, one night each. Peach Choirs ×2."],
+      ["Hallelujah", "The big one. Peach Choirs ×2."],
     ],
   },
   {
@@ -170,6 +200,10 @@ export const HELPERS = [
       ["Five stars", "Tripadvisor loves it. Day Spas ×2."],
       ["Spa planet", "Entire planet is a jacuzzi. Day Spas ×2."],
       ["Nirvana package", "Includes enlightenment. Day Spas ×2."],
+      ["Seaweed wrap", "Smells like the ocean floor. Day Spas ×2."],
+      ["Hot tub time machine", "Relax in every decade. Day Spas ×2."],
+      ["Robe of robes", "Fluffier than a cloud. Day Spas ×2."],
+      ["Infinity pool", "Ends at the horizon. Day Spas ×2."],
     ],
   },
   {
@@ -191,6 +225,10 @@ export const HELPERS = [
       ["Black-hole press", "Nothing escapes. Juice Presses ×2."],
       ["Press of presses", "It presses presses. Juice Presses ×2."],
       ["Final squeeze", "Heat death of the juice. Juice Presses ×2."],
+      ["Pulp fiction", "The juice has bits now. Juice Presses ×2."],
+      ["Juice futures", "Traded on Wall Street. Juice Presses ×2."],
+      ["Planet press", "Squeezes a whole planet. Juice Presses ×2."],
+      ["Last drop", "There is always one more. Juice Presses ×2."],
     ],
   },
   {
@@ -212,6 +250,10 @@ export const HELPERS = [
       ["Schism", "Two cults, twice the fervour. Cheek Cults ×2."],
       ["Ascended prophet", "Floated off mid-sermon. Cheek Cults ×2."],
       ["The one true bottom", "Revealed at last. Cheek Cults ×2."],
+      ["Pilgrimage", "Barefoot, all the way. Cheek Cults ×2."],
+      ["Cheek relics", "A holy dimple in a jar. Cheek Cults ×2."],
+      ["Mass ritual", "Stadium-sized chanting. Cheek Cults ×2."],
+      ["Rapture", "Everyone ascends, cheeks first. Cheek Cults ×2."],
     ],
   },
   {
@@ -233,6 +275,10 @@ export const HELPERS = [
       ["Blood moon", "Ominous but juicy. Peach Moons ×2."],
       ["Twin moons", "Obviously. Peach Moons ×2."],
       ["Death Star", "That's no moon. Peach Moons ×2."],
+      ["Moonshine", "Strong stuff. Peach Moons ×2."],
+      ["Lunar eclipse", "The moon covers itself. Shy. Peach Moons ×2."],
+      ["Moon base", "Juice pipelines to Earth. Peach Moons ×2."],
+      ["Supermoon", "Bigger, rounder, closer. Peach Moons ×2."],
     ],
   },
   {
@@ -254,6 +300,10 @@ export const HELPERS = [
       ["String theory", "Eleven-dimensional thongs. Colliders ×2."],
       ["Unified field", "Everything is jiggle. Colliders ×2."],
       ["God particle", "It has a bottom. Colliders ×2."],
+      ["Quark soup", "Up, down, cheeky. Colliders ×2."],
+      ["Dark matter", "Can't see it, can feel it. Colliders ×2."],
+      ["Peach boson", "Gives the jiggle its mass. Colliders ×2."],
+      ["Theory of everything", "The answer is bottoms. Colliders ×2."],
     ],
   },
   {
@@ -275,6 +325,10 @@ export const HELPERS = [
       ["White hole", "The juice comes back out. Singularities ×2."],
       ["Naked singularity", "No horizon. No shame. Singularities ×2."],
       ["Big crunch", "Everything becomes a peach. Singularities ×2."],
+      ["Frame dragging", "Space spins with it. Singularities ×2."],
+      ["Information paradox", "The juice remembers. Singularities ×2."],
+      ["Black hole merger", "Two become one rounder one. Singularities ×2."],
+      ["Cosmic censorship", "Nobody is allowed to look. Singularities ×2."],
     ],
   },
   {
@@ -296,6 +350,10 @@ export const HELPERS = [
       ["Omniverse", "Every possible peach. Peachverses ×2."],
       ["Heat death", "Very, very hot. Peachverses ×2."],
       ["The end", "And the beginning. Peachverses ×2."],
+      ["Parallel peaches", "One for every choice you made. Peachverses ×2."],
+      ["Peach inflation", "Grows faster than light. Peachverses ×2."],
+      ["Cosmic web", "Strands of juice between galaxies. Peachverses ×2."],
+      ["Big smack", "How it all started. Peachverses ×2."],
     ],
   },
 ];

@@ -71,7 +71,7 @@
 .score-pits {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 7px;
   margin-top: 6px;
   color: var(--blush);
   font-size: 20px;
@@ -123,6 +123,14 @@
   transform-origin: right center;
 }
 
+.craving-talk {
+  background: linear-gradient(
+    90deg,
+    var(--blush) var(--left, 100%),
+    var(--blush-dim) var(--left, 100%)
+  );
+}
+
 body::after {
   content: "";
   position: fixed;
@@ -137,6 +145,12 @@ body::after {
 body.is-frenzy::after {
   opacity: 1;
   animation: frenzy 0.9s ease-in-out infinite alternate;
+}
+
+body.is-satisfied::after {
+  opacity: 1;
+  box-shadow: inset 0 0 160px rgba(255, 140, 150, 0.5);
+  animation: frenzy 1.4s ease-in-out infinite alternate;
 }
 
 body.is-storm::after {
@@ -729,7 +743,7 @@ body.is-storm::after {
 .pit-tag .pit-icon {
   width: 0.75em;
   height: 1.05em;
-  margin-left: 2px;
+  margin-left: 0.35em;
 }
 
 .reward-tag {
@@ -1059,6 +1073,7 @@ body.is-storm::after {
   .node::after,
   .sky-star,
   body.is-frenzy::after,
+  body.is-satisfied::after,
   body.is-storm::after {
     animation: none !important;
   }
@@ -1122,6 +1137,26 @@ body.is-storm::after {
   font-size: 18px;
   font-style: italic;
   font-weight: 700;
+}
+
+.ripen-meter {
+  overflow: hidden;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--blush-faint);
+}
+
+.ripen-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blush-dim);
+  transform-origin: left;
+  transition: transform 0.4s ease-out;
+}
+
+.ripen-meter-fill.is-ready {
+  background: linear-gradient(90deg, var(--gold), var(--peach));
 }
 
 .ripen-button:disabled {
@@ -1368,6 +1403,86 @@ body.is-storm::after {
 .dares[hidden],
 .shop-title[hidden] {
   display: none;
+}
+
+.near {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.near-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.near-row.is-empty {
+  display: none;
+}
+
+.near-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  border: 1px solid rgba(212, 162, 76, 0.5);
+  border-radius: 10px;
+  color: rgba(255, 210, 122, 0.75);
+}
+
+.near-icon .icon {
+  width: 19px;
+  height: 19px;
+}
+
+.near-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.near-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.near-name {
+  font-weight: 600;
+}
+
+.near-count {
+  color: var(--peach);
+  font-size: 13px;
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.near-about {
+  color: var(--blush-dim);
+  font-size: 13px;
+}
+
+.near-bar {
+  display: block;
+  overflow: hidden;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--blush-faint);
+}
+
+.near-bar b {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  transform-origin: left;
 }
 
 .trophies {

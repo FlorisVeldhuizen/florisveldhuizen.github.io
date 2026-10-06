@@ -26,11 +26,21 @@ import { TREE_BY_ID } from "./data/tree";
 import { DARE_BY_ID } from "./data/dares";
 import { TROPHIES } from "./data/trophies";
 import { TOY_BY_ID } from "./data/toys";
+import {
+  CRAVINGS,
+  CRAVE_SECONDS,
+  CRAVE_EVERY,
+  CRAVE_COMBO,
+  CRAVE_RUB,
+} from "./data/cravings";
 import { setNotation } from "./numbers";
 
 const AWAY_AFTER = 60;
+const RIPEN_READY = 0.5;
 const SAVE_EVERY = 15;
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
+const SQUIRM_EVERY = [2, 3.5];
+const between = ([low, high]) => low + Math.random() * (high - low);
 
 export class IdleGame {
   constructor(interaction) {
@@ -39,7 +49,13 @@ export class IdleGame {
     this.listeners = {};
     this.live = { heat: 0, oil: 0 };
     this.rate = 0;
-    this.timers = { save: 0, check: 0, butler: 0 };
+    this.timers = {
+      save: 0,
+      check: 0,
+      butler: 0,
+      crave: between(CRAVE_EVERY),
+    };
+    this.craving = null;
     this.pouring = false;
     this.pendingBurst = null;
     this.ripening = false;
@@ -98,6 +114,7 @@ export class IdleGame {
     i.on("release", ({ knead, length }) => {
       const s = this.state;
       s.stats.grabs += 1;
+      this.satisfy("grab");
       const value =
         this.handValue(1, 0) * (1 + knead * 4 + length * 3) * this.model.grab;
       this.gain(value, "hand");
@@ -105,6 +122,7 @@ export class IdleGame {
     });
     i.on("wedgie", ({ amount }) => {
       this.state.stats.wedgies += 1;
+      this.satisfy("wedgie");
       const value = this.handValue(1, 0) * 10 * amount * this.model.wedgie;
       this.gain(value, "hand");
       this.popAtPeach(value, "wedgie");
@@ -139,6 +157,7 @@ export class IdleGame {
     s.stats.smacks += 1;
     s.runSmacks += 1;
     s.stats.bestCombo = Math.max(s.stats.bestCombo, combo);
+    if (combo >= CRAVE_COMBO) this.satisfy("combo");
     this.gain(value, "hand");
     this.emit("pop", { x, y, value, kind: crit ? "crit" : "smack" });
   }
@@ -162,6 +181,7 @@ export class IdleGame {
     if (edged) s.seen.edged = true;
     this.gain(value, "burst");
     this.pendingBurst = { value, pits, lucky };
+    this.satisfy("burst");
     this.emit("split", this.pendingBurst);
   }
 
@@ -225,7 +245,10 @@ export class IdleGame {
       this.gain(this.handValue(1, 0) * power * m.rub * dt, "hand");
     }
     const pouring = i.carrying && i.rubbing > 0;
-    if (pouring && !this.pouring) s.stats.pours += 1;
+    if (pouring && !this.pouring) {
+      s.stats.pours += 1;
+      this.satisfy("oil");
+    }
     this.pouring = pouring;
 
     if (
@@ -250,6 +273,8 @@ export class IdleGame {
       this.emit("buffs");
     }
 
+    this.stepCraving(dt, live && !document.hidden);
+
     this.timers.check -= dt;
     if (this.timers.check <= 0) {
       this.timers.check = 1;
@@ -270,6 +295,55 @@ export class IdleGame {
 
   save() {
     save(this.state);
+  }
+
+  stepCraving(dt, live) {
+    const c = this.craving;
+    if (c) {
+      if (c.id === "rub" && this.i.rubbing > 0) c.rubbed += dt;
+      c.squirm -= dt;
+      if (c.squirm <= 0) {
+        c.squirm = between(SQUIRM_EVERY);
+        const left = (c.until - Date.now()) / (CRAVE_SECONDS * 1000);
+        this.i.squirm(0.5 + (1 - left));
+      }
+      if (c.rubbed >= CRAVE_RUB) this.satisfy("rub");
+      else if (Date.now() > c.until) {
+        this.craving = null;
+        this.emit("craving", { craving: c, done: false });
+      }
+      return;
+    }
+    const s = this.state;
+    const m = this.model;
+    if (!live || m.handsOff || s.stats.bursts < 1) return;
+    this.timers.crave -= dt;
+    if (this.timers.crave > 0) return;
+    this.startCraving();
+  }
+
+  startCraving() {
+    this.timers.crave = between(CRAVE_EVERY);
+    const craving = pick(
+      CRAVINGS.filter((option) => option.can(this.model, this.activeToys)),
+    );
+    this.craving = {
+      ...craving,
+      until: Date.now() + CRAVE_SECONDS * 1000,
+      rubbed: 0,
+      squirm: 0,
+    };
+    this.emit("craving", { craving: this.craving, done: null });
+  }
+
+  satisfy(id) {
+    const c = this.craving;
+    if (c?.id !== id) return;
+    this.craving = null;
+    this.state.stats.cravings += 1;
+    this.addBuff("crave", BUFFS.crave.seconds);
+    this.i.squirm(2.5);
+    this.emit("craving", { craving: c, done: true });
   }
 
   checkTrophies() {
@@ -400,10 +474,28 @@ export class IdleGame {
     );
   }
 
-  nextNectarAt() {
+  ripenTarget() {
+    return Math.max(1, Math.ceil(this.state.nectarTotal * RIPEN_READY));
+  }
+
+  ripenReady() {
+    return this.pendingNectar() >= this.ripenTarget();
+  }
+
+  ripenBoost(gain = this.pendingNectar()) {
+    const { nectarTotal } = this.state;
+    const power = this.model.nectarPower;
+    return (1 + (nectarTotal + gain) * power) / (1 + nectarTotal * power) - 1;
+  }
+
+  secondsToRipe() {
     const s = this.state;
-    const next = s.nectarTotal + this.pendingNectar() + 1;
-    return juiceForNectar(next, this.model.nectarGain);
+    const goal = juiceForNectar(
+      s.nectarTotal + this.ripenTarget(),
+      this.model.nectarGain,
+    );
+    const need = goal - s.juiceTotal;
+    return need > 0 && this.rate > 0 ? need / this.rate : 0;
   }
 
   ripen(dare = null) {

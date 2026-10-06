@@ -387,6 +387,7 @@ export class Panel {
     this.buttons.ripen.hidden =
       state.nectarTotal === 0 &&
       state.nectar === 0 &&
+      state.tree.length === 0 &&
       this.game.pendingNectar() === 0 &&
       state.stats.ripens === 0;
     const badge = (id, count) => {
@@ -395,7 +396,7 @@ export class Panel {
       setText(b, count);
     };
     badge("upgrades", this.views.upgrades.affordableCount());
-    badge("ripen", this.game.pendingNectar() > 0 ? "!" : 0);
+    badge("ripen", this.game.ripenReady() ? "!" : 0);
     if (this.buttons[this.current].hidden) this.show("helpers");
     this.views[this.current].update();
   }

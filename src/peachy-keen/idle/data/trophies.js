@@ -2,9 +2,15 @@ import { HELPERS } from "./helpers";
 import { SEEDS } from "./orchard";
 import { DARES } from "./dares";
 import { TREE } from "./tree";
-import { format } from "../numbers";
+import { format, formatTime } from "../numbers";
 
 const owned = (s, id) => s.helpers[id] || 0;
+const counted = (need, count, show = format) => ({
+  need,
+  count,
+  show,
+  test: (s) => count(s) >= need,
+});
 
 const JUICE = [
   [1e3, "Moist", "Earn a thousand juice."],
@@ -25,7 +31,7 @@ const JUICE = [
   id: `juice-${n}`,
   name,
   about,
-  test: (s) => s.juiceTotal >= n,
+  ...counted(n, (s) => s.juiceTotal),
 }));
 
 const RATE = [
@@ -42,7 +48,7 @@ const RATE = [
   id: `rate-${n}`,
   name,
   about: `Make ${format(n)} juice per second.`,
-  test: (s) => s.stats.bestRate >= n,
+  ...counted(n, (s) => s.stats.bestRate),
 }));
 
 const SMACKS = [
@@ -61,7 +67,7 @@ const SMACKS = [
   id: n === 1 ? "first" : `smacks-${n}`,
   name,
   about,
-  test: (s) => s.stats.smacks >= n,
+  ...counted(n, (s) => s.stats.smacks),
 }));
 
 const BURSTS = [
@@ -76,7 +82,7 @@ const BURSTS = [
   id: n === 1 ? "pop" : `bursts-${n}`,
   name,
   about,
-  test: (s) => s.stats.bursts >= n,
+  ...counted(n, (s) => s.stats.bursts),
 }));
 
 const GOLDEN = [
@@ -90,7 +96,7 @@ const GOLDEN = [
   id: `golden-${n}`,
   name,
   about,
-  test: (s) => s.stats.goldens >= n,
+  ...counted(n, (s) => s.stats.goldens),
 }));
 
 const COMBOS = [
@@ -103,7 +109,7 @@ const COMBOS = [
   id: n === 10 ? "drum" : `combo-${n}`,
   name,
   about,
-  test: (s) => s.stats.bestCombo >= n,
+  ...counted(n, (s) => s.stats.bestCombo),
 }));
 
 const HELPER_COUNTS = [
@@ -119,7 +125,7 @@ const HELPER_TROPHIES = HELPERS.flatMap((h) =>
     name: name(h),
     about: about(h),
     icon: h.id,
-    test: (s) => owned(s, h.id) >= n,
+    ...counted(n, (s) => owned(s, h.id)),
   })),
 );
 
@@ -133,7 +139,7 @@ const RIPENS = [
   id: `ripen-${n}`,
   name,
   about,
-  test: (s) => s.stats.ripens >= n,
+  ...counted(n, (s) => s.stats.ripens),
 }));
 
 const ORCHARD = [
@@ -142,21 +148,21 @@ const ORCHARD = [
     id: "plant-1",
     name: "Green thumb",
     about: "Plant a pit in the Orchard.",
-    test: (s) => s.stats.plantings >= 1,
+    ...counted(1, (s) => s.stats.plantings),
   },
   {
     icon: "seed",
     id: "harvest-10",
     name: "Harvest festival",
     about: "Harvest 10 ripe peaches.",
-    test: (s) => s.stats.harvests >= 10,
+    ...counted(10, (s) => s.stats.harvests),
   },
   {
     icon: "seed",
     id: "harvest-100",
     name: "Peach farmer",
     about: "Harvest 100 ripe peaches.",
-    test: (s) => s.stats.harvests >= 100,
+    ...counted(100, (s) => s.stats.harvests),
   },
   ...SEEDS.slice(2).map((seed) => ({
     icon: "seed",
@@ -180,13 +186,25 @@ const SPECIAL = [
     id: "unwrapped",
     name: "Unwrapped",
     about: "The lingerie came off.",
-    test: (s) => s.stats.strips >= 1,
+    ...counted(1, (s) => s.stats.strips),
   },
   {
     id: "atomic",
     name: "Atomic",
     about: "A wedgie with a snap.",
-    test: (s) => s.stats.wedgies >= 1,
+    ...counted(1, (s) => s.stats.wedgies),
+  },
+  {
+    id: "mind-reader",
+    name: "Mind reader",
+    about: "Give the peach what it craves ten times.",
+    ...counted(10, (s) => s.stats.cravings),
+  },
+  {
+    id: "love-language",
+    name: "Love language",
+    about: "Give the peach what it craves a hundred times.",
+    ...counted(100, (s) => s.stats.cravings),
   },
   {
     id: "slippery",
@@ -204,55 +222,55 @@ const SPECIAL = [
     id: "crit",
     name: "Right there",
     about: "Land a critical smack.",
-    test: (s) => s.stats.crits >= 1,
+    ...counted(1, (s) => s.stats.crits),
   },
   {
     id: "twerk",
     name: "Look what I can do",
     about: "Let the peach twerk for you.",
-    test: (s) => s.stats.twerks >= 1,
+    ...counted(1, (s) => s.stats.twerks),
   },
   {
     id: "away",
     name: "Did you miss me?",
     about: "Come back after at least an hour away.",
-    test: (s) => s.stats.longestAway >= 3600,
+    ...counted(3600, (s) => s.stats.longestAway, formatTime),
   },
   {
     id: "overnight",
     name: "Morning glory",
     about: "Come back after at least eight hours away.",
-    test: (s) => s.stats.longestAway >= 8 * 3600,
+    ...counted(8 * 3600, (s) => s.stats.longestAway, formatTime),
   },
   {
     id: "hot",
     name: "Hot to trot",
     about: "Heat the peach to the edge.",
-    test: (s) => s.stats.hottest >= 99,
+    ...counted(99, (s) => s.stats.hottest),
   },
   {
     id: "massage",
     name: "Masseur",
     about: "Rub the peach for a full minute in total.",
-    test: (s) => s.stats.rubSeconds >= 60,
+    ...counted(60, (s) => s.stats.rubSeconds),
   },
   {
     id: "grabby",
     name: "Grabby",
     about: "Grab the peach 50 times.",
-    test: (s) => s.stats.grabs >= 50,
+    ...counted(50, (s) => s.stats.grabs),
   },
   {
     id: "shopaholic",
     name: "Shopaholic",
     about: "Own 50 upgrades at once.",
-    test: (s) => s.upgrades.length >= 50,
+    ...counted(50, (s) => s.upgrades.length),
   },
   {
     id: "collector",
     name: "Completionist",
     about: "Own 100 upgrades at once.",
-    test: (s) => s.upgrades.length >= 100,
+    ...counted(100, (s) => s.upgrades.length),
   },
   {
     id: "frenzy-golden",
@@ -270,25 +288,25 @@ const SPECIAL = [
     id: "pits-100",
     name: "The pits",
     about: "Collect 100 pits in total.",
-    test: (s) => s.pitsTotal >= 100,
+    ...counted(100, (s) => s.pitsTotal),
   },
   {
     id: "tree-all",
     name: "Starstruck",
     about: "Light every star in the Peachy Way.",
-    test: (s) => s.tree.length >= TREE.length,
+    ...counted(TREE.length, (s) => s.tree.length),
   },
   {
     id: "played-hour",
     name: "Committed",
     about: "Play for a total of one hour.",
-    test: (s) => s.stats.played >= 3600,
+    ...counted(3600, (s) => s.stats.played, formatTime),
   },
   {
     id: "played-day",
     name: "Devoted",
     about: "Play for a total of 24 hours.",
-    test: (s) => s.stats.played >= 86400,
+    ...counted(86400, (s) => s.stats.played, formatTime),
   },
 ];
 

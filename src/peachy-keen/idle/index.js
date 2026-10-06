@@ -2,6 +2,7 @@ import { IdleGame } from "./game";
 import { Orchard } from "./orchard";
 import { Panel } from "./panel";
 import { Hud } from "./hud";
+import { CravingLook } from "./craving-look";
 import { Popups } from "./popups";
 import { Modal } from "./modal";
 import { GoldenPeach } from "./golden";
@@ -41,6 +42,7 @@ export function createIdle({
   settings.useStore("peachy-keen-idle-settings");
   const game = new IdleGame(interaction);
   game.buzzer = buzzer;
+  const cravingLook = new CravingLook(game, interaction);
   const orchard = new Orchard(game);
   const modal = new Modal();
   const popups = new Popups(modal);
@@ -192,6 +194,19 @@ export function createIdle({
     hud.hold("pits", pits);
     hud.flyPits(golden.claimedAt, pits);
   });
+  game.on("craving", ({ done }) => {
+    if (done === null) {
+      playNotes([659, 880], { gap: 0.09, length: 0.18, volume: 0.04 });
+    } else if (done) {
+      const at = interaction.toScreen(interaction.group.position);
+      popups.big(at.x, at.y - 30, "×3", "all juice for 30 seconds");
+      playNotes([523, 659, 784, 1046], {
+        gap: 0.06,
+        length: 0.2,
+        volume: 0.05,
+      });
+    }
+  });
   game.on("toy", (toy) =>
     popups.toast(
       "New toy",
@@ -289,6 +304,7 @@ export function createIdle({
     update(realDelta) {
       game.tick();
       orchard.update(realDelta);
+      cravingLook.update(realDelta);
       hud.update();
       panel.update(realDelta);
       renders.update();

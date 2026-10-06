@@ -7,6 +7,7 @@ import { TOY_BY_ID } from "./data/toys";
 import { bulkCost, maxAffordable } from "./numbers";
 
 export const NECTAR_SCALE = 1e9;
+const NECTAR_ROOT = 5;
 export const OFFLINE_BASE = { rate: 0.25, hours: 8 };
 export const HEAT_CAP_COLD = 60;
 
@@ -16,14 +17,15 @@ export const BUFFS = {
   spill: { name: "Oil spill", about: "Fully oiled, oil ×3", seconds: 30 },
   showcase: { name: "Showcase", about: "One helper goes wild", seconds: 30 },
   wave: { name: "Heat wave", about: "Heat never cools", seconds: 20 },
+  crave: { name: "Satisfied ×3", about: "All juice ×3", seconds: 30 },
 };
 
 export function nectarFor(juiceTotal, gain = 1) {
-  return Math.floor(Math.cbrt(juiceTotal / NECTAR_SCALE) * gain);
+  return Math.floor((juiceTotal / NECTAR_SCALE) ** (1 / NECTAR_ROOT) * gain);
 }
 
 export function juiceForNectar(nectar, gain = 1) {
-  return (nectar / gain) ** 3 * NECTAR_SCALE;
+  return (nectar / gain) ** NECTAR_ROOT * NECTAR_SCALE;
 }
 
 function activeEffects(state, now, toys) {
@@ -305,6 +307,7 @@ export function flushMult(m, heat) {
 export function liveRate(m, state, { heat = 0, oil = 0 }, now = Date.now()) {
   let rate = m.helperJps * (1 + m.glaze * oil) * flushMult(m, heat);
   if (buffActive(state, "frenzy", now)) rate *= 7;
+  if (buffActive(state, "crave", now)) rate *= 3;
   const show = buffActive(state, "showcase", now);
   if (show) rate += m.totals[show.helper] * show.power;
   return rate;
@@ -320,6 +323,7 @@ export function smackValue(m, state, live, hit, now = Date.now()) {
   value *= 1 + live.oil * m.oil * spill;
   value *= flushMult(m, live.heat);
   if (buffActive(state, "frenzy", now)) value *= 7;
+  if (buffActive(state, "crave", now)) value *= 3;
   if (buffActive(state, "storm", now)) value *= 777;
   return value;
 }

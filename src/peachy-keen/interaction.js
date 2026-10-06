@@ -353,6 +353,15 @@ export class Interaction {
     this.talk.say("shake", 0.2);
   }
 
+  squirm(amount) {
+    if (this.phase !== "live") return;
+    const size = amount * (reducedMotion.matches ? 0.3 : 1);
+    this.spin.z += (Math.random() - 0.5) * size * 1.6;
+    this.squashVelocity.x += size * 0.8;
+    this.wobbleAll(0.04 + size * 0.05);
+    this.wake();
+  }
+
   begin() {
     this.enter();
   }

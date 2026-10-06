@@ -79,6 +79,10 @@ export class Hud {
       this.game.state.buffs.some((b) => b.id === "frenzy"),
     );
     document.body.classList.toggle(
+      "is-satisfied",
+      this.game.state.buffs.some((b) => b.id === "crave"),
+    );
+    document.body.classList.toggle(
       "is-storm",
       this.game.state.buffs.some((b) => b.id === "storm"),
     );

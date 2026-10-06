@@ -13,10 +13,11 @@ import { iconSvg } from "../icons";
 import { format, formatTime } from "../numbers";
 
 const COLS = 7;
-const ROWS = 7;
+const ROWS = Math.max(...TREE.map((n) => n.at[1])) + 1;
 const STRETCH = 1.2;
 const HEIGHT = ROWS * STRETCH;
-const STARS = 46;
+const STARS = ROWS * 7;
+const RIPE_SOON = 7 * 86400;
 const canHover = window.matchMedia("(hover: hover)");
 
 const hash = (text) =>
@@ -66,6 +67,8 @@ export class RipenView {
     this.button = el("button", "ripen-button", top);
     this.button.type = "button";
     this.button.addEventListener("click", () => this.askRipen());
+    const meter = el("div", "ripen-meter", top);
+    this.meterFill = el("span", "ripen-meter-fill", meter);
     this.next = el("p", "ripen-next", top);
 
     el("h3", "shop-title", root, "The Peachy Way");
@@ -228,9 +231,11 @@ export class RipenView {
     const m = game.model;
     const gain = game.pendingNectar();
     const bonus = Math.round((m.nectarMult - 1) * 100);
+    const boost = Math.round(game.ripenBoost(gain) * 100);
+    const target = game.ripenTarget();
     setText(
       this.summary,
-      `You have earned ${format(s.nectarTotal, { whole: true })} nectar in total, for +${format(bonus, { whole: true })}% juice. Ripening now earns ${format(gain, { whole: true })} more.`,
+      `You have earned ${format(s.nectarTotal, { whole: true })} nectar in total, for +${format(bonus, { whole: true })}% juice. Ripening now earns ${format(gain, { whole: true })} more${gain > 0 ? `, so your next run earns +${format(boost, { whole: true })}% juice` : ""}.`,
     );
     setText(
       this.button,
@@ -239,10 +244,14 @@ export class RipenView {
         : "Not ripe yet",
     );
     this.button.disabled = gain <= 0;
-    setText(
-      this.next,
-      `Next nectar at ${format(game.nextNectarAt())} juice earned in total (you have ${format(s.juiceTotal)}).`,
-    );
+    this.meterFill.style.transform = `scaleX(${Math.min(1, gain / target)})`;
+    toggle(this.meterFill, "is-ready", gain >= target);
+    const wait = game.secondsToRipe();
+    let next = `Ripe at ${format(target, { whole: true })} nectar.`;
+    if (gain >= target) next = "Ripe. A good moment to ripen.";
+    else if (wait > 0 && wait < RIPE_SOON)
+      next += ` About ${formatTime(wait)} at this pace.`;
+    setText(this.next, next);
     setText(
       this.balance,
       `${format(s.nectar, { whole: true })} nectar to light stars with.`,

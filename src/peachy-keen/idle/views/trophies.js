@@ -1,11 +1,36 @@
 import { TROPHIES } from "../data/trophies";
-import { el, setText, setDetail, clearOnLeave, floatBeside } from "../dom";
+import {
+  el,
+  setText,
+  setDetail,
+  clearOnLeave,
+  floatBeside,
+  toggle,
+} from "../dom";
 import { iconSvg } from "../icons";
+
+const NEAR = 3;
 
 export class TrophiesView {
   constructor(game, root) {
     this.game = game;
     this.summary = el("p", "shop-note", root);
+    this.nearTitle = el("h3", "shop-title", root, "Almost there");
+    const list = el("ol", "near", root);
+    this.near = Array.from({ length: NEAR }, () => {
+      const li = el("li", "near-row", list);
+      const icon = el("span", "near-icon", li);
+      const main = el("span", "near-main", li);
+      const head = el("span", "near-head", main);
+      return {
+        li,
+        icon,
+        name: el("span", "near-name", head),
+        count: el("span", "near-count", head),
+        about: el("span", "near-about", main),
+        bar: el("b", "", el("i", "near-bar", main)),
+      };
+    });
     this.grid = el("div", "trophies", root);
     this.detail = el("p", "shop-detail is-floating", root);
     this.detail.setAttribute("aria-live", "polite");
@@ -28,7 +53,38 @@ export class TrophiesView {
     floatBeside(this.detail, anchor);
   }
 
+  updateNear() {
+    const s = this.game.state;
+    const owned = new Set(s.achievements);
+    const near = TROPHIES.filter((t) => t.need && !owned.has(t.id))
+      .map((t) => {
+        const have = t.count(s);
+        return { t, have, share: have / t.need };
+      })
+      .filter(({ share }) => share > 0)
+      .sort((a, b) => b.share - a.share)
+      .slice(0, NEAR);
+    this.nearTitle.hidden = !near.length;
+    for (let n = 0; n < NEAR; n += 1) {
+      const row = this.near[n];
+      const pick = near[n];
+      toggle(row.li, "is-empty", !pick);
+      if (pick) {
+        const { t, have, share } = pick;
+        if (row.id !== t.id) {
+          row.id = t.id;
+          row.icon.innerHTML = iconSvg(t.icon || "trophy");
+          setText(row.name, t.name);
+          setText(row.about, t.about);
+        }
+        setText(row.count, `${t.show(have)} / ${t.show(t.need)}`);
+        row.bar.style.transform = `scaleX(${share})`;
+      }
+    }
+  }
+
   update() {
+    this.updateNear();
     const { achievements } = this.game.state;
     if (achievements.length === this.shown) return;
     this.shown = achievements.length;

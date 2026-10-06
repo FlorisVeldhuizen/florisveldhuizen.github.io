@@ -278,11 +278,7 @@ const LINES = {
       "Is everyone watching?",
       "My cheeks have rhythm?",
     ],
-    golden: [
-      "Was that… gold?",
-      "You caught it! For me?",
-      "So sparkly…",
-    ],
+    golden: ["Was that… gold?", "You caught it! For me?", "So sparkly…"],
     ripen: [
       "I feel… new.",
       "Do I look different?",

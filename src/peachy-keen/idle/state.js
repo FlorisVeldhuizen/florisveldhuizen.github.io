@@ -1,5 +1,8 @@
+import { buildModel, nectarFor } from "./economy";
+import { TREE_BY_ID } from "./data/tree";
+
 const STORAGE_KEY = "peachy-keen-idle";
-const VERSION = 2;
+const VERSION = 3;
 
 const freshStats = () => ({
   smacks: 0,
@@ -12,6 +15,7 @@ const freshStats = () => ({
   twerks: 0,
   wedgies: 0,
   strips: 0,
+  cravings: 0,
   harvests: 0,
   plantings: 0,
   rubSeconds: 0,
@@ -88,6 +92,15 @@ function merge(base, saved) {
   return base;
 }
 
+function rescaleNectar(state) {
+  const earned = nectarFor(state.juiceTotal, buildModel(state).nectarGain);
+  const spent = state.tree.reduce((sum, id) => sum + TREE_BY_ID[id].cost, 0);
+  Object.assign(state, {
+    nectarTotal: Math.min(state.nectarTotal, earned),
+    nectar: Math.min(state.nectar, Math.max(0, earned - spent)),
+  });
+}
+
 export function decode(text) {
   const saved = JSON.parse(text);
   if (!saved || typeof saved !== "object" || typeof saved.juice !== "number")
@@ -95,6 +108,7 @@ export function decode(text) {
   const state = merge(freshState(), saved);
   if (state.version < 2 && state.toys.includes("talk")) state.toys.push("shy");
   if (state.options.helperStyle === "props") state.options.helperStyle = "room";
+  if (state.version < 3) rescaleNectar(state);
   state.version = VERSION;
   return state;
 }

@@ -248,6 +248,62 @@ export const TREE = [
     parent: "overripe",
     effects: [{ kind: "nectarGain", mult: 1.5 }],
   },
+  {
+    id: "lode",
+    icon: "golden",
+    name: "Mother lode",
+    about: "Lucky golden peaches pay twice as much.",
+    cost: 750,
+    at: [5, 7],
+    parent: "midas",
+    effects: [{ kind: "lucky", mult: 2 }],
+  },
+  {
+    id: "academy",
+    icon: "hand",
+    name: "Old school",
+    about:
+      "Every run starts with 100 Feathers, 75 Admirers, 50 Paddles and 25 Masseuses.",
+    cost: 1000,
+    at: [2, 7],
+    parent: "sticky",
+    effects: [
+      {
+        kind: "start",
+        helpers: { feather: 100, admirer: 75, paddle: 50, masseuse: 25 },
+      },
+    ],
+  },
+  {
+    id: "roots",
+    icon: "nectar",
+    name: "Deep roots",
+    about: "Every nectar you have earned gives +4% juice.",
+    cost: 1500,
+    at: [6, 8],
+    parent: "gods",
+    effects: [{ kind: "nectarPower", value: 0.04 }],
+  },
+  {
+    id: "mirrors",
+    icon: "peachverse",
+    name: "Hall of mirrors",
+    about: "Every helper works twice as hard.",
+    cost: 3000,
+    at: [3, 8],
+    parent: "academy",
+    effects: [{ kind: "helpersAll", mult: 2 }],
+  },
+  {
+    id: "bigbang",
+    icon: "nectar",
+    name: "Big bang",
+    about: "Earn 50% more nectar when you ripen.",
+    cost: 6000,
+    at: [4, 9],
+    parent: "mirrors",
+    effects: [{ kind: "nectarGain", mult: 1.5 }],
+  },
 ];
 
 export const TREE_BY_ID = Object.fromEntries(TREE.map((n) => [n.id, n]));
