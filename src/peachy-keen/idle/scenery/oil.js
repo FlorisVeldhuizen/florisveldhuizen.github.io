@@ -14,6 +14,23 @@ const MAX_TRAIL = 20;
 const DRAG = 0.4;
 const LIFE = 14;
 const FADE = 1.4;
+const MIN_HIT = 0.05;
+const FULL_HIT = 0.14;
+const HIT_REACH = 0.9;
+const SURGE = 70 * PX;
+const SURGE_DECAY = 5;
+const FLING_AT = 0.6;
+const FLING_SHRINK = 0.55;
+const FLING_TRAIL = 0.7;
+
+function nudge(d, k) {
+  /* eslint-disable no-param-reassign */
+  d.surge = (d.surge || 0) + SURGE * k;
+  d.wait = Math.min(d.wait, d.age);
+  d.trail.push({ at: d.head.clone(), r: d.r * TRAIL_SIZE * 1.15 });
+  if (d.trail.length > MAX_TRAIL) d.trail.shift();
+  /* eslint-enable no-param-reassign */
+}
 
 export class OilDrips {
   constructor(interaction, soundOn) {
@@ -31,6 +48,63 @@ export class OilDrips {
     this.normal = new Vector3();
     this.slope = new Vector3();
     this.side = new Vector3();
+    this.away = new Vector3();
+    this.i.peach.onJiggle = (point, amount, radius) =>
+      this.hit(point, amount, radius);
+  }
+
+  hit(point, amount, radius) {
+    if (amount < MIN_HIT || this.i.phase !== "live") return;
+    const reach = radius * HIT_REACH;
+    this.drips.forEach((d) => {
+      if (d.state !== "smear" || !d.attached) return;
+      const head = this.worldOf(d.head);
+      const dist = head.distanceTo(point);
+      if (dist > reach) return;
+      const k = Math.min(1, (amount / FULL_HIT) * (1 - dist / reach) ** 1.5);
+      if (k > FLING_AT && d.r > MIN_HEAD * 1.2)
+        this.fling(d, head.clone(), point, k);
+      else nudge(d, k);
+    });
+  }
+
+  fling(d, head, point, k) {
+    const n = d.normal;
+    const away = this.away.copy(head).sub(point);
+    away.addScaledVector(n, -away.dot(n));
+    if (away.lengthSq() < 1e-6) away.set(Math.random() - 0.5, 0.3, 0);
+    away.normalize();
+    head.addScaledVector(n, 0.03);
+    const count = 4 + Math.round(k * 3);
+    for (let m = 0; m < count; m += 1) {
+      const main = m === 0;
+      const velocity = n
+        .clone()
+        .multiplyScalar(
+          (1.6 + 1.6 * k) * (main ? 1 : 0.6 + Math.random() * 0.6),
+        )
+        .addScaledVector(
+          away,
+          (1.2 + 1.5 * k) * (main ? 1 : 0.5 + Math.random()),
+        );
+      if (!main)
+        velocity.add(
+          new Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.3,
+            Math.random() - 0.5,
+          ).multiplyScalar(1.4),
+        );
+      const size = main ? 0.045 : 0.014 + Math.random() * 0.016;
+      this.emit(head.clone(), velocity, size, 0.3 + Math.random() * 0.2);
+    }
+    /* eslint-disable no-param-reassign */
+    d.r = Math.max(MIN_HEAD, d.r * FLING_SHRINK);
+    d.trail.forEach((t) => {
+      t.r *= FLING_TRAIL;
+    });
+    Object.assign(d, { surge: 0, vy: 0, wait: d.age + 0.5 });
+    /* eslint-enable no-param-reassign */
   }
 
   cast(origin, direction) {
@@ -122,7 +196,8 @@ export class OilDrips {
     const i = this.i;
     const maxSpeed = (18 * PX + d.r * 2.2) * DRAG;
     d.vy = Math.min(maxSpeed, d.vy + (20 * PX + d.r) * DRAG * delta);
-    const move = d.vy * delta * motion;
+    d.surge = (d.surge || 0) * Math.exp(-SURGE_DECAY * delta);
+    const move = (d.vy + d.surge) * delta * motion;
     const n = d.normal;
     this.slope.set(0, -1, 0).addScaledVector(n, n.y);
     const steep = this.slope.length();

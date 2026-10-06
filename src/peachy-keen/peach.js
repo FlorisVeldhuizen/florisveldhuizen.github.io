@@ -2238,6 +2238,7 @@ export class Peach {
       radius / scale,
     );
     this.lastHitTime = now;
+    this.onJiggle?.(worldPoint, baseAmplitude, baseRadius);
   }
 
   setTool(name) {
