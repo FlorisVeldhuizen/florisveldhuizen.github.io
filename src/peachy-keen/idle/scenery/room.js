@@ -12,6 +12,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
+  NormalBlending,
   Object3D,
   PlaneGeometry,
   Points,
@@ -61,10 +62,12 @@ import { ringMaterial, showRing } from "../../rings";
 
 const level = (owned, full = 100) =>
   owned > 0 ? Math.min(1, Math.log10(1 + owned) / Math.log10(1 + full)) : 0;
+const crowd = (owned, most, full) =>
+  Math.min(owned, Math.round(most * level(owned, full)));
 const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 
+const ARRIVAL_GAP = 0.15;
 const SWEEP = 0.7;
-
 const TRAIL = 26;
 const STREAKS = 6;
 const HEARTS = 20;
@@ -174,7 +177,7 @@ function sprites(count, map, color, additive = false) {
         transparent: true,
         depthWrite: false,
         opacity: 0,
-        blending: additive ? AdditiveBlending : undefined,
+        blending: additive ? AdditiveBlending : NormalBlending,
       }),
     ),
     age: Math.random(),
@@ -196,7 +199,7 @@ function points(count, map, color, size, additive = true, opacity = 1) {
     transparent: true,
     opacity,
     depthWrite: false,
-    blending: additive ? AdditiveBlending : undefined,
+    blending: additive ? AdditiveBlending : NormalBlending,
   });
   const p = new Points(geometry, material);
   p.frustumCulled = false;
@@ -229,6 +232,7 @@ export class Room {
     this.group.matrixAutoUpdate = false;
     this.paddles = new Paddles(game, interaction, this.toucher, this.group);
     this.time = 0;
+    this.shown = {};
     this.dummy = new Object3D();
     this.drifter = new Object3D();
     this.middle = new Vector3();
@@ -628,12 +632,25 @@ export class Room {
     return d;
   }
 
+  arrive(key, target, delta) {
+    if (!(key in this.shown)) this.shown[key] = { count: target, wait: 0 };
+    const s = this.shown[key];
+    s.wait -= delta;
+    if (target < s.count) s.count = target;
+    else if (target > s.count && s.wait <= 0) {
+      s.count += 1;
+      s.wait = ARRIVAL_GAP;
+    }
+    return s.count;
+  }
+
   drift(mesh, data, count, delta, scale) {
     const still = reducedMotion.matches ? 0.15 : 1;
     const d = this.drifter;
     const petal = mesh === this.petals;
     for (let n = 0; n < count; n += 1) {
       const p = data[n];
+      if (n >= mesh.count) p.born = this.time; // eslint-disable-line no-param-reassign
       if (p.land) this.land(p, delta, still);
       else this.fallStep(p, delta, still, petal);
       d.position.copy(p.at);
@@ -1522,14 +1539,14 @@ export class Room {
     this.drift(
       this.feathers,
       this.featherData,
-      Math.round(36 * level(own("feather"))),
+      this.arrive("feather", crowd(own("feather"), 36), delta),
       delta,
       1,
     );
     this.drift(
       this.petals,
       this.petalData,
-      Math.round(40 * level(own("admirer"))),
+      this.arrive("petal", crowd(own("admirer"), 40), delta),
       delta,
       0.22,
     );
@@ -1538,12 +1555,16 @@ export class Room {
     this.coachBeat(delta, own("coach"));
     this.oil.update(
       delta,
-      own("baron") > 0 ? Math.max(1, Math.round(3 * level(own("baron")))) : 0,
+      this.arrive(
+        "oil",
+        Math.max(Math.sign(own("baron")), crowd(own("baron"), 3)),
+        delta,
+      ),
       this.bounds,
     );
     this.lifecycle(
       this.notes,
-      Math.round(10 * level(own("choir"), 50)),
+      this.arrive("note", crowd(own("choir"), 10, 50), delta),
       delta,
       0.18,
       (p, k) => {
@@ -1563,13 +1584,17 @@ export class Room {
       },
     );
 
-    this.heartFlock(delta, Math.round(HEARTS * level(own("admirer"))), still);
+    this.heartFlock(
+      delta,
+      this.arrive("heart", crowd(own("admirer"), HEARTS), delta),
+      still,
+    );
     if (this.wind.gustStarted)
       this.puff(Math.round(40 * level(own("admirer"))));
 
     this.lifecycle(
       this.fog,
-      Math.round(6 * level(own("spa"), 50)),
+      this.arrive("fog", crowd(own("spa"), 6, 50), delta),
       delta,
       0.05,
       (p, k) => {
@@ -1619,7 +1644,7 @@ export class Room {
         (Math.sin(t * 0.2 + n) * 0.04 + this.wind.breeze.x * 0.04) * still;
     });
 
-    const drops = Math.round(16 * level(own("press"), 50));
+    const drops = this.arrive("drop", crowd(own("press"), 16, 50), delta);
     const d = this.dummy;
     for (let n = 0; n < drops; n += 1) {
       const p = this.dropData[n];
@@ -1681,7 +1706,7 @@ export class Room {
     );
     this.droplets.instanceMatrix.needsUpdate = true;
 
-    const candles = Math.round(12 * level(own("cult"), 50));
+    const candles = this.arrive("candle", crowd(own("cult"), 12, 50), delta);
     this.floatCandles(delta, candles, rest, still);
 
     const moon = level(own("moon"), 50);
@@ -1708,10 +1733,11 @@ export class Room {
     this.moonHalo.scale.setScalar(5.5 + moon * 3);
     this.moonHalo.material.opacity = 0.2 + moon * 0.3;
 
-    const streaks =
-      own("collider") > 0
-        ? Math.max(1, Math.round(STREAKS * level(own("collider"), 50)))
-        : 0;
+    const streaks = this.arrive(
+      "streak",
+      Math.max(Math.sign(own("collider")), crowd(own("collider"), STREAKS, 50)),
+      delta,
+    );
     const trail = this.sparks.geometry.attributes;
     const heads = [];
     for (let n = 0; n < streaks; n += 1) {
