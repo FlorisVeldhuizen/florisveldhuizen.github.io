@@ -99,7 +99,9 @@
 
 .buff {
   display: grid;
-  gap: 3px;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
   color: var(--gold);
   font-size: 14px;
   font-style: italic;
