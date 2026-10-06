@@ -25,13 +25,22 @@ const COUNT_DRIPS = [
 ];
 const DRIP_SHARE = 0.14;
 const COUNT_EASE = 9;
+const WIDTH_SAMPLES = 200;
 
 function countUp(node, value, drop) {
+  if (reducedMotion.matches) {
+    // eslint-disable-next-line no-param-reassign
+    node.textContent = `+${format(value)}`;
+    return;
+  }
+  let widest = 0;
+  for (let i = WIDTH_SAMPLES; i >= 0; i -= 1) {
+    // eslint-disable-next-line no-param-reassign
+    node.textContent = `+${format((value * i) / WIDTH_SAMPLES)}`;
+    widest = Math.max(widest, node.getBoundingClientRect().width);
+  }
   // eslint-disable-next-line no-param-reassign
-  node.textContent = `+${format(value)}`;
-  if (reducedMotion.matches) return;
-  // eslint-disable-next-line no-param-reassign
-  node.style.minWidth = `${node.getBoundingClientRect().width}px`;
+  node.style.minWidth = `${widest}px`;
   const start = performance.now();
   let last = start;
   let drips = 0;
