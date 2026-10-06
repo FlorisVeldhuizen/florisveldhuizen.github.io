@@ -5,6 +5,7 @@ import {
   CanvasTexture,
   Color,
   DoubleSide,
+  Euler,
   Group,
   InstancedBufferAttribute,
   InstancedMesh,
@@ -15,6 +16,7 @@ import {
   PlaneGeometry,
   Points,
   PointsMaterial,
+  Quaternion,
   ShaderMaterial,
   SphereGeometry,
   SRGBColorSpace,
@@ -66,6 +68,14 @@ const TRAIL = 26;
 const STREAKS = 6;
 const HEARTS = 20;
 const NEAREST_DRIFT = 0.8;
+const FACING = new Vector3(0, 0, 1);
+const LIE_FLAT = new Quaternion().setFromAxisAngle(
+  new Vector3(1, 0, 0),
+  -Math.PI / 2,
+);
+const FACE_CAMERA = 0.6;
+const SLIDE_PULL = 1.2;
+const GRIP = 0.6;
 const STEADY = 0.85;
 const RING_TILT = 0.32;
 const MOON_CROSSING = 300;
@@ -212,10 +222,16 @@ export class Room {
     this.time = 0;
     this.dummy = new Object3D();
     this.drifter = new Object3D();
+    this.middle = new Vector3();
     this.drifter.rotation.order = "YZX";
     this.bounds = new Vector3(1.7, 1.5, 1.5);
     this.measureTimer = 0;
     this.tmp = new Vector3();
+    this.probe = new Vector3();
+    this.normal = new Vector3();
+    this.slope = new Vector3();
+    this.turn = new Euler();
+    this.spinQ = new Quaternion();
     this.air = new Vector3();
     this.wind = new Wind(camera, interaction);
     this.halfHeightAt = (z) => this.halfHeight(z);
@@ -452,43 +468,84 @@ export class Room {
     }
   }
 
-  surfacePoint(upper = false) {
+  land(p, delta, still) {
+    /* eslint-disable no-param-reassign */
+    const l = p.land;
     const center = this.i.group.position;
-    const { x, y } = this.bounds;
-    return this.oil.surfaceAt(
-      center.x + (Math.random() - 0.5) * x * 1.3,
-      center.y + (upper ? Math.random() * 0.7 : Math.random() * 1.4 - 0.7) * y,
-    );
+    const at = this.tmp
+      .copy(l.local)
+      .applyMatrix4(this.i.peach.mesh.matrixWorld);
+    const carried = at.distanceTo(l.last) / Math.max(delta, 1e-3);
+    const off = this.from.copy(at).sub(center);
+    const n = this.surfaceNormal(off);
+    const down = this.slope.set(n.x * n.y, n.y * n.y - 1, n.z * n.y);
+    p.v.addScaledVector(down, SLIDE_PULL * delta);
+    p.v.addScaledVector(n, -p.v.dot(n));
+    const speed = p.v.length();
+    const brake = GRIP * SLIDE_PULL * Math.max(n.y, 0) * delta;
+    if (speed <= brake) {
+      p.v.set(0, 0, 0);
+      l.rest += delta;
+    } else p.v.multiplyScalar((1 - brake / speed) * Math.exp(-2 * delta));
+    at.addScaledVector(p.v, delta * still);
+    off.copy(at).sub(center);
+    const s = this.ellipse(off);
+    if (speed > brake && this.time - p.shellAt > 0.15)
+      this.measureShell(p, off, s);
+    at.copy(center).addScaledVector(off, p.shell / s);
+    this.i.peach.toLocal(at, l.local);
+    l.last.copy(at);
+    p.flatQ
+      .setFromUnitVectors(FACING, n)
+      .multiply(this.spinQ.setFromAxisAngle(FACING, p.seed));
+    p.at.copy(at).addScaledVector(n, 0.03 + 0.08 * (1 - (p.flat ?? 0)));
+    const tired = l.rest > l.stay;
+    if (n.y > 0.1 && !tired && carried < 2.5) return;
+    if (tired) {
+      p.v.copy(n).multiplyScalar(0.25).x += (Math.sign(off.x) || 1) * 0.4;
+    }
+    p.land = null;
+    p.shell = undefined;
+    p.bumped = this.time;
+    /* eslint-enable no-param-reassign */
   }
 
-  land(p, delta) {
-    const l = p.land;
-    const mesh = this.i.peach.mesh;
-    this.tmp.copy(l.local).applyMatrix4(mesh.matrixWorld);
-    if (l.stick > 0) {
-      l.stick -= delta;
-      p.at.copy(this.tmp).z += 0.03;
-      if (l.stick <= 0) {
-        // eslint-disable-next-line no-param-reassign
-        p.land = null;
-        // eslint-disable-next-line no-param-reassign
-        p.fall = 0.25;
-      }
-      return;
-    }
-    const to = this.from.copy(this.tmp).sub(p.at);
-    const dist = to.length();
-    if (dist < 0.06) {
-      l.stick = 2.5 + Math.random() * 2;
-      return;
-    }
-    p.at.addScaledVector(to, Math.min(1, (0.9 * delta) / dist));
+  ellipse(off) {
+    const { x, y, z } = this.bounds;
+    return Math.hypot(off.x / x, off.y / y, off.z / z);
+  }
+
+  surfaceNormal(off) {
+    const { x, y, z } = this.bounds;
+    return this.normal
+      .set(off.x / x / x, off.y / y / y, off.z / z / z)
+      .normalize();
+  }
+
+  measureShell(p, off, s) {
+    /* eslint-disable no-param-reassign */
+    const out = 1.5;
+    this.probe.copy(this.i.group.position).addScaledVector(off, out / s);
+    const hit = this.toucher.hitFrom(this.probe);
+    p.shell = hit ? out - (hit.distance * s) / off.length() : 1;
+    p.shellAt = this.time;
+    /* eslint-enable no-param-reassign */
   }
 
   // eslint-disable-next-line class-methods-use-this
   halfHeight(z) {
     const cam = this.camera;
     return Math.tan((cam.fov * Math.PI) / 360) * (cam.userData.baseZ - z);
+  }
+
+  viewMiddle(z) {
+    const { position, view } = this.camera;
+    const px = view ? (2 * this.halfHeight(z)) / view.fullHeight : 0;
+    return this.middle.set(
+      position.x + (view?.offsetX ?? 0) * px,
+      position.y - (view?.offsetY ?? 0) * px,
+      z,
+    );
   }
 
   spawnDrift(d, top = false) {
@@ -499,7 +556,10 @@ export class Room {
     d.spin ??= new Vector3();
     d.rot ??= new Vector3();
     d.v ??= new Vector3();
-    d.at.set(rand(-6, 6), top ? edge : rand(-edge, edge), z);
+    d.flyQ ??= new Quaternion();
+    d.flatQ ??= new Quaternion();
+    const y = top ? this.viewMiddle(z).y + edge : rand(-edge, edge);
+    d.at.set(rand(-6, 6), y, z);
     d.spin.set(
       rand(1.5, 3) * (Math.random() < 0.5 ? -1 : 1),
       rand(-0.3, 0.3),
@@ -513,6 +573,8 @@ export class Room {
       flutter: rand(1.3, 1.9),
       drag: rand(0.6, 1.4),
       seed: Math.random() * 10,
+      heading: rand(0, Math.PI * 2),
+      shell: undefined,
       look: undefined,
       sweepAt: undefined,
     });
@@ -526,11 +588,19 @@ export class Room {
     const petal = mesh === this.petals;
     for (let n = 0; n < count; n += 1) {
       const p = data[n];
-      if (p.land) this.land(p, delta);
+      if (p.land) this.land(p, delta, still);
       else this.fallStep(p, delta, still, petal);
       d.position.copy(p.at);
-      if (petal) d.rotation.set(p.rot.x, p.rot.y, 0.4 * Math.sin(p.rot.z));
-      else
+      if (petal) {
+        // eslint-disable-next-line no-param-reassign
+        p.flat = Math.min(
+          1,
+          Math.max(0, (p.flat ?? 0) + (p.land ? delta : -delta) / 0.15),
+        );
+        d.quaternion.copy(p.flyQ);
+        if (p.flat > 0)
+          d.quaternion.slerp(p.flatQ, p.flat * p.flat * (3 - 2 * p.flat));
+      } else
         d.rotation.set(
           p.rot.x * 0.6,
           0.5 * Math.sin(p.seed + this.time * 0.1),
@@ -604,7 +674,7 @@ export class Room {
   fallStep(p, delta, still, petal) {
     /* eslint-disable no-param-reassign */
     const air = this.wind.sample(p.at, this.air);
-    this.aroundPeach(p.at, air);
+    if (!petal) this.aroundPeach(p.at, air);
     air.y = Math.min(air.y - p.fall, -p.fall * 0.7);
     p.v.lerp(air, ease((petal ? 1.4 : 2.4) * p.drag, delta));
     this.wind.kick(p.at, p.v, delta);
@@ -617,7 +687,20 @@ export class Room {
     const swing = Math.cos(phase);
     const glide = Math.sin(phase);
     if (petal) {
-      p.at.x += swing * 0.12 * delta * still;
+      const turn = this.time * p.flutter * 2 + p.seed;
+      const across = Math.cos(turn);
+      p.heading +=
+        Math.sin(this.time * 0.23 + p.seed * 3) * 0.5 * delta * still;
+      const step = 0.45 * across * delta * still;
+      p.at.x += Math.cos(p.heading) * step;
+      p.at.z -= Math.sin(p.heading) * step * 0.5;
+      p.at.y -= p.fall * (2.2 * across * across - 1.1) * delta * still;
+      p.flyQ
+        .setFromEuler(
+          this.turn.set(FACE_CAMERA, p.heading, 0.55 * Math.sin(turn)),
+        )
+        .multiply(LIE_FLAT)
+        .multiply(this.spinQ.setFromAxisAngle(FACING, p.rot.z));
     } else {
       p.at.x += swing * 0.9 * delta * still;
       p.at.y +=
@@ -626,7 +709,7 @@ export class Room {
         still;
     }
     p.rot.addScaledVector(p.spin, delta * still * (0.5 + p.v.length() * 0.8));
-    const cam = this.camera.position;
+    const cam = this.viewMiddle(p.at.z);
     const high = this.halfHeight(p.at.z);
     const wide = high * this.camera.aspect + 0.8;
     if (p.at.x - cam.x > wide) p.at.x -= 2 * wide;
@@ -637,14 +720,10 @@ export class Room {
     }
     if (p.at.y < cam.y - high - 0.8) {
       this.spawnDrift(p, true);
-      if (petal && Math.random() < 0.3) {
-        const hit = this.surfacePoint(true);
-        if (hit)
-          p.land = {
-            local: this.i.peach.toLocal(hit.point, new Vector3()),
-            stick: 0,
-          };
-      }
+    }
+    if (petal) {
+      this.touchPeach(p);
+      return;
     }
     const center = this.i.group.position;
     const dx = p.at.x - center.x;
@@ -669,7 +748,7 @@ export class Room {
       const lean = Math.sign(dx) || (p.seed > 5 ? 1 : -1);
       p.v.x += (nx * ny + lean * 0.4 * Math.max(ny, 0)) * delta * 3;
       p.v.y += (ny * ny - 1) * delta * 3;
-      if (!petal && this.time - (p.bumped ?? -9) > 3) {
+      if (this.time - (p.bumped ?? -9) > 3) {
         const hit = this.toucher.hitFrom(p.at);
         if (hit && hit.distance < 0.35) {
           p.bumped = this.time;
@@ -678,6 +757,34 @@ export class Room {
         }
       }
     }
+    /* eslint-enable no-param-reassign */
+  }
+
+  touchPeach(p) {
+    /* eslint-disable no-param-reassign */
+    const center = this.i.group.position;
+    const off = this.from.copy(p.at).sub(center);
+    const s = this.ellipse(off);
+    if (s >= 1 || s < 1e-3) {
+      p.shell = undefined;
+      return;
+    }
+    if (p.shell === undefined || this.time - p.shellAt > 0.15)
+      this.measureShell(p, off, s);
+    if (s > p.shell) return;
+    p.at.copy(center).addScaledVector(off, p.shell / s);
+    const n = this.surfaceNormal(off);
+    p.v.addScaledVector(n, -Math.min(0, p.v.dot(n)));
+    const seen = this.slope.copy(this.camera.position).sub(p.at).normalize();
+    if (n.y < 0.2 || n.dot(seen) < 0.35) return;
+    if (this.time - (p.bumped ?? -9) < 1) return;
+    p.v.multiplyScalar(0.3);
+    p.land = {
+      local: this.i.peach.toLocal(p.at, new Vector3()),
+      last: p.at.clone(),
+      rest: 0,
+      stay: rand(1.5, 4),
+    };
     /* eslint-enable no-param-reassign */
   }
 
@@ -820,6 +927,7 @@ export class Room {
         .sub(center);
       this.bounds.x = Math.max(this.bounds.x, Math.abs(this.tmp.x));
       this.bounds.y = Math.max(this.bounds.y, Math.abs(this.tmp.y));
+      this.bounds.z = Math.max(this.bounds.z, Math.abs(this.tmp.z));
     }
   }
 
@@ -899,18 +1007,25 @@ export class Room {
 
   puff(count) {
     const { gustDir } = this.wind;
-    const cam = this.camera.position;
     const y = rand(-1.5, 2);
     const z = rand(-2, 1);
     const wide = this.halfHeight(z) * this.camera.aspect + 0.6;
     this.petalData
       .slice(0, count)
-      .filter((p) => !p.land)
+      .filter((p) => {
+        if (p.land) return false;
+        const high = this.halfHeight(p.at.z);
+        const view = this.viewMiddle(p.at.z);
+        return (
+          Math.abs(p.at.x - view.x) > high * this.camera.aspect + 0.2 ||
+          Math.abs(p.at.y - view.y) > high + 0.2
+        );
+      })
       .sort(() => Math.random() - 0.5)
       .slice(0, 5)
       .forEach((p) => {
         p.at.set(
-          cam.x - gustDir * (wide + rand(0, 3)),
+          this.viewMiddle(z).x - gustDir * (wide + rand(0, 3)),
           y + rand(-1.2, 1.2),
           z + rand(-0.9, 0.9),
         );
