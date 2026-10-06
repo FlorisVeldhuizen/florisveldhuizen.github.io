@@ -2096,7 +2096,7 @@ export class Interaction {
     const p = this.pointer;
     const held =
       !this.carrying &&
-      (this.grab || this.recoil || (p.pressed && p.downOnPeach));
+      (this.grab || this.recoil || (p.pressed && p.downOnPeach && !p.rubbing));
     this.swayRate +=
       ((held ? 0 : 1) - this.swayRate) * (1 - Math.exp(-delta * 8));
     this.sway += delta * this.swayRate;
