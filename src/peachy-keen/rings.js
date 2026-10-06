@@ -3,6 +3,7 @@ import {
   Color,
   Mesh,
   PlaneGeometry,
+  Quaternion,
   ShaderMaterial,
   Sprite,
   SpriteMaterial,
@@ -80,6 +81,7 @@ export function showRing(mesh, t, from, to, opacity) {
 
 const POOL = 3;
 const Z = new Vector3(0, 0, 1);
+const MIN_FACING = 0.7;
 
 const SPARKS = 3;
 const SPARK_LIFE = 0.3;
@@ -98,6 +100,9 @@ const glow = (map, color) =>
 export class SkinRings {
   constructor(scene, interaction) {
     this.peach = interaction.peach;
+    this.camera = interaction.camera;
+    this.view = new Vector3();
+    this.turn = new Quaternion();
     this.n = new Vector3();
     this.out = new Vector3();
     this.side = new Vector3();
@@ -120,7 +125,17 @@ export class SkinRings {
         /* eslint-enable no-param-reassign */
         scene.add(o);
       });
-      return { ring, flash, sparks, age: 1, life: 1, size: 1, power: 0 };
+      return {
+        ring,
+        flash,
+        sparks,
+        at: new Vector3(),
+        centre: new Vector3(),
+        age: 1,
+        life: 1,
+        size: 1,
+        power: 0,
+      };
     });
     interaction.on("snapback", (e) => this.add(e));
   }
@@ -132,10 +147,11 @@ export class SkinRings {
     );
     const { matrixWorld } = this.peach.mesh;
     const n = this.n.copy(normal).transformDirection(matrixWorld);
-    const at = slot.ring.position
-      .copy(local)
-      .applyMatrix4(matrixWorld)
-      .addScaledVector(n, 0.03);
+    const centre = this.peach.mesh.getWorldPosition(slot.centre);
+    const at = slot.at.copy(local).applyMatrix4(matrixWorld);
+    this.faceCamera(at, n, centre);
+    at.addScaledVector(n, 0.03);
+    slot.ring.position.copy(at);
     slot.ring.quaternion.setFromUnitVectors(Z, n);
     slot.flash.position.copy(at).addScaledVector(n, 0.15);
     const out = this.out.copy(direction).addScaledVector(n, -direction.dot(n));
@@ -162,9 +178,25 @@ export class SkinRings {
     });
   }
 
+  // Edge spots face up or down, so slide the ring toward the front like a paddle hit.
+  faceCamera(at, n, centre) {
+    const view = this.view.copy(this.camera.position).sub(at).normalize();
+    const facing = n.dot(view);
+    if (facing >= MIN_FACING) return;
+    const target = this.side.copy(n).addScaledVector(view, -facing).normalize();
+    target
+      .multiplyScalar(Math.sqrt(1 - MIN_FACING ** 2))
+      .addScaledVector(view, MIN_FACING);
+    this.turn.setFromUnitVectors(n, target);
+    at.sub(centre).applyQuaternion(this.turn).add(centre);
+    n.copy(target);
+  }
+
   update(delta) {
+    const now = this.peach.mesh?.getWorldPosition(this.view);
     this.slots.forEach((slot) => {
       if (slot.age >= slot.life) return;
+      slot.ring.position.copy(slot.at).add(now).sub(slot.centre);
       /* eslint-disable no-param-reassign */
       slot.age = Math.min(slot.life, slot.age + delta);
       const { age, flash } = slot;
