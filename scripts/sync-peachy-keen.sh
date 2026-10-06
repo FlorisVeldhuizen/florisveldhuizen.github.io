@@ -6,7 +6,7 @@ set -euo pipefail
 site_dir=$(cd "$(dirname "$0")/.." && pwd)
 ref=${1:-master}
 target=${2:-"$site_dir/../peachy-keen"}
-keep=(.git package.json vite.config.js .gitignore README.md yarn.lock node_modules)
+keep=(.git package.json vite.config.js .gitignore README.md yarn.lock node_modules wrangler.jsonc)
 
 if [ -n "$(git -C "$target" status --porcelain)" ]; then
   echo "Standalone repo has uncommitted changes: $target" >&2
