@@ -319,7 +319,9 @@ export class OrchardView {
         toggle(b, "is-short", short > 0);
         const cost = b.querySelector("small");
         cost.innerHTML = pitTag(
-          short > 0 ? `${format(short, { whole: true })} more` : seed.pits,
+          short > 0
+            ? `Need ${format(short, { whole: true })} more`
+            : `Costs ${format(seed.pits, { whole: true })}`,
         );
         b.setAttribute(
           "aria-label",
