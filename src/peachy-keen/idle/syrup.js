@@ -253,6 +253,10 @@ export function pitWobble(svg) {
       wobble.v -= 2.6 + 1.4 * size;
       tilt.v += (Math.random() * 2 - 1) * (26 + 14 * size);
     },
+    thump(size) {
+      wobble.v -= 9.2 + 11 * size;
+      tilt.v += (Math.random() * 2 - 1) * (40 + 50 * size);
+    },
     step(dt) {
       wobble.step(dt);
       tilt.step(dt);

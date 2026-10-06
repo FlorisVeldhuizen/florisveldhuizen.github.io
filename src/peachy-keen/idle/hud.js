@@ -10,9 +10,13 @@ import { RollingNumber } from "./rolling-number";
 
 const ROLL_RATE = 10;
 const PIT_FLIERS = 5;
-const PIT_STAGGER_MS = 90;
-const PIT_DELAY_MS = 280;
-const PIT_FLIGHT_MS = 950;
+const PIT_STAGGER = 0.035;
+const PIT_DELAY_MS = 220;
+const PIT_GRAVITY = 1700;
+const PIT_POP_SPEED = 620;
+const PIT_FAN = 0.9;
+const PIT_SIZE = 1.35;
+const PIT_DOCK = 14 / 22;
 const PIT_NOTES = [784, 880, 988, 1047, 1175];
 const HOLD_LIMIT_MS = 8000;
 
@@ -35,6 +39,7 @@ export class Hud {
     this.steppedAt = performance.now();
     this.held = { juice: 0, pits: 0 };
     this.heldAt = 0;
+    this.fliers = [];
     this.layer = el("div", "gain-layer", document.body);
     this.layer.setAttribute("aria-hidden", "true");
     game.on("buffs", () => this.buildBuffs());
@@ -96,68 +101,102 @@ export class Hud {
       this.release("pits", pits);
       return;
     }
-    const fliers = Math.min(pits, PIT_FLIERS);
-    const box = this.pitIcon.getBoundingClientRect();
-    const to = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-    for (let n = 0; n < fliers; n += 1) {
-      const carry = Math.floor(pits / fliers) + (n < pits % fliers ? 1 : 0);
-      const last = n === fliers - 1;
-      setTimeout(
-        () =>
-          this.flyPit(from, to, () => {
-            this.release("pits", carry, last ? 1 : 0);
-            playNotes(
-              last ? [PIT_NOTES[n], PIT_NOTES[n] / 2] : [PIT_NOTES[n]],
-              { gap: 0.07, length: 0.16, volume: 0.04 },
-            );
-          }),
-        PIT_DELAY_MS + n * PIT_STAGGER_MS,
-      );
-    }
+    const count = Math.min(pits, PIT_FLIERS);
+    const toward = Math.sign(this.pitTarget().x - from.x) || 1;
+    const trip = { count, landed: 0 };
+    setTimeout(() => {
+      for (let n = 0; n < count; n += 1) {
+        const fan = count === 1 ? 0 : (n / (count - 1) - 0.5) * 2 * PIT_FAN;
+        const a =
+          -Math.PI / 2 + toward * 0.25 + fan + (Math.random() - 0.5) * 0.2;
+        const speed = PIT_POP_SPEED * (0.85 + Math.random() * 0.3);
+        const node = el("div", "pit-flier", this.layer, pitIcon());
+        node.style.visibility = "hidden";
+        this.fliers.push({
+          node,
+          trip,
+          carry: Math.floor(pits / count) + (n < pits % count ? 1 : 0),
+          x: from.x + (Math.random() - 0.5) * 30,
+          y: from.y + (Math.random() - 0.5) * 20,
+          vx: Math.cos(a) * speed,
+          vy: Math.sin(a) * speed,
+          age: -n * PIT_STAGGER,
+          popFor: 0.36 + Math.random() * 0.12,
+          angle: Math.random() * 360,
+          spin: (Math.random() < 0.5 ? -1 : 1) * (500 + Math.random() * 400),
+        });
+      }
+    }, PIT_DELAY_MS);
   }
 
-  flyPit(from, to, land) {
-    const x0 = from.x + (Math.random() - 0.5) * 70;
-    const lift = 90 + Math.random() * 50;
-    const hang = { x: x0 + (to.x - x0) * 0.12, y: from.y - lift };
-    const spin = (Math.random() < 0.5 ? -1 : 1) * 320;
-    const across = [
-      { translate: `${x0}px 0` },
-      { translate: `${hang.x}px 0`, offset: 0.4 },
-      { translate: `${hang.x + 6}px 0`, offset: 0.55 },
-      { translate: `${to.x}px 0` },
-    ];
-    const rise = [
-      { translate: `0 ${from.y}px`, scale: 0.6, rotate: "0deg" },
-      {
-        translate: `0 ${hang.y}px`,
-        scale: 1.5,
-        rotate: `${spin * 0.3}deg`,
-        offset: 0.4,
-        easing: "cubic-bezier(.3,0,.7,1)",
-      },
-      {
-        translate: `0 ${hang.y - 6}px`,
-        scale: 1.45,
-        rotate: `${spin * 0.4}deg`,
-        offset: 0.55,
-        easing: "cubic-bezier(.6,0,1,.6)",
-      },
-      { translate: `0 ${to.y}px`, scale: 1, rotate: `${spin}deg` },
-    ];
-    [0.18, 0.4, 1].forEach((opacity, n, all) => {
-      const outer = el("div", "pit-flier", this.layer);
-      const inner = el("div", "", outer, pitIcon());
-      outer.style.opacity = opacity;
-      const delay = (all.length - 1 - n) * 45;
-      const options = { duration: PIT_FLIGHT_MS, delay, fill: "both" };
-      outer.animate(across, { ...options, easing: "linear" });
-      inner
-        .animate(rise, { ...options, easing: "cubic-bezier(.2,.6,.4,1)" })
-        .finished.then(() => {
-          outer.remove();
-          if (opacity === 1) land();
-        });
+  pitTarget() {
+    const box = this.pitIcon.getBoundingClientRect();
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  }
+
+  stepFliers(dt) {
+    if (!this.fliers.length) return;
+    const to = this.pitTarget();
+    this.fliers = this.fliers.filter((f) => {
+      /* eslint-disable no-param-reassign */
+      f.age += dt;
+      if (f.age < 0) return true;
+      const pull = f.age - f.popFor;
+      let dx = to.x - f.x;
+      let dy = to.y - f.y;
+      let dist = Math.hypot(dx, dy);
+      if (pull < 0) f.vy += PIT_GRAVITY * dt;
+      else {
+        const rush = Math.min(2400, 250 + 3000 * pull);
+        const steer = 1 - Math.exp(-(4 + 40 * pull) * dt);
+        f.vx += ((dx / dist) * rush - f.vx) * steer;
+        f.vy += ((dy / dist) * rush - f.vy) * steer;
+        f.vy += PIT_GRAVITY * Math.max(0, 1 - pull * 4) * dt;
+      }
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      dx = to.x - f.x;
+      dy = to.y - f.y;
+      dist = Math.hypot(dx, dy);
+      const passed = dist < 60 && f.vx * dx + f.vy * dy < 0;
+      if (pull > 0 && (dist < 12 || passed || f.age > 3)) {
+        f.node.remove();
+        this.landPit(f);
+        return false;
+      }
+      f.spin *= Math.exp(-1.2 * dt);
+      f.angle = (f.angle + f.spin * dt) % 360;
+      const near = pull > 0 ? Math.min(1, dist / 180) : 1;
+      const tilt = (((f.angle + 540) % 360) - 180) * near;
+      const grow = Math.min(1, f.age / 0.14);
+      const pop =
+        0.5 +
+        (PIT_SIZE - 0.5) *
+          grow *
+          (2 - grow) *
+          (1 + 0.25 * (1 - grow) * grow * 4);
+      const size = PIT_DOCK + (pop - PIT_DOCK) * near;
+      const speed = Math.hypot(f.vx, f.vy);
+      const stretch = 1 + Math.min(0.4, speed / 3000);
+      const heading = (Math.atan2(f.vy, f.vx) * 180) / Math.PI;
+      f.node.style.visibility = "";
+      f.node.style.transform = `translate(${f.x}px, ${f.y}px) rotate(${heading}deg) scale(${size * stretch}, ${size / stretch}) rotate(${tilt - heading}deg)`;
+      return true;
+      /* eslint-enable no-param-reassign */
+    });
+  }
+
+  landPit(f) {
+    const { trip } = f;
+    trip.landed += 1;
+    const last = trip.landed === trip.count;
+    const note = PIT_NOTES[trip.landed - 1];
+    this.held.pits = Math.max(0, this.held.pits - f.carry);
+    this.pitWobble.thump(trip.landed / trip.count);
+    playNotes(last ? [note, note / 2] : [note], {
+      gap: 0.07,
+      length: 0.16,
+      volume: 0.04,
     });
   }
 
@@ -192,6 +231,7 @@ export class Hud {
       );
     }
     this.pitCount.step(dt);
+    this.stepFliers(dt);
     this.pitWobble.step(dt);
     const clock = Date.now();
     this.buffRows.forEach((bar, b) => {
