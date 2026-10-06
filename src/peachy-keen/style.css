@@ -530,6 +530,17 @@ button:focus-visible {
   font-size: 16px;
 }
 
+.intro-copyright {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--gutter) + env(safe-area-inset-bottom));
+  left: 0;
+  margin: 0;
+  color: var(--blush-dim);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
 .intro.is-leaving {
   opacity: 0;
   pointer-events: none;
