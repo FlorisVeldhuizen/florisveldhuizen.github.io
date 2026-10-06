@@ -63,7 +63,7 @@ export class Toucher {
       MAX_PER_SECOND,
       this.budget + delta * MAX_PER_SECOND,
     );
-    if (this.i.phase !== "live") return [];
+    if (this.i.phase !== "live" || this.i.helpersHold) return [];
     const ready = [];
     const { helpers } = this.game.state;
     Object.keys(TOUCH).forEach((id) => {

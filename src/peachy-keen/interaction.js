@@ -133,6 +133,7 @@ export class Interaction {
     this.heatGain = 1;
     this.heatCap = 100;
     this.coolRate = 1;
+    this.helpersHold = false;
     this.twerkAfter = CFG.TWERK_IDLE_SECONDS;
     this.oil = 0;
     this.smacks = 0;

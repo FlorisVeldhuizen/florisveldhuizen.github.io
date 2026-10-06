@@ -154,6 +154,7 @@ class Edging {
 
   update() {
     const i = this.interaction;
+    i.helpersHold = this.on && this.atBrink && !this.ready;
     if (!this.on || i.phase !== "live") return;
     if (!this.atBrink && i.heat >= BRINK) {
       this.atBrink = true;
