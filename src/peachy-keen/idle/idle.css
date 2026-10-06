@@ -123,6 +123,16 @@
   transform-origin: right center;
 }
 
+.buff-sour,
+.buff-numb {
+  color: var(--welt);
+}
+
+.buff-sour b,
+.buff-numb b {
+  background: var(--welt);
+}
+
 .craving-talk {
   background: linear-gradient(
     90deg,

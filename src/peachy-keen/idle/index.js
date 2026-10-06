@@ -194,6 +194,11 @@ export function createIdle({
     hud.hold("pits", pits);
     hud.flyPits(golden.claimedAt, pits);
   });
+  game.on("bruised", ({ effect, pits }) => {
+    if (effect !== "pits") return;
+    hud.hold("pits", pits);
+    hud.flyPits(golden.claimedAt, pits);
+  });
   game.on("craving", ({ done }) => {
     if (done === null) {
       playNotes([659, 880], { gap: 0.09, length: 0.18, volume: 0.04 });

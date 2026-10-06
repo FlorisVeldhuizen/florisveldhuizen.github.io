@@ -16,6 +16,7 @@ import {
   Vector3,
 } from "three";
 import { el } from "./dom";
+import { rotGeometry, flyTexture } from "./rot";
 import { softTexture, twinkleTexture } from "./scenery/shapes";
 import { ringMaterial, showRing } from "../rings";
 import { format } from "./numbers";
@@ -34,8 +35,52 @@ const SPIN = 2;
 const KICK = 5;
 const ROCK = 0.5;
 const TAU = Math.PI * 2;
-const GOLD = new Color(0xffc94a);
-const LIGHT_GOLD = new Color(0xffe08c);
+const BRUISE_CHANCE = 1 / 8;
+const LOOKS = {
+  golden: {
+    base: new Color(0xffc94a),
+    light: new Color(0xffe08c),
+    emissive: new Color(0x6b3a1c),
+    metalness: 1,
+    roughness: 0.2,
+    glow: new Color(0xffc050),
+    glowLevel: 0.35,
+    shine: 1.6,
+    sparkle: true,
+    flash: 6,
+    ring: new Color(0xffd27a),
+    dust: new Color(0xffe0a0),
+    label: "Golden peach. Click it!",
+    arrive: [1318, 1760, 2637],
+    chime: [2093, 2637],
+  },
+  bruised: {
+    base: new Color(0xffffff),
+    light: new Color(0xfff0e6),
+    emissive: new Color(0x140604),
+    metalness: 0,
+    roughness: 0.6,
+    glow: new Color(0x9a6a48),
+    glowLevel: 0.12,
+    shine: 0.75,
+    sparkle: false,
+    flash: 1.5,
+    ring: new Color(0xb89870),
+    dust: new Color(0xd9c4a0),
+    label: "Bruised peach. Squeeze it, if you dare.",
+    arrive: [392, 370, 311],
+    chime: [466, 440],
+  },
+};
+const WIN_NOTES = [784, 988, 1175, 1568];
+const LOSE_NOTES = [659, 523, 440, 330];
+const BRUISE_TEXT = {
+  sweet: () => "All juice ×21",
+  pits: (r) => `+${r.pits} pits`,
+  sour: () => "All juice halved",
+  spoil: (r) => `-${format(r.value)} juice`,
+  numb: () => "Smacks earn nothing",
+};
 const SHINE = 2;
 
 const rand = ([lo, hi]) => lo + Math.random() * (hi - lo);
@@ -90,6 +135,17 @@ export class GoldenPeach {
       return s;
     });
     this.trailTimer = 0;
+    const fly = flyTexture();
+    this.flies = Array.from({ length: 3 }, (_, n) => {
+      const s = new Sprite(
+        new SpriteMaterial({ map: fly, transparent: true, depthWrite: false }),
+      );
+      s.scale.setScalar(0.45);
+      s.visible = false;
+      s.userData = { angle: (n / 3) * TAU, speed: 2.4 + n * 0.7, jitter: n };
+      this.holder.add(s);
+      return s;
+    });
     this.chimeTimer = 2;
     this.ray = new Raycaster();
     this.plane = new Plane(new Vector3(0, 0, 1), -DEPTH);
@@ -125,7 +181,7 @@ export class GoldenPeach {
     this.el.addEventListener("pointerdown", () => {
       this.press = 1;
     });
-    game.on("summon", () => this.spawn());
+    game.on("summon", (kind) => this.spawn(kind));
   }
 
   warmup(peach) {
@@ -135,7 +191,7 @@ export class GoldenPeach {
     const mesh = new Mesh(
       source.geometry,
       new MeshPhysicalMaterial({
-        color: GOLD,
+        color: LOOKS.golden.base,
         metalness: 1,
         roughness: 0.2,
         clearcoat: 0.6,
@@ -149,6 +205,25 @@ export class GoldenPeach {
       .multiply(source.matrixWorld);
     this.gold = mesh;
     this.spin.add(mesh);
+    const front = new Vector3(0.3, 0.2, 1).transformDirection(
+      new Matrix4().copy(mesh.matrix).invert(),
+    );
+    this.rot = new Mesh(
+      rotGeometry(source.geometry, front, peach.material.map),
+      new MeshPhysicalMaterial({
+        vertexColors: true,
+        normalMap: peach.material.normalMap,
+        normalScale: new Vector2(0.5, 0.5),
+        sheen: 0.45,
+        sheenRoughness: 0.8,
+        sheenColor: new Color(0xffd6d0),
+      }),
+    );
+    this.rot.matrixAutoUpdate = false;
+    this.rot.matrix.copy(mesh.matrix);
+    this.rot.visible = false;
+    this.spin.add(this.rot);
+    this.body = mesh;
     const { position, normal } = source.geometry.attributes;
     const turn = new Matrix3().getNormalMatrix(mesh.matrix);
     const facing = new Vector3();
@@ -164,7 +239,29 @@ export class GoldenPeach {
     }
   }
 
-  spawn() {
+  paint(kind) {
+    const look = LOOKS[kind];
+    this.kind = kind;
+    this.look = look;
+    this.body = kind === "golden" ? this.gold : this.rot;
+    this.gold.visible = kind === "golden";
+    this.rot.visible = kind !== "golden";
+    this.body.material.emissive.copy(look.emissive);
+    this.body.material.metalness = look.metalness;
+    this.flies.forEach((f) => {
+      f.visible = kind === "bruised"; // eslint-disable-line no-param-reassign
+    });
+    this.glow.material.color.copy(look.glow);
+    this.ring.material.uniforms.uColor.value.copy(look.ring);
+    this.shine.color.copy(look.light);
+    this.dust.forEach((s) => s.material.color.copy(look.dust));
+    this.el.setAttribute("aria-label", look.label);
+  }
+
+  spawn(kind) {
+    const bruised =
+      this.game.state.stats.ripens > 0 && Math.random() < BRUISE_CHANCE;
+    this.paint(kind || (bruised ? "bruised" : "golden"));
     const rect = this.layout.stageRect();
     const i = this.i;
     const center = i.toScreen(i.group.position);
@@ -178,7 +275,7 @@ export class GoldenPeach {
     }
     this.live = { age: 0, x, y, phase: Math.random() * Math.PI * 2 };
     this.el.hidden = false;
-    playNotes([1318, 1760, 2637], { gap: 0.07, length: 0.4, volume: 0.035 });
+    playNotes(this.look.arrive, { gap: 0.07, length: 0.4, volume: 0.035 });
   }
 
   claim() {
@@ -193,6 +290,16 @@ export class GoldenPeach {
       // eslint-disable-next-line no-param-reassign
       s.visible = false;
     });
+    if (this.kind === "bruised") {
+      const result = this.game.bruised();
+      this.popups.big(x, y, result.title, BRUISE_TEXT[result.effect](result));
+      playNotes(result.good ? WIN_NOTES : LOSE_NOTES, {
+        gap: 0.07,
+        length: 0.5,
+        volume: 0.07,
+      });
+      return;
+    }
     const result = this.game.golden();
     let text = "";
     if (result.effect === "lucky") text = `+${format(result.value)} juice`;
@@ -203,7 +310,7 @@ export class GoldenPeach {
     else if (result.effect === "wave") text = "The heat won't go down";
     else if (result.effect === "showcase") text = "One helper goes wild";
     this.popups.big(x, y, result.title, text);
-    playNotes([784, 988, 1175, 1568], { gap: 0.06, length: 0.5, volume: 0.07 });
+    playNotes(WIN_NOTES, { gap: 0.06, length: 0.5, volume: 0.07 });
   }
 
   emit(size, life, drag, fall) {
@@ -266,6 +373,21 @@ export class GoldenPeach {
     });
   }
 
+  updateFlies(delta) {
+    if (this.kind !== "bruised") return;
+    this.flies.forEach((s) => {
+      const d = s.userData;
+      d.jitter += delta;
+      d.angle += delta * d.speed * (1 + Math.sin(d.jitter * 7) * 0.6);
+      const r = 2.1 + Math.sin(d.jitter * 3.1) * 0.35;
+      s.position.set(
+        Math.cos(d.angle) * r,
+        Math.sin(d.angle * 1.3) * r * 0.55 + Math.sin(d.jitter * 11) * 0.12,
+        Math.sin(d.angle) * 1.2 + 0.6,
+      );
+    });
+  }
+
   updateGlints(delta) {
     this.glints.forEach((s) => {
       const d = s.userData;
@@ -280,7 +402,7 @@ export class GoldenPeach {
       const k = d.age > 0 ? Math.sin((d.age / d.life) * Math.PI) : 0;
       s.scale.setScalar(0.3 + k * 0.8);
       // eslint-disable-next-line no-param-reassign
-      s.material.opacity = k * this.hover;
+      s.material.opacity = this.look.sparkle ? k * this.hover : 0;
     });
   }
 
@@ -301,7 +423,7 @@ export class GoldenPeach {
     }
     const pop = t < 0.08 ? 1 + (t / 0.08) * 0.3 : 1.3 * (1 - (t - 0.08) / 0.18);
     this.spin.scale.setScalar(Math.max(0.001, pop));
-    this.gold.material.emissiveIntensity = 6;
+    this.body.material.emissiveIntensity = this.look.flash;
     const out = 1 - (1 - t / FLASH) ** 3;
     this.glow.scale.setScalar(2 + out * 4);
     this.glow.material.opacity = Math.max(0, 1 - t / 0.3) ** 2;
@@ -343,7 +465,7 @@ export class GoldenPeach {
     this.ray.setFromCamera(this.ndc, this.camera);
     if (!this.ray.ray.intersectPlane(this.plane, this.at)) return;
     const h = this.holder;
-    h.visible = Boolean(this.gold);
+    h.visible = Boolean(this.body);
     h.position.copy(this.at);
     const motion = reducedMotion.matches ? 0 : 1;
     this.hover +=
@@ -364,20 +486,24 @@ export class GoldenPeach {
       this.turn * motion,
       Math.sin(g.age * 1.6) * 0.15 * motion,
     );
-    const { material } = this.gold;
+    const { material } = this.body;
     material.emissiveIntensity = 0.6 + this.hover * 0.4 + this.press * 0.6;
-    material.envMapIntensity = 1.6 + this.hover * 0.8;
-    material.roughness = 0.2 - this.hover * 0.08;
-    material.color.lerpColors(GOLD, LIGHT_GOLD, this.hover);
-    this.shine.intensity = this.hover * SHINE;
+    material.envMapIntensity = this.look.shine * (1 + this.hover * 0.5);
+    material.roughness = this.look.roughness - this.hover * 0.08;
+    material.color.lerpColors(this.look.base, this.look.light, this.hover);
+    this.shine.intensity = this.look.sparkle ? this.hover * SHINE : 0;
     const orbit = g.age * 1.4;
     this.shine.position
       .set(Math.cos(orbit) * 2, Math.sin(orbit) * 1.5, 2.5)
       .multiplyScalar(h.scale.x)
       .add(h.position);
-    this.glow.material.opacity = 0.35 + Math.sin(g.age * 4) * 0.1;
+    this.glow.material.opacity =
+      this.look.glowLevel * (1 + Math.sin(g.age * 4) * 0.3);
+    this.updateFlies(delta);
     this.trailTimer -= delta;
-    const s = this.trailTimer <= 0 && fade > 0.5 && this.emit(0.12, 0.9, 0, 0);
+    const fall = this.look.sparkle ? 0 : 0.6;
+    const s =
+      this.trailTimer <= 0 && fade > 0.5 && this.emit(0.12, 0.9, 0, fall);
     if (s) {
       this.trailTimer = 0.16;
       const a = Math.random() * Math.PI * 2;
@@ -392,7 +518,7 @@ export class GoldenPeach {
     this.chimeTimer -= delta;
     if (this.chimeTimer <= 0) {
       this.chimeTimer = 3.5;
-      playNotes([2093, 2637], { gap: 0.09, length: 0.5, volume: 0.018 });
+      playNotes(this.look.chime, { gap: 0.09, length: 0.5, volume: 0.018 });
     }
     this.updateGlints(delta);
   }

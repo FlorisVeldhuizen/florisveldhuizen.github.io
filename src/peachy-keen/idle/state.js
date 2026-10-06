@@ -9,6 +9,7 @@ const freshStats = () => ({
   crits: 0,
   bursts: 0,
   goldens: 0,
+  bruises: 0,
   ripens: 0,
   pours: 0,
   grabs: 0,

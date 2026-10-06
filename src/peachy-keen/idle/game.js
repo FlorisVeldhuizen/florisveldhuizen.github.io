@@ -40,6 +40,13 @@ const RIPEN_READY = 0.5;
 const SAVE_EVERY = 15;
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const SQUIRM_EVERY = [2, 3.5];
+const rollTable = (table) => {
+  let roll = Math.random() * table.reduce((sum, [, w]) => sum + w, 0);
+  return table.find(([, w]) => {
+    roll -= w;
+    return roll <= 0;
+  })[0];
+};
 const between = ([low, high]) => low + Math.random() * (high - low);
 
 export class IdleGame {
@@ -593,11 +600,7 @@ export class IdleGame {
       ["wave", 3],
       ["pits", 2],
     ];
-    let roll = Math.random() * table.reduce((sum, [, w]) => sum + w, 0);
-    const [effect] = table.find(([, w]) => {
-      roll -= w;
-      return roll <= 0;
-    });
+    const effect = rollTable(table);
     const length = m.goldenLength;
     let result;
     if (effect === "lucky") {
@@ -623,6 +626,37 @@ export class IdleGame {
       result = { effect, title: `${BUFFS[effect].name}!` };
     }
     this.emit("golden", result);
+    return result;
+  }
+
+  bruised() {
+    const s = this.state;
+    s.stats.bruises += 1;
+    const effect = rollTable([
+      ["sweet", 30],
+      ["pits", 20],
+      ["sour", 25],
+      ["spoil", 15],
+      ["numb", 10],
+    ]);
+    let result;
+    if (effect === "sweet") {
+      this.addBuff("sweet", BUFFS.sweet.seconds * this.model.goldenLength);
+      result = { effect, good: true, title: "Sweet rot!" };
+    } else if (effect === "pits") {
+      const pits = 15 + Math.floor(Math.random() * 11);
+      s.pits += pits;
+      s.pitsTotal += pits;
+      result = { effect, pits, good: true, title: "Pit avalanche!" };
+    } else if (effect === "spoil") {
+      const value = Math.min(s.juice * 0.05, this.rate * 600 + 13);
+      s.juice -= value;
+      result = { effect, value, title: "Spoiled!" };
+    } else {
+      this.addBuff(effect, BUFFS[effect].seconds);
+      result = { effect, title: effect === "sour" ? "Sour!" : "Numb!" };
+    }
+    this.emit("bruised", result);
     return result;
   }
 

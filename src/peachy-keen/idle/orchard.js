@@ -191,7 +191,7 @@ export class Orchard {
     } else if (h.kind === "frenzy") {
       game.addBuff("frenzy", h.seconds);
     } else if (h.kind === "golden") {
-      game.emit("summon");
+      game.emit("summon", "golden");
     }
     return h;
   }

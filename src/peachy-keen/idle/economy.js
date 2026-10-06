@@ -18,6 +18,9 @@ export const BUFFS = {
   showcase: { name: "Showcase", about: "One helper goes wild", seconds: 30 },
   wave: { name: "Heat wave", about: "Heat never cools", seconds: 20 },
   crave: { name: "Satisfied ×3", about: "All juice ×3", seconds: 30 },
+  sweet: { name: "Sweet rot ×21", about: "All juice ×21", seconds: 15 },
+  sour: { name: "Sour ×½", about: "All juice ×½", seconds: 60 },
+  numb: { name: "Numb", about: "Smacks earn nothing", seconds: 10 },
 };
 
 export function nectarFor(juiceTotal, gain = 1) {
@@ -308,6 +311,8 @@ export function liveRate(m, state, { heat = 0, oil = 0 }, now = Date.now()) {
   let rate = m.helperJps * (1 + m.glaze * oil) * flushMult(m, heat);
   if (buffActive(state, "frenzy", now)) rate *= 7;
   if (buffActive(state, "crave", now)) rate *= 3;
+  if (buffActive(state, "sweet", now)) rate *= 21;
+  if (buffActive(state, "sour", now)) rate *= 0.5;
   const show = buffActive(state, "showcase", now);
   if (show) rate += m.totals[show.helper] * show.power;
   return rate;
@@ -324,6 +329,9 @@ export function smackValue(m, state, live, hit, now = Date.now()) {
   value *= flushMult(m, live.heat);
   if (buffActive(state, "frenzy", now)) value *= 7;
   if (buffActive(state, "crave", now)) value *= 3;
+  if (buffActive(state, "sweet", now)) value *= 21;
+  if (buffActive(state, "sour", now)) value *= 0.5;
+  if (buffActive(state, "numb", now)) return 0;
   if (buffActive(state, "storm", now)) value *= 777;
   return value;
 }

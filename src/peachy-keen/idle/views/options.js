@@ -177,7 +177,12 @@ export class OptionsView {
       });
       game.refresh();
     });
-    actionRow(box, "Golden peach", "Spawn", () => game.emit("summon"));
+    actionRow(box, "Golden peach", "Spawn", () =>
+      game.emit("summon", "golden"),
+    );
+    actionRow(box, "Bruised peach", "Spawn", () =>
+      game.emit("summon", "bruised"),
+    );
     actionRow(box, "Craving", "Start one", () => game.startCraving());
     actionRow(box, "Fresh save", "Restart", () => game.hardReset());
   }

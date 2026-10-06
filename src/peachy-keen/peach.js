@@ -994,7 +994,7 @@ function computeSmoothNormals(geometry) {
   geometry.setAttribute("normal", new BufferAttribute(normals, 3));
 }
 
-function sampleTexture(map) {
+export function sampleTexture(map) {
   const size = 256;
   const canvas = document.createElement("canvas");
   canvas.width = size;
