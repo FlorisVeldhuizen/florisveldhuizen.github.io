@@ -16,6 +16,7 @@ import { SkinRings } from "./rings";
 import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
 import IntroTitle from "./intro-title";
+import JiggleText from "./jiggle-text";
 import { stepFill, drawFill } from "./fill-wave";
 
 const MODE_KEY = "peachy-keen-mode";
@@ -80,6 +81,7 @@ let started = false;
 let idleReady = null;
 let preparedMode = null;
 let startGame = null;
+let jiggleText = null;
 const switching = takeFlag(SWITCH_KEY);
 const skipLoading = switching;
 if (switching) {
@@ -585,6 +587,7 @@ peach
       }, 700);
       peach.fitPlant();
       interaction.begin(afterOpening ? 0 : 1.6);
+      jiggleText = new JiggleText();
       interaction.bottle.view.group.visible = true;
       interaction.bottle.screen.x -= 220;
       idle?.begin();
@@ -618,6 +621,7 @@ const clock = new Clock();
 renderer.setAnimationLoop(() => {
   if (warming) return;
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
+  jiggleText?.update(realDelta);
   if (!started || intro.isConnected) {
     showRipeness(realDelta);
     introTitle.update(realDelta);

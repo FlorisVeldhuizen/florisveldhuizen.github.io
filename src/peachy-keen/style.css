@@ -245,6 +245,18 @@ html.is-handing .intro .intro-shape {
   background: var(--oil);
 }
 
+/* Letters of the score and hints, split so each can jiggle on hover. */
+.jig,
+.score .roll-slot,
+.score .roll-char {
+  display: inline-block;
+  transform-origin: 50% 88%;
+}
+
+.jig.is-space {
+  display: inline;
+}
+
 .hints {
   position: fixed;
   left: var(--edge-left);
