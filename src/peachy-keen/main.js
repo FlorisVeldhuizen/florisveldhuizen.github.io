@@ -326,6 +326,7 @@ peach.load().then(async () => {
   else await warm();
   await idleReady;
   peachReady = true;
+  interaction.bottle.view.group.visible = false;
   group.visible = true;
   intro.classList.add("has-shape");
   introStatus.textContent = "Ripening";
@@ -356,6 +357,8 @@ peach.load().then(async () => {
     setTimeout(() => intro.remove(), 700);
     peach.fitPlant();
     interaction.begin();
+    interaction.bottle.view.group.visible = true;
+    interaction.bottle.screen.x -= 220;
     idle?.begin();
   };
 

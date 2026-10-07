@@ -456,7 +456,7 @@ button:focus-visible {
   grid-template-rows: auto 1fr auto;
   justify-items: center;
   padding: calc(var(--edge-top) + 28px) var(--edge-right)
-    calc(var(--gutter) + env(safe-area-inset-bottom) + 34px) var(--edge-left);
+    calc(var(--gutter) + env(safe-area-inset-bottom)) var(--edge-left);
   text-align: center;
   cursor: progress;
   transition: opacity 0.7s ease;
@@ -509,8 +509,10 @@ button:focus-visible {
   width: 0.24em;
 }
 
+/* Idle replaces the intro padding, so the room above the copyright sits here. */
 .intro-foot {
   grid-row: 3;
+  margin-bottom: 34px;
   display: grid;
   justify-items: center;
   gap: 12px;
