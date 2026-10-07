@@ -2541,6 +2541,8 @@ export class Peach {
 
   updateLeaf(delta) {
     if (!this.mesh || delta <= 0) return;
+    // The intro stills show the leaf without breeze, so it follows the sway hold.
+    this.breeze ??= 1;
     const dt = Math.min(delta, 1 / 30);
     if (!this.leaf) {
       this.leaf = {
@@ -2623,7 +2625,7 @@ export class Peach {
         0,
         Math.sin(t * 0.9 + 0.5) * 0.7 + Math.sin(t * 1.7 + 2.3) * 0.3,
       )
-      .multiplyScalar(LEAF.BREEZE);
+      .multiplyScalar(LEAF.BREEZE * this.breeze);
     uLeafBend.value.copy(L.bend).add(breeze).multiplyScalar(L.calm);
     uLeafAxis.value.w =
       Math.min(1, L.bendVel.length() / LEAF.FLUTTER_AT) * L.calm;

@@ -635,6 +635,7 @@ renderer.setAnimationLoop(() => {
   naughty.update(delta);
   if (started) idle?.update(realDelta);
   wild.update(delta, realDelta);
+  peach.breeze = interaction.swayAmount;
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);
   mood.update(realDelta, interaction.heat / 100);
