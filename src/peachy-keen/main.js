@@ -20,8 +20,6 @@ import IntroTitle from "./intro-title";
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["classic", "idle"];
 const SWITCH_KEY = "peachy-keen-switching";
-// Roughly the shape's share of the bytes; the skin is the rest.
-const SHAPE_SHARE = 0.6;
 const SHAPE_FADE_MS = 350;
 // The skin usually lands in a blink, so the ripening rises at this pace at the fastest.
 const RIPEN_SECONDS = 1.6;
@@ -157,7 +155,6 @@ function showRipeness(delta) {
   if (ripeShown >= ripeLoaded) return;
   ripeShown = Math.min(ripeLoaded, ripeShown + delta / RIPEN_SECONDS);
   peach.uniforms.uRipe.value = ripeShown;
-  introTitle.fill(SHAPE_SHARE + ripeShown * (1 - SHAPE_SHARE));
   const step = Math.floor(ripeShown * 10);
   if (step > ripeStep) {
     ripeStep = step;
@@ -308,50 +305,47 @@ intro.addEventListener("click", (e) => {
   }
 });
 
-peach
-  .load((fraction) => introTitle.fill(fraction * SHAPE_SHARE))
-  .then(async () => {
-    introTitle.fill(SHAPE_SHARE);
-    peach.uniforms.uRipe.value = 0;
-    group.visible = true;
-    intro.classList.add("has-shape");
-    introStatus.textContent = "Ripening";
-    setTimeout(() => {
-      interaction.holdStill = false;
-    }, SHAPE_FADE_MS);
-    const ripe = new Promise((resolve) => {
-      onRipe = resolve;
-    });
-    await peach.loadSkin(ripen);
-    ripen(1);
-    interaction.prepareHalves();
-    await Promise.all([warm(), ripe]);
-    juice.clear();
-    loadSounds();
-    keepAudioUnlocked();
-
-    const start = async () => {
-      started = true;
-      interaction.holdStill = false;
-      intro.classList.remove("is-ready");
-      saveMode(mode);
-      if (mode === "idle") await startIdle();
-      interaction.requestShake();
-      intro.classList.add("is-leaving");
-      document.body.classList.remove("is-intro");
-      setTimeout(() => intro.remove(), 700);
-      interaction.begin();
-      idle?.begin();
-    };
-
-    if (switching) {
-      start();
-      return;
-    }
-    introStatus.textContent = "Ripe. Tap the peach. Sound on.";
-    intro.classList.add("is-ready");
-    startGame = start;
+peach.load().then(async () => {
+  peach.uniforms.uRipe.value = 0;
+  group.visible = true;
+  intro.classList.add("has-shape");
+  introStatus.textContent = "Ripening";
+  setTimeout(() => {
+    interaction.holdStill = false;
+  }, SHAPE_FADE_MS);
+  const ripe = new Promise((resolve) => {
+    onRipe = resolve;
   });
+  await peach.loadSkin(ripen);
+  ripen(1);
+  interaction.prepareHalves();
+  await Promise.all([warm(), ripe]);
+  juice.clear();
+  loadSounds();
+  keepAudioUnlocked();
+
+  const start = async () => {
+    started = true;
+    interaction.holdStill = false;
+    intro.classList.remove("is-ready");
+    saveMode(mode);
+    if (mode === "idle") await startIdle();
+    interaction.requestShake();
+    intro.classList.add("is-leaving");
+    document.body.classList.remove("is-intro");
+    setTimeout(() => intro.remove(), 700);
+    interaction.begin();
+    idle?.begin();
+  };
+
+  if (switching) {
+    start();
+    return;
+  }
+  introStatus.textContent = "Ripe. Tap the peach. Sound on.";
+  intro.classList.add("is-ready");
+  startGame = start;
+});
 
 const SHADOW_HOLD = 1.5;
 let shadowHold = 0;

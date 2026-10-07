@@ -499,26 +499,14 @@ button:focus-visible {
   transition: transform 0.7s cubic-bezier(0.5, 0, 0.2, 1);
 }
 
-/* Padding gives the italic overhang and descenders room inside the clipped fill; the margin cancels it. */
 .intro-letter {
   display: inline-block;
-  padding: 0.12em 0.16em 0.3em;
-  margin: -0.12em -0.16em -0.3em;
   transform-origin: 50% 88%;
-  color: transparent;
-  background: linear-gradient(
-    90deg,
-    var(--peach) var(--fill, 0%),
-    var(--blush-faint) var(--fill, 0%)
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
+  color: var(--peach);
 }
 
 .intro-letter.is-space {
   width: 0.24em;
-  padding: 0;
-  margin: 0;
 }
 
 .intro-foot {

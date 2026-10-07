@@ -28,7 +28,6 @@ export default class IntroTitle {
         y: new Spring(STIFFNESS, DAMPING),
         r: new Spring(STIFFNESS * 0.85, DAMPING * 0.9),
         s: new Spring(STIFFNESS * 1.2, DAMPING * 1.25),
-        filled: -1,
       };
       span.addEventListener("pointerenter", () => this.poke(i, 0.8));
       span.addEventListener("pointerdown", () => this.ripple(i));
@@ -82,19 +81,6 @@ export default class IntroTitle {
       }
     });
     return best;
-  }
-
-  fill(progress) {
-    const count = this.letters.length;
-    this.letters.forEach((letter, i) => {
-      const filled = Math.round(
-        Math.min(1, Math.max(0, progress * count - i)) * 100,
-      );
-      if (filled === letter.filled) return;
-      // eslint-disable-next-line no-param-reassign
-      letter.filled = filled;
-      letter.span.style.setProperty("--fill", `${filled}%`);
-    });
   }
 
   update(delta) {

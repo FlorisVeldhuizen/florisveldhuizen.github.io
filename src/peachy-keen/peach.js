@@ -1379,7 +1379,7 @@ export class Peach {
     return Array.from({ length: count }, () => new Vector4(0, 0, 0, -1e4));
   }
 
-  async load(onProgress) {
+  async load() {
     const preview = await skinTexture(SKIN_PREVIEW);
     this.uniforms.uSkinLow.value = preview;
     this.uniforms.uSkinSharp.value = 0;
@@ -1394,9 +1394,7 @@ export class Peach {
           this.install(gltf.scene, found, preview);
           resolve(this.mesh);
         },
-        (event) => {
-          if (event.total) onProgress(event.loaded / event.total);
-        },
+        undefined,
         (error) => {
           // eslint-disable-next-line no-console
           console.error("Peach model failed to load, using a sphere:", error);
