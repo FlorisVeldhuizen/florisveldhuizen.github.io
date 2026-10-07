@@ -108,7 +108,7 @@ modeButtons.forEach((b) =>
     const picked = b.dataset.mode;
     if (started) {
       if (picked === mode) return;
-      document.documentElement.classList.add("is-switching");
+      document.documentElement.classList.add("is-switching", "is-opening");
       setTimeout(() => reloadInto(picked), 400);
       return;
     }
@@ -298,8 +298,6 @@ const handOver = async () => {
   root.classList.add("is-handing");
   root.classList.remove("is-switching");
   await wait(STAGE_FADE_MS);
-  intro.classList.add("is-quiet");
-  root.classList.remove("is-handing");
 };
 if (switching) breathe();
 
@@ -534,7 +532,11 @@ peach
       interaction.holdStill = true;
       setStatus(openingText(mode));
       await wait(650);
-      document.documentElement.classList.add("is-switching", "has-status");
+      document.documentElement.classList.add(
+        "is-switching",
+        "is-opening",
+        "has-status",
+      );
       await wait(450);
       peach.fitPlant();
       if (mode === "classic") {
@@ -555,6 +557,10 @@ peach
         openOther();
         return;
       }
+      if (afterOpening) {
+        intro.classList.add("is-handed", "is-quiet");
+        await wait(300);
+      }
       // The shop panel reserves its space as it appears; the fading intro keeps its place.
       intro.style.padding = getComputedStyle(intro).padding;
       started = true;
@@ -568,9 +574,15 @@ peach
       await idleReady;
       interaction.requestShake();
       intro.classList.add("is-leaving");
-      if (afterOpening) intro.classList.add("is-handed");
       showHud();
-      setTimeout(() => intro.remove(), 700);
+      setTimeout(() => {
+        intro.remove();
+        document.documentElement.classList.remove(
+          "is-opening",
+          "is-handing",
+          "has-status",
+        );
+      }, 700);
       peach.fitPlant();
       interaction.begin(afterOpening ? 0 : 1.6);
       interaction.bottle.view.group.visible = true;

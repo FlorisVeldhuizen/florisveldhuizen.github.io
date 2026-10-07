@@ -8,7 +8,7 @@ const TOP_FROM = 0.15;
 const TOP_RAMP = 0.2;
 const SETTLE_FREQUENCY = 17;
 const SETTLE_DAMPING = 0.55;
-const ARRIVE_SECONDS = 0.9;
+const ARRIVE_SECONDS = 1.3;
 
 export class Layout {
   constructor(camera, panel) {
@@ -74,7 +74,8 @@ export class Layout {
     let shownTargets = targets;
     if (this.arrive) {
       this.arrive.t = Math.min(1, this.arrive.t + delta / ARRIVE_SECONDS);
-      const k = this.arrive.t * this.arrive.t * (3 - 2 * this.arrive.t);
+      const { t } = this.arrive;
+      const k = t * t * t * (t * (t * 6 - 15) + 10);
       const { from } = this.arrive;
       shownTargets = targets.map((t, i) => from[i] + (t - from[i]) * k);
       if (this.arrive.t >= 1) this.arrive = null;
