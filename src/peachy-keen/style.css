@@ -95,13 +95,39 @@ button:focus-visible {
 
 /* While a mode switch reloads, only the ripe still peach shows. */
 .is-switching #stage,
-.is-switching .intro-copyright,
+html.is-switching .intro .intro-copyright,
+html.is-switching .intro .intro-modes,
+html.is-switching:not(.has-status) .intro .intro-status,
 #intro.is-quiet > :not(.intro-shape) {
   opacity: 0;
 }
 
 .is-switching body {
   background: radial-gradient(120% 80% at 50% 42%, #4b3a5e, #2b2036);
+}
+
+/* The fill canvas keeps its last frame once the worker stops, so the ripe render stands in. */
+.intro.is-ready .intro-shape,
+html.is-switching .intro-shape {
+  background-image: url("/peachy-keen/intro-peach-ripe.webp");
+}
+
+.intro.is-ready #intro-fill,
+html.is-switching #intro-fill {
+  visibility: hidden;
+}
+
+/* The opening screen looks the same before and after a reload, so it shows at once. */
+html.is-switching .intro .intro-title,
+html.is-switching .intro .intro-foot {
+  opacity: 1;
+  transition: none;
+}
+
+html.is-switching .intro .intro-status {
+  color: var(--peach);
+  font-style: normal;
+  font-weight: 600;
 }
 
 /* A compositor animation, so the peach keeps breathing while the page is busy building the mode. */

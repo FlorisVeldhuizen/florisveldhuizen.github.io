@@ -21,7 +21,6 @@ import { stepFill, drawFill } from "./fill-wave";
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["classic", "idle"];
 const SWITCH_KEY = "peachy-keen-switching";
-const SKIP_KEY = "peachy-keen-intro-ripe";
 const SHAPE_FADE_MS = 350;
 // Each step's share of the fill: shape download, skin download, building and warming the scene.
 const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
@@ -29,6 +28,9 @@ const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
 const introStatus = document.getElementById("intro-status");
+const openingText = (picked) =>
+  picked === "idle" ? "Opening the shop" : "Opening Classic";
+
 function setStatus(text) {
   if (introStatus.textContent === text) return;
   introStatus.textContent = text;
@@ -78,41 +80,41 @@ let idleReady = null;
 let preparedMode = null;
 let startGame = null;
 const switching = takeFlag(SWITCH_KEY);
-const skipLoading = takeFlag(SKIP_KEY) || switching;
-const switchStatus = mode === "idle" ? "Opening the shop" : "Opening Classic";
-if (skipLoading) introStatus.textContent = switchStatus;
+const skipLoading = switching;
+if (switching) {
+  introStatus.textContent = openingText(mode);
+  document.documentElement.classList.add("has-status");
+}
 const showMode = () =>
   modeButtons.forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.mode === mode)),
   );
+function reloadInto(picked) {
+  saveMode(picked);
+  try {
+    sessionStorage.setItem(SWITCH_KEY, "1");
+  } catch {
+    // Without session storage the start screen shows after the switch.
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.delete("mode");
+  window.history.replaceState(null, "", url);
+  window.location.reload();
+}
+
 modeButtons.forEach((b) =>
   b.addEventListener("click", () => {
     const picked = b.dataset.mode;
-    // Building the other mode freezes the page, so it happens behind a reload that shows the still peach.
-    if (!started && (preparedMode === null || picked === preparedMode)) {
-      mode = picked;
-      showMode();
-      startGame?.();
-    } else if (!started || picked !== mode) {
-      saveMode(picked);
-      try {
-        sessionStorage.setItem(
-          started || startGame ? SWITCH_KEY : SKIP_KEY,
-          "1",
-        );
-      } catch {
-        // Without session storage the start screen shows after the switch.
-      }
-      const url = new URL(window.location.href);
-      url.searchParams.delete("mode");
-      window.history.replaceState(null, "", url);
-      document.body
-        .animate([{ opacity: 1 }, { opacity: 0 }], {
-          duration: 250,
-          fill: "forwards",
-        })
-        .finished.then(() => window.location.reload());
+    if (started) {
+      if (picked === mode) return;
+      document.documentElement.classList.add("is-switching");
+      setTimeout(() => reloadInto(picked), 400);
+      return;
     }
+    // Before the start a pick only selects; a ripe peach starts it straight away.
+    mode = picked;
+    showMode();
+    startGame?.();
   }),
 );
 showMode();
@@ -466,7 +468,7 @@ peach
     loaded.prepare = 1;
     group.visible = true;
     intro.classList.add("has-shape");
-    setStatus(skipLoading ? switchStatus : "Ripening");
+    setStatus(switching ? openingText(mode) : "Ripening");
     setTimeout(() => {
       interaction.holdStill = false;
       stillGone = true;
@@ -484,7 +486,41 @@ peach
     loadSounds();
     keepAudioUnlocked();
 
+    const wait = (ms) =>
+      new Promise((resolve) => {
+        setTimeout(resolve, ms);
+      });
+    // Starting the mode that was not prepared: the peach stays as the one fixed point while the rest
+    // fades to a calm screen, and the slow work happens behind it.
+    let opening = false;
+    const openOther = async () => {
+      if (opening) return;
+      opening = true;
+      interaction.nudge(1.4);
+      setStatus(openingText(mode));
+      await wait(220);
+      document.documentElement.classList.add("is-switching", "has-status");
+      await wait(450);
+      if (mode === "classic") {
+        reloadInto("classic");
+        return;
+      }
+      preparedMode = "idle";
+      idleReady = prepareIdle();
+      await idleReady;
+      intro.classList.add("is-quiet");
+      // eslint-disable-next-line no-use-before-define
+      start();
+      requestAnimationFrame(() =>
+        document.documentElement.classList.remove("is-switching"),
+      );
+    };
+
     const start = async () => {
+      if (mode !== preparedMode) {
+        openOther();
+        return;
+      }
       // The shop panel reserves its space as it appears; the fading intro keeps its place.
       intro.style.padding = getComputedStyle(intro).padding;
       started = true;
