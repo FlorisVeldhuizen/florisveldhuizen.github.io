@@ -31,6 +31,9 @@ const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
 const introStatus = document.getElementById("intro-status");
+const modeName = (picked) => (picked === "idle" ? "Idle" : "Classic");
+// eslint-disable-next-line no-use-before-define
+const readyText = () => `Ripe. Tap the peach to play ${modeName(mode)}.`;
 const openingText = (picked) =>
   picked === "idle" ? "Opening the shop" : "Opening Classic";
 
@@ -128,10 +131,14 @@ modeButtons.forEach((b) =>
       setTimeout(() => reloadInto(picked), 400);
       return;
     }
-    // Before the start a pick only selects; a ripe peach starts it straight away.
+    // Before the start a pick only selects; the peach is the one way to start.
+    if (picked === mode) return;
     mode = picked;
     showMode();
-    startGame?.();
+    if (!startGame) return;
+    setStatus(readyText());
+    // eslint-disable-next-line no-use-before-define
+    if (!interaction.holdStill) interaction.nudge(0.6);
   }),
 );
 showMode();
@@ -615,7 +622,7 @@ peach
       start(true);
       return;
     }
-    setStatus("Ripe. Tap the peach to play. Sound on.");
+    setStatus(readyText());
     intro.classList.add("is-ready");
     interaction.nudge(1.4);
     const invite = setInterval(() => {
