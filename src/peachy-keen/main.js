@@ -25,9 +25,9 @@ const SHAPE_FADE_MS = 350;
 const RIPEN_MIN_SECONDS = 1.5;
 // Each step's share of the fill: shape download, skin download, building and warming the scene.
 const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
-// Where the peach, leaf included, sits in the intro renders, as a share of the image height.
-const RENDER_TOP = 0.283;
-const RENDER_BOTTOM = 0.741;
+// The peach model's height range projected onto the intro renders, as a share of the image height.
+const RENDER_TOP = 0.2655;
+const RENDER_BOTTOM = 0.7345;
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
@@ -183,6 +183,7 @@ const loadedShare = () =>
     0,
   );
 let ripeShown = 0;
+let stillGone = false;
 let onRipe = null;
 
 const fillCanvas = document.getElementById("intro-fill");
@@ -191,7 +192,7 @@ const ripeRender = new Image();
 ripeRender.src = "/peachy-keen/intro-peach-ripe.webp";
 
 function drawFill(level, time) {
-  if (intro.classList.contains("has-shape") || !ripeRender.complete) return;
+  if (stillGone || !ripeRender.complete) return;
   const size = Math.round(
     fillCanvas.clientWidth * Math.min(2, devicePixelRatio),
   );
@@ -203,10 +204,7 @@ function drawFill(level, time) {
   const top = RENDER_TOP * size;
   const height = (RENDER_BOTTOM - RENDER_TOP) * size;
   const surface = (x) => {
-    const across = (x - size / 2) / height;
-    const wave =
-      Math.sin(across * 30 + time * 3) * 0.02 +
-      Math.sin(across * 17 - time * 2.2) * 0.012;
+    const wave = Math.sin(((x - size / 2) / height) * 7 + time * 1.6) * 0.006;
     return top + height * (1 - (level * 1.2 - 0.1 + wave));
   };
   fillContext.clearRect(0, 0, size, size);
@@ -218,17 +216,30 @@ function drawFill(level, time) {
   fillContext.clip();
   fillContext.drawImage(ripeRender, 0, 0, size, size);
   fillContext.restore();
+  // The same soft bright edge the shader draws on the live peach, kept inside the silhouette.
+  fillContext.beginPath();
+  for (let x = 0; x <= size; x += size / 64) fillContext.lineTo(x, surface(x));
+  fillContext.strokeStyle = "rgba(255, 219, 199, 0.16)";
+  fillContext.lineWidth = height * 0.02;
+  fillContext.stroke();
+  fillContext.globalCompositeOperation = "destination-in";
+  fillContext.drawImage(ripeRender, 0, 0, size, size);
+  fillContext.globalCompositeOperation = "source-over";
 }
 
 function showRipeness(delta, time) {
   const target = loadedShare();
+  // Follows the loading at an even pace: it eases toward each new step and never jumps.
+  const speed = Math.min(
+    1 / RIPEN_MIN_SECONDS,
+    Math.max(0.25, (target - ripeShown) * 2.5),
+  );
   if (ripeShown < target)
     ripeShown = skipLoading
       ? target
-      : Math.min(target, ripeShown + delta / RIPEN_MIN_SECONDS);
-  const level = 1 - (1 - ripeShown) ** 2;
-  peach.uniforms.uRipe.value = level;
-  drawFill(level, time);
+      : Math.min(target, ripeShown + delta * speed);
+  peach.uniforms.uRipe.value = ripeShown;
+  drawFill(ripeShown, time);
   if (ripeShown >= 1) onRipe?.();
 }
 
@@ -409,6 +420,7 @@ peach
     setStatus("Ripening");
     setTimeout(() => {
       interaction.holdStill = false;
+      stillGone = true;
     }, SHAPE_FADE_MS);
     const ripe = new Promise((resolve) => {
       onRipe = resolve;
@@ -424,7 +436,6 @@ peach
     const start = async () => {
       started = true;
       interaction.holdStill = false;
-      intro.classList.remove("is-ready");
       saveMode(mode);
       await idleReady;
       interaction.requestShake();
