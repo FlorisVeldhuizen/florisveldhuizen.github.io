@@ -79,6 +79,8 @@ let preparedMode = null;
 let startGame = null;
 const switching = takeFlag(SWITCH_KEY);
 const skipLoading = takeFlag(SKIP_KEY) || switching;
+const switchStatus = mode === "idle" ? "Opening the shop" : "Opening Classic";
+if (skipLoading) introStatus.textContent = switchStatus;
 const showMode = () =>
   modeButtons.forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.mode === mode)),
@@ -464,7 +466,7 @@ peach
     loaded.prepare = 1;
     group.visible = true;
     intro.classList.add("has-shape");
-    setStatus("Ripening");
+    setStatus(skipLoading ? switchStatus : "Ripening");
     setTimeout(() => {
       interaction.holdStill = false;
       stillGone = true;

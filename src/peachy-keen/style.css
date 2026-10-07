@@ -95,13 +95,26 @@ button:focus-visible {
 
 /* While a mode switch reloads, only the ripe still peach shows. */
 .is-switching #stage,
-.is-switching #intro > :not(.intro-shape),
+.is-switching .intro-copyright,
 #intro.is-quiet > :not(.intro-shape) {
   opacity: 0;
 }
 
+.is-switching body {
+  background: radial-gradient(120% 80% at 50% 42%, #4b3a5e, #2b2036);
+}
+
+/* A compositor animation, so the peach keeps breathing while the page is busy building the mode. */
 .is-switching .intro-shape {
   background-image: url("/peachy-keen/intro-peach-ripe.webp");
+  transform-origin: 50% 74%;
+  animation: intro-breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes intro-breathe {
+  50% {
+    transform: scale(1.025, 0.975);
+  }
 }
 
 .is-switching .intro.has-shape .intro-shape {
