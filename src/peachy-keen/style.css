@@ -474,11 +474,9 @@ button:focus-visible {
   width: min(var(--view-h), 123.08vw);
   aspect-ratio: 1;
   translate: -50% -50%;
-  background: radial-gradient(circle at 42% 38%, #7d6079, #4f3d5c 72%);
-  -webkit-mask: url("/peachy-keen/intro-shape.png") center / 100% 100% no-repeat;
-  mask: url("/peachy-keen/intro-shape.png") center / 100% 100% no-repeat;
+  background: url("/peachy-keen/intro-peach.webp") center / 100% 100% no-repeat;
   pointer-events: none;
-  transition: opacity 1.1s ease;
+  transition: opacity 0.35s ease;
 }
 
 .intro.has-shape .intro-shape {
@@ -501,8 +499,11 @@ button:focus-visible {
   transition: transform 0.7s cubic-bezier(0.5, 0, 0.2, 1);
 }
 
+/* Padding gives the italic overhang and descenders room inside the clipped fill; the margin cancels it. */
 .intro-letter {
   display: inline-block;
+  padding: 0.12em 0.16em 0.3em;
+  margin: -0.12em -0.16em -0.3em;
   transform-origin: 50% 88%;
   color: transparent;
   background: linear-gradient(
@@ -516,6 +517,8 @@ button:focus-visible {
 
 .intro-letter.is-space {
   width: 0.24em;
+  padding: 0;
+  margin: 0;
 }
 
 .intro-foot {

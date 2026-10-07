@@ -22,7 +22,7 @@ const MODES = ["classic", "idle"];
 const SWITCH_KEY = "peachy-keen-switching";
 // Roughly the shape's share of the bytes; the skin is the rest.
 const SHAPE_SHARE = 0.6;
-const SHAPE_FADE_MS = 1100;
+const SHAPE_FADE_MS = 350;
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
