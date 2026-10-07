@@ -60,6 +60,13 @@ export default class JiggleText {
           (n.nodeType === Node.ELEMENT_NODE && n.classList.contains("jig")),
       );
       const text = el.textContent;
+      const kids = [...el.children];
+      const split =
+        kids.length === el.childNodes.length &&
+        kids.length > 0 &&
+        kids.every((k) => k.classList.contains("jig"));
+      // Already split for this text: splitting again would only feed the observer.
+      if (split && this.groups.has(el)) return;
       if (!onlyText || !text.trim()) {
         this.groups.delete(el);
         return;

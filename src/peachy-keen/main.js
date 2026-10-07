@@ -571,6 +571,7 @@ peach
     };
 
     const start = async (afterOpening = false) => {
+      if (started) return;
       if (mode !== preparedMode) {
         openOther();
         return;
@@ -603,7 +604,7 @@ peach
       }, 700);
       peach.fitPlant();
       interaction.begin(afterOpening ? 0 : 1.6);
-      jiggleText = new JiggleText();
+      jiggleText ??= new JiggleText();
       interaction.bottle.view.group.visible = true;
       interaction.bottle.screen.x -= 220;
       idle?.begin();
