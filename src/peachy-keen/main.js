@@ -61,6 +61,8 @@ function takeSwitch() {
 
 let mode = readMode();
 let started = false;
+let peachReady = false;
+let idleReady = null;
 const switching = takeSwitch();
 const showMode = () =>
   modeButtons.forEach((b) =>
@@ -68,13 +70,15 @@ const showMode = () =>
   );
 modeButtons.forEach((b) =>
   b.addEventListener("click", () => {
-    if (!started) {
+    if (!started && !(idleReady && b.dataset.mode === "classic")) {
       mode = b.dataset.mode;
       showMode();
+      // eslint-disable-next-line no-use-before-define
+      if (mode === "idle" && peachReady) idleReady ??= prepareIdle();
     } else if (b.dataset.mode !== mode) {
       saveMode(b.dataset.mode);
       try {
-        sessionStorage.setItem(SWITCH_KEY, "1");
+        if (started) sessionStorage.setItem(SWITCH_KEY, "1");
       } catch {
         // Without session storage the start screen shows after the switch.
       }
@@ -143,7 +147,6 @@ const skinRings = new SkinRings(scene, interaction);
 settings.applyAll();
 let idle = null;
 
-let ripeStep = 0;
 let ripeLoaded = 0;
 let ripeShown = 0;
 let onRipe = null;
@@ -154,12 +157,7 @@ function ripen(fraction) {
 function showRipeness(delta) {
   if (ripeShown >= ripeLoaded) return;
   ripeShown = Math.min(ripeLoaded, ripeShown + delta / RIPEN_SECONDS);
-  peach.uniforms.uRipe.value = ripeShown;
-  const step = Math.floor(ripeShown * 10);
-  if (step > ripeStep) {
-    ripeStep = step;
-    if (!interaction.holdStill) interaction.nudge(0.3);
-  }
+  peach.uniforms.uRipe.value = ripeShown * ripeShown * (3 - 2 * ripeShown);
   if (ripeShown >= 1) onRipe?.();
 }
 
@@ -269,7 +267,9 @@ renderer.domElement.addEventListener("webglcontextrestored", async () => {
   warming = false;
 });
 
-async function startIdle() {
+// Building the shop and compiling its shaders freezes the page, so it happens before the tap.
+async function prepareIdle() {
+  const status = introStatus.textContent;
   introStatus.textContent = "Opening the shop";
   const { createIdle } = await import("./idle");
   idle = createIdle({
@@ -288,6 +288,20 @@ async function startIdle() {
   idle.prepare();
   await warm();
   idle.ready();
+  introStatus.textContent = status;
+}
+
+const HUD = [".score", ".hints", ".settings-dock", ".bottle", ".panel"];
+function showHud() {
+  document.body.classList.remove("is-intro");
+  HUD.forEach((selector) =>
+    document
+      .querySelector(selector)
+      ?.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: 700,
+        easing: "ease-out",
+      }),
+  );
 }
 
 let startGame = null;
@@ -307,6 +321,11 @@ intro.addEventListener("click", (e) => {
 
 peach.load().then(async () => {
   peach.uniforms.uRipe.value = 0;
+  interaction.prepareHalves();
+  if (mode === "idle") idleReady = prepareIdle();
+  else await warm();
+  await idleReady;
+  peachReady = true;
   group.visible = true;
   intro.classList.add("has-shape");
   introStatus.textContent = "Ripening";
@@ -318,8 +337,7 @@ peach.load().then(async () => {
   });
   await peach.loadSkin(ripen);
   ripen(1);
-  interaction.prepareHalves();
-  await Promise.all([warm(), ripe]);
+  await ripe;
   juice.clear();
   loadSounds();
   keepAudioUnlocked();
@@ -329,11 +347,14 @@ peach.load().then(async () => {
     interaction.holdStill = false;
     intro.classList.remove("is-ready");
     saveMode(mode);
-    if (mode === "idle") await startIdle();
+    await idleReady;
     interaction.requestShake();
+    // The shop panel reserves its space as it appears; the fading intro keeps its place.
+    intro.style.padding = getComputedStyle(intro).padding;
     intro.classList.add("is-leaving");
-    document.body.classList.remove("is-intro");
+    showHud();
     setTimeout(() => intro.remove(), 700);
+    peach.fitPlant();
     interaction.begin();
     idle?.begin();
   };
@@ -372,10 +393,10 @@ renderer.setAnimationLoop(() => {
   renderer.shadowMap.enabled = shadows;
   const delta = realDelta * interaction.timeScale(realDelta);
   // The camera and bottle read the framing, so it updates before them.
-  idle?.frame(realDelta);
+  if (started) idle?.frame(realDelta);
   interaction.update(delta);
   naughty.update(delta);
-  idle?.update(realDelta);
+  if (started) idle?.update(realDelta);
   wild.update(delta, realDelta);
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);

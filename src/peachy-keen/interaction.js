@@ -127,6 +127,7 @@ export class Interaction {
     this.swayRate = 0;
     // The intro outline is drawn from the rest pose, so the peach stays put until it fades.
     this.holdStill = true;
+    this.swayWake = 0;
     this.idle = 0;
     this.twerk = null;
 
@@ -2117,9 +2118,10 @@ export class Interaction {
     const held =
       !this.carrying &&
       (this.grab || this.recoil || (p.pressed && p.downOnPeach && !p.rubbing));
+    if (!this.holdStill) this.swayWake = Math.min(1, this.swayWake + delta / 2);
+    const wake = this.swayWake * this.swayWake * (3 - 2 * this.swayWake);
     this.swayRate +=
-      ((held || this.holdStill ? 0 : 1) - this.swayRate) *
-      (1 - Math.exp(-delta * 8));
+      ((held ? 0 : wake) - this.swayRate) * (1 - Math.exp(-delta * 8));
     this.sway += delta * this.swayRate;
   }
 

@@ -548,7 +548,8 @@ button:focus-visible {
 .is-intro .score,
 .is-intro .hints,
 .is-intro .settings-dock,
-.is-intro .bottle {
+.is-intro .bottle,
+.is-intro .panel {
   visibility: hidden;
 }
 

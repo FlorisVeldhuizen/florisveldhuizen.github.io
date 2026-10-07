@@ -790,7 +790,7 @@ const FRAGMENT_COLOR = `
   }
   if (uRipe < 1.0) {
     float ripeLine = uRipe * 1.2 - 0.1 + sin(vRestPosition.x / uBounds.w * 30.0 + uTime * 3.0) * 0.012 + sin(vRestPosition.z / uBounds.w * 24.0 - uTime * 2.2) * 0.008;
-    float unripe = smoothstep(ripeLine - 0.004, ripeLine + 0.004, heightOf(vRestPosition));
+    float unripe = smoothstep(ripeLine - 0.012, ripeLine + 0.012, heightOf(vRestPosition));
     float unripeGray = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(unripeGray) * vec3(0.5, 0.42, 0.58) * 0.55, unripe);
   }
@@ -1023,10 +1023,14 @@ function computeSmoothNormals(geometry) {
   geometry.setAttribute("normal", new BufferAttribute(normals, 3));
 }
 
-async function skinTexture(url) {
+async function loadImage(url) {
   const image = new Image();
   image.src = url;
   await image.decode();
+  return image;
+}
+
+function skinTexture(image) {
   const map = new Texture(image);
   map.flipY = false;
   map.colorSpace = SRGBColorSpace;
@@ -1380,8 +1384,10 @@ export class Peach {
   }
 
   async load() {
-    const preview = await skinTexture(SKIN_PREVIEW);
-    this.uniforms.uSkinLow.value = preview;
+    const previewImage = await loadImage(SKIN_PREVIEW);
+    // The skin texture is filled in place later, so materials copied from it pick up the full skin too.
+    const skin = skinTexture(previewImage);
+    this.uniforms.uSkinLow.value = skinTexture(previewImage);
     this.uniforms.uSkinSharp.value = 0;
     return new Promise((resolve) => {
       new GLTFLoader().load(
@@ -1391,7 +1397,7 @@ export class Peach {
           gltf.scene.traverse((child) => {
             if (child.isMesh && !found) found = child;
           });
-          this.install(gltf.scene, found, preview);
+          this.install(gltf.scene, found, skin);
           resolve(this.mesh);
         },
         undefined,
@@ -1414,7 +1420,7 @@ export class Peach {
         async (blob) => {
           const url = URL.createObjectURL(blob);
           try {
-            this.applySkin(await skinTexture(url));
+            this.applySkin(await loadImage(url));
           } catch (error) {
             this.keepPreview(error);
           }
@@ -1438,11 +1444,18 @@ export class Peach {
     this.uniforms.uSkinSharp.value = 1;
   }
 
-  applySkin(map) {
-    if (!this.material.map) this.material.needsUpdate = true;
-    this.material.map = map;
-    this.mesh.customDepthMaterial.map = map;
-    this.sharpening = true;
+  applySkin(image) {
+    const { map } = this.material;
+    map.image = image;
+    map.needsUpdate = true;
+    this.sharpenTime = 0;
+  }
+
+  // Swapping leaf stiffness moves the leaf, so it waits for the squash at game start.
+  fitPlant() {
+    const { map } = this.material;
+    if (!map || map.image === this.plantImage) return;
+    this.plantImage = map.image;
     const stemBase = computeStiffness(
       this.mesh.geometry,
       map,
@@ -1469,6 +1482,7 @@ export class Peach {
     mesh.geometry = subdivide(mesh.geometry);
     computeSmoothNormals(mesh.geometry);
     this.findCrease(mesh.geometry);
+    this.plantImage = map?.image;
     const stemBase = computeStiffness(
       mesh.geometry,
       map,
@@ -2610,10 +2624,10 @@ export class Peach {
   }
 
   update(delta, heat) {
-    if (this.sharpening) {
-      const sharp = Math.min(1, this.uniforms.uSkinSharp.value + delta / 0.7);
-      this.uniforms.uSkinSharp.value = sharp;
-      this.sharpening = sharp < 1;
+    if (this.sharpenTime !== undefined && this.sharpenTime < 1) {
+      this.sharpenTime = Math.min(1, this.sharpenTime + delta / 0.9);
+      const t = this.sharpenTime;
+      this.uniforms.uSkinSharp.value = t * t * (3 - 2 * t);
     }
     this.applyOil(delta);
     this.updateFade(delta);
