@@ -93,9 +93,19 @@ button:focus-visible {
   opacity: 1;
 }
 
+/* While a mode switch reloads, only the ripe still peach shows. */
 .is-switching #stage,
-.is-switching #intro {
+.is-switching #intro > :not(.intro-shape),
+#intro.is-quiet > :not(.intro-shape) {
   opacity: 0;
+}
+
+.is-switching .intro-shape {
+  background-image: url("/peachy-keen/intro-peach-ripe.webp");
+}
+
+.is-switching .intro.has-shape .intro-shape {
+  opacity: 1;
 }
 
 .score {

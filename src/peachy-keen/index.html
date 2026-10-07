@@ -10,9 +10,12 @@
     <meta name="description" content="A peach to smack, pull and oil up." />
     <title>Jiggle Peach</title>
     <script>
-      // A mode switch on the start screen reloads; the page stays hidden until the peach is back.
+      // A mode switch reloads the page; it stays hidden until the peach is back.
       try {
-        if (sessionStorage.getItem("peachy-keen-intro-ripe") === "1")
+        if (
+          sessionStorage.getItem("peachy-keen-intro-ripe") === "1" ||
+          sessionStorage.getItem("peachy-keen-switching") === "1"
+        )
           document.documentElement.classList.add("is-switching");
       } catch {}
     </script>

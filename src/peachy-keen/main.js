@@ -81,7 +81,7 @@ let peachReady = false;
 let idleReady = null;
 let startGame = null;
 const switching = takeFlag(SWITCH_KEY);
-const skipLoading = takeFlag(SKIP_KEY);
+const skipLoading = takeFlag(SKIP_KEY) || switching;
 const showMode = () =>
   modeButtons.forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.mode === mode)),
@@ -204,7 +204,10 @@ function drawFill(level, time) {
   const top = RENDER_TOP * size;
   const height = (RENDER_BOTTOM - RENDER_TOP) * size;
   const surface = (x) => {
-    const wave = Math.sin(((x - size / 2) / height) * 7 + time * 1.6) * 0.006;
+    const across = (x - size / 2) / height;
+    const wave =
+      Math.sin(across * 15 + time * 3) * 0.015 +
+      Math.sin(across * 12 - time * 2.2) * 0.01;
     return top + height * (1 - (level * 1.2 - 0.1 + wave));
   };
   fillContext.clearRect(0, 0, size, size);
@@ -216,15 +219,6 @@ function drawFill(level, time) {
   fillContext.clip();
   fillContext.drawImage(ripeRender, 0, 0, size, size);
   fillContext.restore();
-  // The same soft bright edge the shader draws on the live peach, kept inside the silhouette.
-  fillContext.beginPath();
-  for (let x = 0; x <= size; x += size / 64) fillContext.lineTo(x, surface(x));
-  fillContext.strokeStyle = "rgba(255, 219, 199, 0.16)";
-  fillContext.lineWidth = height * 0.02;
-  fillContext.stroke();
-  fillContext.globalCompositeOperation = "destination-in";
-  fillContext.drawImage(ripeRender, 0, 0, size, size);
-  fillContext.globalCompositeOperation = "source-over";
 }
 
 function showRipeness(delta, time) {
@@ -239,7 +233,7 @@ function showRipeness(delta, time) {
       ? target
       : Math.min(target, ripeShown + delta * speed);
   peach.uniforms.uRipe.value = ripeShown;
-  drawFill(ripeShown, time);
+  drawFill(skipLoading ? 1 : ripeShown, time);
   if (ripeShown >= 1) onRipe?.();
 }
 
@@ -428,6 +422,7 @@ peach
     peach.applySkin(await skinImage);
     loaded.skin = 1;
     await ripe;
+    if (switching) intro.classList.add("is-leaving", "is-quiet");
     document.documentElement.classList.remove("is-switching");
     juice.clear();
     loadSounds();

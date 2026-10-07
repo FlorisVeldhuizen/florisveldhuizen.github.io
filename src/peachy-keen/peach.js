@@ -789,13 +789,10 @@ const FRAGMENT_COLOR = `
     diffuseColor.rgb *= mix(vec3(1.0), vec3(1.03, 0.72, 0.75), squeeze * 0.8) * mix(vec3(1.0), vec3(1.05, 0.95, 0.94), swell * 0.5);
   }
   if (uRipe < 1.0) {
-    float ripeLine = uRipe * 1.2 - 0.1 + sin(vRestPosition.x / uBounds.w * 7.0 + uTime * 1.6) * 0.006;
-    float ripeHeight = heightOf(vRestPosition);
-    float unripe = smoothstep(ripeLine - 0.008, ripeLine + 0.008, ripeHeight);
+    float ripeLine = uRipe * 1.2 - 0.1 + sin(vRestPosition.x / uBounds.w * 15.0 + uTime * 3.0) * 0.015 + sin(vRestPosition.z / uBounds.w * 12.0 - uTime * 2.2) * 0.01;
+    float unripe = smoothstep(ripeLine - 0.004, ripeLine + 0.004, heightOf(vRestPosition));
     float unripeGray = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(unripeGray) * vec3(0.5, 0.42, 0.58) * 0.55, unripe);
-    float ripeEdge = 1.0 - smoothstep(0.0, 0.016, abs(ripeHeight - ripeLine));
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.86, 0.78), ripeEdge * 0.16);
   }
 `;
 
