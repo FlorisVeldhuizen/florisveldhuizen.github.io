@@ -9,6 +9,13 @@
     <meta name="theme-color" content="#362c3f" />
     <meta name="description" content="A peach to smack, pull and oil up." />
     <title>Jiggle Peach</title>
+    <script>
+      // A mode switch on the start screen reloads; the page stays hidden until the peach is back.
+      try {
+        if (sessionStorage.getItem("peachy-keen-intro-ripe") === "1")
+          document.documentElement.classList.add("is-switching");
+      } catch {}
+    </script>
     <link
       rel="icon"
       href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍑</text></svg>"
@@ -21,6 +28,7 @@
       href="/peachy-keen/intro-peach.webp"
       fetchpriority="high"
     />
+    <link rel="preload" as="image" href="/peachy-keen/intro-peach-ripe.webp" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Jiggle Peach" />
@@ -350,7 +358,9 @@
     <div id="cursor" class="cursor" aria-hidden="true"><span></span></div>
 
     <div id="intro" class="ui intro">
-      <div id="intro-shape" class="intro-shape" aria-hidden="true"></div>
+      <div id="intro-shape" class="intro-shape" aria-hidden="true">
+        <canvas id="intro-fill"></canvas>
+      </div>
       <h1 id="intro-title" class="intro-title">Jiggle Peach</h1>
       <div class="intro-foot">
         <p class="segmented intro-modes" role="group" aria-label="Game mode">
@@ -358,7 +368,7 @@
           <button type="button" data-mode="idle">Idle</button>
         </p>
         <p id="intro-status" class="intro-status" aria-live="polite">
-          Getting the shape
+          Ripening
         </p>
       </div>
       <p class="intro-copyright">© 2026 Maanraket. All rights reserved.</p>

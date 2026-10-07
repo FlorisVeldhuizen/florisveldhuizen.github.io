@@ -20,9 +20,14 @@ import IntroTitle from "./intro-title";
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["classic", "idle"];
 const SWITCH_KEY = "peachy-keen-switching";
+const SKIP_KEY = "peachy-keen-intro-ripe";
 const SHAPE_FADE_MS = 350;
-// The skin usually lands in a blink, so the ripening rises at this pace at the fastest.
-const RIPEN_SECONDS = 2.4;
+const RIPEN_MIN_SECONDS = 1.5;
+// Each step's share of the fill: shape download, skin download, building and warming the scene.
+const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
+// Where the peach, leaf included, sits in the intro renders, as a share of the image height.
+const RENDER_TOP = 0.283;
+const RENDER_BOTTOM = 0.741;
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
@@ -60,11 +65,11 @@ function saveMode(value) {
   }
 }
 
-function takeSwitch() {
+function takeFlag(key) {
   try {
-    const switching = sessionStorage.getItem(SWITCH_KEY) === "1";
-    sessionStorage.removeItem(SWITCH_KEY);
-    return switching;
+    const set = sessionStorage.getItem(key) === "1";
+    sessionStorage.removeItem(key);
+    return set;
   } catch {
     return false;
   }
@@ -75,7 +80,8 @@ let started = false;
 let peachReady = false;
 let idleReady = null;
 let startGame = null;
-const switching = takeSwitch();
+const switching = takeFlag(SWITCH_KEY);
+const skipLoading = takeFlag(SKIP_KEY);
 const showMode = () =>
   modeButtons.forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.mode === mode)),
@@ -91,14 +97,22 @@ modeButtons.forEach((b) =>
     } else if (b.dataset.mode !== mode) {
       saveMode(b.dataset.mode);
       try {
-        if (started || startGame) sessionStorage.setItem(SWITCH_KEY, "1");
+        sessionStorage.setItem(
+          started || startGame ? SWITCH_KEY : SKIP_KEY,
+          "1",
+        );
       } catch {
         // Without session storage the start screen shows after the switch.
       }
       const url = new URL(window.location.href);
       url.searchParams.delete("mode");
       window.history.replaceState(null, "", url);
-      window.location.reload();
+      document.body
+        .animate([{ opacity: 1 }, { opacity: 0 }], {
+          duration: 250,
+          fill: "forwards",
+        })
+        .finished.then(() => window.location.reload());
     }
   }),
 );
@@ -162,17 +176,59 @@ const skinRings = new SkinRings(scene, interaction);
 settings.applyAll();
 let idle = null;
 
-let ripeLoaded = 0;
+const loaded = { shape: 0, skin: 0, prepare: 0 };
+const loadedShare = () =>
+  Object.keys(LOAD_SHARE).reduce(
+    (sum, k) => sum + LOAD_SHARE[k] * loaded[k],
+    0,
+  );
 let ripeShown = 0;
 let onRipe = null;
-function ripen(fraction) {
-  ripeLoaded = Math.max(ripeLoaded, fraction);
+
+const fillCanvas = document.getElementById("intro-fill");
+const fillContext = fillCanvas.getContext("2d");
+const ripeRender = new Image();
+ripeRender.src = "/peachy-keen/intro-peach-ripe.webp";
+
+function drawFill(level, time) {
+  if (intro.classList.contains("has-shape") || !ripeRender.complete) return;
+  const size = Math.round(
+    fillCanvas.clientWidth * Math.min(2, devicePixelRatio),
+  );
+  if (!size) return;
+  if (fillCanvas.width !== size) {
+    fillCanvas.width = size;
+    fillCanvas.height = size;
+  }
+  const top = RENDER_TOP * size;
+  const height = (RENDER_BOTTOM - RENDER_TOP) * size;
+  const surface = (x) => {
+    const across = (x - size / 2) / height;
+    const wave =
+      Math.sin(across * 30 + time * 3) * 0.02 +
+      Math.sin(across * 17 - time * 2.2) * 0.012;
+    return top + height * (1 - (level * 1.2 - 0.1 + wave));
+  };
+  fillContext.clearRect(0, 0, size, size);
+  fillContext.save();
+  fillContext.beginPath();
+  fillContext.moveTo(0, size);
+  for (let x = 0; x <= size; x += size / 64) fillContext.lineTo(x, surface(x));
+  fillContext.lineTo(size, size);
+  fillContext.clip();
+  fillContext.drawImage(ripeRender, 0, 0, size, size);
+  fillContext.restore();
 }
 
-function showRipeness(delta) {
-  if (ripeShown >= ripeLoaded) return;
-  ripeShown = Math.min(ripeLoaded, ripeShown + delta / RIPEN_SECONDS);
-  peach.uniforms.uRipe.value = 1 - (1 - ripeShown) ** 2;
+function showRipeness(delta, time) {
+  const target = loadedShare();
+  if (ripeShown < target)
+    ripeShown = skipLoading
+      ? target
+      : Math.min(target, ripeShown + delta / RIPEN_MIN_SECONDS);
+  const level = 1 - (1 - ripeShown) ** 2;
+  peach.uniforms.uRipe.value = level;
+  drawFill(level, time);
   if (ripeShown >= 1) onRipe?.();
 }
 
@@ -333,61 +389,70 @@ intro.addEventListener("click", (e) => {
   }
 });
 
-peach.load().then(async () => {
-  peach.uniforms.uRipe.value = 0;
-  interaction.prepareHalves();
-  if (mode === "idle") idleReady = prepareIdle();
-  else await warm();
-  await idleReady;
-  peachReady = true;
-  group.visible = true;
-  intro.classList.add("has-shape");
-  setStatus("Ripening");
-  setTimeout(() => {
-    interaction.holdStill = false;
-  }, SHAPE_FADE_MS);
-  const ripe = new Promise((resolve) => {
-    onRipe = resolve;
-  });
-  await peach.loadSkin(ripen);
-  ripen(1);
-  await ripe;
-  juice.clear();
-  loadSounds();
-  keepAudioUnlocked();
-
-  const start = async () => {
-    started = true;
-    interaction.holdStill = false;
-    intro.classList.remove("is-ready");
-    saveMode(mode);
-    await idleReady;
-    interaction.requestShake();
-    // The shop panel reserves its space as it appears; the fading intro keeps its place.
-    intro.style.padding = getComputedStyle(intro).padding;
-    intro.classList.add("is-leaving");
-    showHud();
-    setTimeout(() => intro.remove(), 700);
-    peach.fitPlant();
-    interaction.begin();
-    interaction.bottle.view.group.visible = true;
-    interaction.bottle.screen.x -= 220;
-    idle?.begin();
-  };
-
-  if (switching) {
-    start();
-    return;
-  }
-  setStatus("Ripe. Tap the peach to play. Sound on.");
-  intro.classList.add("is-ready");
-  interaction.nudge(1.4);
-  const invite = setInterval(() => {
-    if (started) clearInterval(invite);
-    else interaction.nudge(0.35);
-  }, 3500);
-  startGame = start;
+const skinImage = Peach.fetchSkin((fraction) => {
+  loaded.skin = fraction;
 });
+peach
+  .load((fraction) => {
+    loaded.shape = fraction;
+  })
+  .then(async () => {
+    loaded.shape = 1;
+    interaction.prepareHalves();
+    if (mode === "idle") idleReady = prepareIdle();
+    else await warm();
+    await idleReady;
+    loaded.prepare = 1;
+    peachReady = true;
+    group.visible = true;
+    intro.classList.add("has-shape");
+    setStatus("Ripening");
+    setTimeout(() => {
+      interaction.holdStill = false;
+    }, SHAPE_FADE_MS);
+    const ripe = new Promise((resolve) => {
+      onRipe = resolve;
+    });
+    peach.applySkin(await skinImage);
+    loaded.skin = 1;
+    await ripe;
+    document.documentElement.classList.remove("is-switching");
+    juice.clear();
+    loadSounds();
+    keepAudioUnlocked();
+
+    const start = async () => {
+      started = true;
+      interaction.holdStill = false;
+      intro.classList.remove("is-ready");
+      saveMode(mode);
+      await idleReady;
+      interaction.requestShake();
+      // The shop panel reserves its space as it appears; the fading intro keeps its place.
+      intro.style.padding = getComputedStyle(intro).padding;
+      intro.classList.add("is-leaving");
+      showHud();
+      setTimeout(() => intro.remove(), 700);
+      peach.fitPlant();
+      interaction.begin();
+      interaction.bottle.view.group.visible = true;
+      interaction.bottle.screen.x -= 220;
+      idle?.begin();
+    };
+
+    if (switching) {
+      start();
+      return;
+    }
+    setStatus("Ripe. Tap the peach to play. Sound on.");
+    intro.classList.add("is-ready");
+    interaction.nudge(1.4);
+    const invite = setInterval(() => {
+      if (started) clearInterval(invite);
+      else interaction.nudge(0.35);
+    }, 3500);
+    startGame = start;
+  });
 
 const SHADOW_HOLD = 1.5;
 let shadowHold = 0;
@@ -403,7 +468,7 @@ renderer.setAnimationLoop(() => {
   if (warming) return;
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
   if (!started || intro.isConnected) {
-    showRipeness(realDelta);
+    showRipeness(realDelta, clock.elapsedTime);
     introTitle.update(realDelta);
   }
   shadowHold = castersInPlay()

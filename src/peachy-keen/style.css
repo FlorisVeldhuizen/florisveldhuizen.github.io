@@ -93,6 +93,11 @@ button:focus-visible {
   opacity: 1;
 }
 
+.is-switching #stage,
+.is-switching #intro {
+  opacity: 0;
+}
+
 .score {
   position: fixed;
   top: var(--edge-top);
@@ -483,6 +488,12 @@ button:focus-visible {
   background: url("/peachy-keen/intro-peach.webp") center / 100% 100% no-repeat;
   pointer-events: none;
   transition: opacity 0.35s ease;
+}
+
+.intro-shape canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .intro.has-shape .intro-shape {

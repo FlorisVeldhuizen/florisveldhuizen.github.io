@@ -1383,7 +1383,7 @@ export class Peach {
     return Array.from({ length: count }, () => new Vector4(0, 0, 0, -1e4));
   }
 
-  async load() {
+  async load(onProgress) {
     const previewImage = await loadImage(SKIN_PREVIEW);
     // The skin texture is filled in place later, so materials copied from it pick up the full skin too.
     const skin = skinTexture(previewImage);
@@ -1400,7 +1400,9 @@ export class Peach {
           this.install(gltf.scene, found, skin);
           resolve(this.mesh);
         },
-        undefined,
+        (event) => {
+          if (event.total) onProgress(event.loaded / event.total);
+        },
         (error) => {
           // eslint-disable-next-line no-console
           console.error("Peach model failed to load, using a sphere:", error);
@@ -1412,7 +1414,8 @@ export class Peach {
     });
   }
 
-  loadSkin(onProgress) {
+  // Resolves with the full skin image, or null when it fails and the preview has to do.
+  static fetchSkin(onProgress) {
     const loader = new FileLoader().setResponseType("blob");
     return new Promise((resolve) => {
       loader.load(
@@ -1420,31 +1423,31 @@ export class Peach {
         async (blob) => {
           const url = URL.createObjectURL(blob);
           try {
-            this.applySkin(await loadImage(url));
+            resolve(await loadImage(url));
           } catch (error) {
-            this.keepPreview(error);
+            // eslint-disable-next-line no-console
+            console.error("Peach skin did not decode:", error);
+            resolve(null);
           }
           URL.revokeObjectURL(url);
-          resolve();
         },
         (event) => {
           if (event.total) onProgress(event.loaded / event.total);
         },
         (error) => {
-          this.keepPreview(error);
-          resolve();
+          // eslint-disable-next-line no-console
+          console.error("Peach skin failed to load:", error);
+          resolve(null);
         },
       );
     });
   }
 
-  keepPreview(error) {
-    // eslint-disable-next-line no-console
-    console.error("Peach skin failed to load, keeping the preview:", error);
-    this.uniforms.uSkinSharp.value = 1;
-  }
-
   applySkin(image) {
+    if (!image) {
+      this.uniforms.uSkinSharp.value = 1;
+      return;
+    }
     const { map } = this.material;
     // The GPU storage is sized for the preview, so it has to be freed before the bigger image goes in.
     map.dispose();
