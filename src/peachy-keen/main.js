@@ -17,6 +17,7 @@ import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
 import IntroTitle from "./intro-title";
 import JiggleText from "./jiggle-text";
+import slideToggle from "./slide-toggle";
 import { stepFill, drawFill } from "./fill-wave";
 
 const MODE_KEY = "peachy-keen-mode";
@@ -135,6 +136,7 @@ modeButtons.forEach((b) =>
 );
 showMode();
 document.querySelector(".intro-modes").classList.add("is-set");
+slideToggle(document.querySelector(".intro-modes"));
 
 const { scene, camera, renderer, lights } = initScene();
 const quality = new QualityGovernor(renderer);
@@ -545,6 +547,7 @@ peach
       // The tap squash settles and the sway eases to the rest pose before the still takes over.
       interaction.nudge(1.4);
       interaction.holdStill = true;
+      intro.classList.remove("is-ready");
       setStatus(openingText(mode));
       await wait(650);
       document.documentElement.classList.add(
