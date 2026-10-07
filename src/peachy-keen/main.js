@@ -22,7 +22,7 @@ const MODES = ["classic", "idle"];
 const SWITCH_KEY = "peachy-keen-switching";
 const SHAPE_FADE_MS = 350;
 // The skin usually lands in a blink, so the ripening rises at this pace at the fastest.
-const RIPEN_SECONDS = 1.6;
+const RIPEN_SECONDS = 2.4;
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
@@ -157,7 +157,7 @@ function ripen(fraction) {
 function showRipeness(delta) {
   if (ripeShown >= ripeLoaded) return;
   ripeShown = Math.min(ripeLoaded, ripeShown + delta / RIPEN_SECONDS);
-  peach.uniforms.uRipe.value = ripeShown * ripeShown * (3 - 2 * ripeShown);
+  peach.uniforms.uRipe.value = 1 - (1 - ripeShown) ** 2;
   if (ripeShown >= 1) onRipe?.();
 }
 
