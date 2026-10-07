@@ -516,6 +516,7 @@ peach
       onRipe = resolve;
     });
     peach.applySkin(await skinImage);
+    if (switching) peach.fitPlant();
     loaded.skin = 1;
     await ripe;
     juice.clear();
@@ -528,18 +529,18 @@ peach
     const openOther = async () => {
       if (opening) return;
       opening = true;
+      // The tap squash settles and the sway eases to the rest pose before the still takes over.
       interaction.nudge(1.4);
+      interaction.holdStill = true;
       setStatus(openingText(mode));
-      await wait(220);
+      await wait(650);
       document.documentElement.classList.add("is-switching", "has-status");
       await wait(450);
+      peach.fitPlant();
       if (mode === "classic") {
         reloadInto("classic");
         return;
       }
-      interaction.holdStill = true;
-      interaction.sway = 0;
-      interaction.swayWake = 0;
       breathe();
       preparedMode = "idle";
       idleReady = prepareIdle();
@@ -557,11 +558,17 @@ peach
       // The shop panel reserves its space as it appears; the fading intro keeps its place.
       intro.style.padding = getComputedStyle(intro).padding;
       started = true;
-      interaction.holdStill = false;
+      // After a switch the peach waits for the still on top of it to fade, so their leaves stay together.
+      if (afterOpening)
+        setTimeout(() => {
+          interaction.holdStill = false;
+        }, 900);
+      else interaction.holdStill = false;
       saveMode(mode);
       await idleReady;
       interaction.requestShake();
       intro.classList.add("is-leaving");
+      if (afterOpening) intro.classList.add("is-handed");
       showHud();
       setTimeout(() => intro.remove(), 700);
       peach.fitPlant();

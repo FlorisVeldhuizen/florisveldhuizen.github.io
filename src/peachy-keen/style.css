@@ -140,6 +140,12 @@ html.is-handing .intro .intro-shape {
   transition: none;
 }
 
+/* Once the live peach is fully back the identical still can go at once, before the camera moves. */
+.intro.is-handed .intro-shape {
+  opacity: 0;
+  transition: none;
+}
+
 html.is-handing #intro > :not(.intro-shape) {
   opacity: 0;
 }

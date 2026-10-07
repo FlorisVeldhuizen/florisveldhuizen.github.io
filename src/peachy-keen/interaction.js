@@ -128,6 +128,7 @@ export class Interaction {
     // The intro outline is drawn from the rest pose, so the peach stays put until it fades.
     this.holdStill = true;
     this.swayWake = 0;
+    this.swayAmount = 0;
     this.idle = 0;
     this.twerk = null;
 
@@ -2118,10 +2119,13 @@ export class Interaction {
     const held =
       !this.carrying &&
       (this.grab || this.recoil || (p.pressed && p.downOnPeach && !p.rubbing));
-    if (!this.holdStill) this.swayWake = Math.min(1, this.swayWake + delta / 2);
-    const wake = this.swayWake * this.swayWake * (3 - 2 * this.swayWake);
+    // Holding still eases the sway back to the rest pose; letting go grows it again over two seconds.
+    this.swayWake = this.holdStill
+      ? Math.max(0, this.swayWake - delta / 0.4)
+      : Math.min(1, this.swayWake + delta / 2);
+    this.swayAmount = this.swayWake * this.swayWake * (3 - 2 * this.swayWake);
     this.swayRate +=
-      ((held ? 0 : wake) - this.swayRate) * (1 - Math.exp(-delta * 8));
+      ((held ? 0 : 1) - this.swayRate) * (1 - Math.exp(-delta * 8));
     this.sway += delta * this.swayRate;
   }
 
@@ -2177,12 +2181,16 @@ export class Interaction {
     const { pose, sway } = this;
     g.position.set(
       this.offset.x + pose.x,
-      this.offset.y + Math.sin(sway * 1.4) * 0.12 * calm + pose.lift,
+      this.offset.y +
+        Math.sin(sway * 1.4) * 0.12 * calm * this.swayAmount +
+        pose.lift,
       this.offset.z,
     );
     g.rotation.set(
       this.tilt.x,
-      Math.sin(sway * 0.45) * 0.25 * calm + this.tilt.y + pose.yaw,
+      Math.sin(sway * 0.45) * 0.25 * calm * this.swayAmount +
+        this.tilt.y +
+        pose.yaw,
       this.tilt.z + Math.sin(t * 43) * tremble + pose.roll,
     );
 
