@@ -32,7 +32,7 @@ export function stepFill(state, target, delta, instant) {
     );
     const temp = (state.velocity + omega * gap) * delta;
     state.velocity = (state.velocity - omega * temp) * decay;
-    state.shown = Math.min(target, target + (gap + temp) * decay);
+    state.shown = Math.min(target, state.shown - gap + (gap + temp) * decay);
     if (target - state.shown < 0.002 && target >= 1) state.shown = 1;
   }
   state.motion +=
