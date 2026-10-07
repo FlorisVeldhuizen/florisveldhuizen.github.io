@@ -1,4 +1,4 @@
-import { Group, Clock, Color } from "three";
+import { Group, Clock, Color, Vector3 } from "three";
 import { initScene, setupResizeHandler, QualityGovernor } from "./scene";
 import { createBackdrop } from "./backdrop";
 import { Peach } from "./peach";
@@ -184,6 +184,7 @@ const loadedShare = () =>
   );
 let ripeShown = 0;
 let ripeMotion = 0;
+const ripeCentre = new Vector3();
 let stillGone = false;
 let onRipe = null;
 
@@ -240,6 +241,17 @@ function showRipeness(delta, time) {
   ripeMotion += (Math.min(1, step * 1.5) - ripeMotion) * Math.min(1, delta * 4);
   peach.uniforms.uRipe.value = ripeShown;
   peach.uniforms.uRipeMotion.value = ripeMotion;
+  if (peach.mesh) {
+    const bounds = peach.uniforms.uBounds.value;
+    peach.mesh.updateMatrixWorld();
+    ripeCentre.set(bounds.x, bounds.y, bounds.z);
+    peach.mesh.localToWorld(ripeCentre).applyMatrix4(camera.matrixWorldInverse);
+    peach.uniforms.uRipeFrame.value.set(
+      -ripeCentre.z,
+      bounds.w * peach.worldScale(),
+      ripeCentre.y,
+    );
+  }
   drawFill(skipLoading ? 1 : ripeShown, time);
   if (ripeShown >= 1) onRipe?.();
 }
