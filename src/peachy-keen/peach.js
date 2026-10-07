@@ -389,6 +389,7 @@ const FRAGMENT_HEADER = `
   uniform float uRipe;
   uniform float uRipeMotion;
   uniform vec3 uRipeFrame;
+  uniform float uRipeTime;
   uniform vec3 uRingCenter;
   uniform vec3 uRingAxisX;
   uniform vec3 uRingAxisY;
@@ -796,8 +797,8 @@ const FRAGMENT_COLOR = `
     float ripeAcross = ripeScreen.x / uRipeFrame.y;
     float ripeHeight = (ripeScreen.y - uRipeFrame.z) / uRipeFrame.y + 0.5;
     float ripeSwing = 1.0 + uRipeMotion * 1.5;
-    float ripeWave = (sin(ripeAcross * 15.0 + uTime * 3.0) * 0.015 + sin(ripeAcross * 12.0 - uTime * 2.2) * 0.01) * ripeSwing;
-    float ripeLine = uRipe * 1.2 - 0.1 + ripeWave + sin(uTime * 1.4) * 0.03 * ripeAcross;
+    float ripeWave = (sin(ripeAcross * 15.0 + uRipeTime * 3.0) * 0.015 + sin(ripeAcross * 12.0 - uRipeTime * 2.2) * 0.01) * ripeSwing;
+    float ripeLine = uRipe * 1.2 - 0.1 + ripeWave + sin(uRipeTime * 1.4) * 0.03 * ripeAcross;
     float unripe = smoothstep(ripeLine - 0.004, ripeLine + 0.004, ripeHeight);
     float unripeGray = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(unripeGray) * vec3(0.5, 0.42, 0.58) * 0.55, unripe);
@@ -1359,6 +1360,7 @@ export class Peach {
       uRipe: { value: 1 },
       uRipeMotion: { value: 0 },
       uRipeFrame: { value: new Vector3(1, 1, 0) },
+      uRipeTime: { value: 0 },
       uSkinGlint: { value: new Color() },
       uSkinPattern: { value: new Vector4() },
       uSkinDeep: { value: new Color() },

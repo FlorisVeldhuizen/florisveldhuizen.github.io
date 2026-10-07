@@ -16,18 +16,15 @@ import { SkinRings } from "./rings";
 import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
 import IntroTitle from "./intro-title";
+import { stepFill, drawFill } from "./fill-wave";
 
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["classic", "idle"];
 const SWITCH_KEY = "peachy-keen-switching";
 const SKIP_KEY = "peachy-keen-intro-ripe";
 const SHAPE_FADE_MS = 350;
-const RIPEN_MIN_SECONDS = 1.5;
 // Each step's share of the fill: shape download, skin download, building and warming the scene.
 const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
-// The peach model's height range projected onto the intro renders, as a share of the image height.
-const RENDER_TOP = 0.2655;
-const RENDER_BOTTOM = 0.7345;
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
@@ -182,65 +179,64 @@ const loadedShare = () =>
     (sum, k) => sum + LOAD_SHARE[k] * loaded[k],
     0,
   );
-let ripeShown = 0;
-let ripeMotion = 0;
+const fill = { shown: 0, motion: 0 };
 const ripeCentre = new Vector3();
 let stillGone = false;
 let onRipe = null;
+const RIPE_RENDER = "/peachy-keen/intro-peach-ripe.webp";
+// The still and the live peach share one wave clock, so the wave carries on across the handover.
+const waveEpoch = performance.timeOrigin + performance.now();
+const waveTime = () =>
+  (performance.timeOrigin + performance.now() - waveEpoch) / 1000;
 
 const fillCanvas = document.getElementById("intro-fill");
-const fillContext = fillCanvas.getContext("2d");
+const fillSize = () =>
+  Math.round(fillCanvas.clientWidth * Math.min(2, devicePixelRatio));
+let fillWorker = null;
+let fillContext = null;
 const ripeRender = new Image();
-ripeRender.src = "/peachy-keen/intro-peach-ripe.webp";
-
-function drawFill(level, time) {
-  if (stillGone || !ripeRender.complete) return;
-  const size = Math.round(
-    fillCanvas.clientWidth * Math.min(2, devicePixelRatio),
+if (fillCanvas.transferControlToOffscreen) {
+  fillWorker = new Worker(new URL("./fill-worker.js", import.meta.url), {
+    type: "module",
+  });
+  const canvas = fillCanvas.transferControlToOffscreen();
+  fillWorker.postMessage(
+    {
+      canvas,
+      size: fillSize(),
+      epoch: waveEpoch,
+      image: RIPE_RENDER,
+      instant: skipLoading,
+    },
+    [canvas],
   );
-  if (!size) return;
-  if (fillCanvas.width !== size) {
-    fillCanvas.width = size;
-    fillCanvas.height = size;
-  }
-  const top = RENDER_TOP * size;
-  const height = (RENDER_BOTTOM - RENDER_TOP) * size;
-  const surface = (x) => {
-    const across = (x - size / 2) / height;
-    const wave =
-      (Math.sin(across * 15 + time * 3) * 0.015 +
-        Math.sin(across * 12 - time * 2.2) * 0.01) *
-        (1 + ripeMotion * 1.5) +
-      Math.sin(time * 1.4) * 0.03 * across;
-    return top + height * (1 - (level * 1.2 - 0.1 + wave));
-  };
-  fillContext.clearRect(0, 0, size, size);
-  fillContext.save();
-  fillContext.beginPath();
-  fillContext.moveTo(0, size);
-  for (let x = 0; x <= size; x += size / 64) fillContext.lineTo(x, surface(x));
-  fillContext.lineTo(size, size);
-  fillContext.clip();
-  fillContext.drawImage(ripeRender, 0, 0, size, size);
-  fillContext.restore();
+  fillWorker.onmessage = ({ data }) => Object.assign(fill, data);
+  window.addEventListener("resize", () =>
+    fillWorker.postMessage({ size: fillSize() }),
+  );
+} else {
+  fillContext = fillCanvas.getContext("2d");
+  ripeRender.src = RIPE_RENDER;
 }
 
-function showRipeness(delta, time) {
+function showRipeness(delta) {
   const target = loadedShare();
-  const before = ripeShown;
-  // Follows the loading at an even pace: it eases toward each new step and never jumps.
-  const speed = Math.min(
-    1 / RIPEN_MIN_SECONDS,
-    Math.max(0.25, (target - ripeShown) * 2.5),
-  );
-  if (ripeShown < target)
-    ripeShown = skipLoading
-      ? target
-      : Math.min(target, ripeShown + delta * speed);
-  const step = delta ? (ripeShown - before) / delta : 0;
-  ripeMotion += (Math.min(1, step * 1.5) - ripeMotion) * Math.min(1, delta * 4);
-  peach.uniforms.uRipe.value = ripeShown;
-  peach.uniforms.uRipeMotion.value = ripeMotion;
+  const time = waveTime();
+  if (fillWorker) fillWorker.postMessage({ target });
+  else {
+    stepFill(fill, target, delta, skipLoading);
+    const size = fillSize();
+    if (!stillGone && ripeRender.complete && size) {
+      if (fillCanvas.width !== size) {
+        fillCanvas.width = size;
+        fillCanvas.height = size;
+      }
+      drawFill(fillContext, ripeRender, size, fill.shown, time, fill.motion);
+    }
+  }
+  peach.uniforms.uRipe.value = fill.shown;
+  peach.uniforms.uRipeMotion.value = fill.motion;
+  peach.uniforms.uRipeTime.value = time;
   if (peach.mesh) {
     const bounds = peach.uniforms.uBounds.value;
     peach.mesh.updateMatrixWorld();
@@ -252,8 +248,7 @@ function showRipeness(delta, time) {
       ripeCentre.y,
     );
   }
-  drawFill(skipLoading ? 1 : ripeShown, time);
-  if (ripeShown >= 1) onRipe?.();
+  if (fill.shown >= 1) onRipe?.();
 }
 
 let statusTimer = 0;
@@ -463,6 +458,7 @@ peach
     setTimeout(() => {
       interaction.holdStill = false;
       stillGone = true;
+      fillWorker?.postMessage({ stop: true });
     }, SHAPE_FADE_MS);
     const ripe = new Promise((resolve) => {
       onRipe = resolve;
@@ -522,7 +518,7 @@ renderer.setAnimationLoop(() => {
   if (warming) return;
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
   if (!started || intro.isConnected) {
-    showRipeness(realDelta, clock.elapsedTime);
+    showRipeness(realDelta);
     introTitle.update(realDelta);
   }
   shadowHold = castersInPlay()
