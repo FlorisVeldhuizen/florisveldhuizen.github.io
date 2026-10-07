@@ -366,8 +366,12 @@ export class Interaction {
     this.wake();
   }
 
+  // Starts from the peach already on screen, so its pose carries on instead of snapping to rest.
   begin(squash = 1.6) {
-    this.enter();
+    this.group.visible = true;
+    this.idle = 0;
+    this.dressUp();
+    this.phaseTime = 0;
     this.phase = "live";
     this.squashVelocity.x += squash;
     this.squashAxis.set(0, 1);

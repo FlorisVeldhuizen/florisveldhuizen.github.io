@@ -2610,7 +2610,8 @@ export class Peach {
     );
     torque.clampLength(0, LEAF.MAX_TORQUE);
     const k = (2 * Math.PI * LEAF.HZ) ** 2;
-    const c = 2 * LEAF.DAMPING * Math.sqrt(k);
+    // Held still, the leaf settles fast so the intro still can take over without a second leaf.
+    const c = 2 * LEAF.DAMPING * Math.sqrt(k) * (1 + (1 - this.breeze) * 6);
     L.bendVel
       .addScaledVector(torque, dt)
       .addScaledVector(L.bend, -k * dt)
