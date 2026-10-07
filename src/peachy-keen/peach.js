@@ -32,6 +32,8 @@ import {
   RepeatWrapping,
   Vector2,
   Quaternion,
+  Texture,
+  FileLoader,
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { PEACH_CONFIG, FABRIC } from "./config";
@@ -40,6 +42,8 @@ import { RibbonBows } from "./ribbon";
 import { Waistband } from "./band";
 import { boxesFor, raycastNearest } from "./raycast";
 import peachyModel from "./assets/peachy.glb?url";
+import peachySkin from "./assets/peachy-skin.jpg?url";
+import SKIN_PREVIEW from "./skin-preview";
 
 const HIT_LIFE = 3.0;
 const MARKER_FRAGMENT = `#include <colorspace_fragment>
@@ -380,6 +384,9 @@ const MARKER_HEADER = `
 const OIL_BLOBS = 64;
 
 const FRAGMENT_HEADER = `
+  uniform sampler2D uSkinLow;
+  uniform float uSkinSharp;
+  uniform float uRipe;
   uniform vec3 uRingCenter;
   uniform vec3 uRingAxisX;
   uniform vec3 uRingAxisY;
@@ -698,11 +705,24 @@ const FABRIC_FRAGMENT = `
   diffuseColor = vec4(garment.rgb, garment.a);
 `;
 
-const CUT_TEST = `
+const MAP_SAMPLE = `
   #include <map_fragment>
   #ifndef USE_MAP
     vec4 sampledDiffuseColor = vec4(1.0);
   #endif
+`;
+
+const SKIN_SAMPLE = `
+  #ifdef USE_MAP
+    vec4 sampledDiffuseColor = texture2D(map, vMapUv);
+    if (uSkinSharp < 1.0) sampledDiffuseColor = mix(texture2D(uSkinLow, vMapUv), sampledDiffuseColor, uSkinSharp);
+    diffuseColor *= sampledDiffuseColor;
+  #else
+    vec4 sampledDiffuseColor = vec4(1.0);
+  #endif
+`;
+
+const CUT_RULE = `
   float leaf = smoothstep(0.02, 0.12, sampledDiffuseColor.g - sampledDiffuseColor.r);
   #ifdef PEACH_CUT
   if (uCutSide != 0.0) {
@@ -713,6 +733,8 @@ const CUT_TEST = `
   }
   #endif
 `;
+
+const CUT_TEST = MAP_SAMPLE + CUT_RULE;
 
 // Where the UVs stretch (stem hole, filled side crease) the fuzz comes from the rest position instead.
 const HOLE_FUZZ = `
@@ -732,7 +754,8 @@ const HOLE_FUZZ = `
 `;
 
 const FRAGMENT_COLOR = `
-  ${CUT_TEST}
+  ${SKIN_SAMPLE}
+  ${CUT_RULE}
   #ifdef SKIN_FADE
     float fadeFacing = clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0);
     float fadeAt = mix(skinFbm(vRestPosition / uBounds.w * 5.0), 1.0 - fadeFacing, 0.55);
@@ -764,6 +787,12 @@ const FRAGMENT_COLOR = `
     float squeeze = smoothstep(0.0, 0.6, -vFabricPush) * (1.0 - leaf);
     float swell = smoothstep(0.2, 1.4, vFabricPush) * (1.0 - leaf);
     diffuseColor.rgb *= mix(vec3(1.0), vec3(1.03, 0.72, 0.75), squeeze * 0.8) * mix(vec3(1.0), vec3(1.05, 0.95, 0.94), swell * 0.5);
+  }
+  if (uRipe < 1.0) {
+    float ripeLine = uRipe * 1.2 - 0.1 + sin(vRestPosition.x / uBounds.w * 30.0 + uTime * 3.0) * 0.012 + sin(vRestPosition.z / uBounds.w * 24.0 - uTime * 2.2) * 0.008;
+    float unripe = smoothstep(ripeLine - 0.004, ripeLine + 0.004, heightOf(vRestPosition));
+    float unripeGray = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(unripeGray) * vec3(0.5, 0.42, 0.58) * 0.55, unripe);
   }
 `;
 
@@ -994,6 +1023,19 @@ function computeSmoothNormals(geometry) {
   geometry.setAttribute("normal", new BufferAttribute(normals, 3));
 }
 
+async function skinTexture(url) {
+  const image = new Image();
+  image.src = url;
+  await image.decode();
+  const map = new Texture(image);
+  map.flipY = false;
+  map.colorSpace = SRGBColorSpace;
+  map.wrapS = RepeatWrapping;
+  map.wrapT = RepeatWrapping;
+  map.needsUpdate = true;
+  return map;
+}
+
 export function sampleTexture(map) {
   const size = 256;
   const canvas = document.createElement("canvas");
@@ -1183,8 +1225,18 @@ function computeStiffness(geometry, map, stemY) {
     stiffness[i] = current[slotOf[i]];
     plant[i] = base[slotOf[i]];
   }
-  geometry.setAttribute("stiffness", new BufferAttribute(stiffness, 1));
-  geometry.setAttribute("plant", new BufferAttribute(plant, 1));
+  [
+    ["stiffness", stiffness],
+    ["plant", plant],
+  ].forEach(([name, values]) => {
+    const attribute = geometry.attributes[name];
+    if (!attribute) {
+      geometry.setAttribute(name, new BufferAttribute(values, 1));
+      return;
+    }
+    attribute.array.set(values);
+    attribute.needsUpdate = true;
+  });
   const stemBase = new Vector3();
   let count = 0;
   for (let i = 0; i < pos.count; i += 1) {
@@ -1290,6 +1342,9 @@ export class Peach {
       uOilCount: { value: 0 },
       uOilDepth: { value: 0.045 },
       uSkinLook: { value: new Vector4() },
+      uSkinLow: { value: null },
+      uSkinSharp: { value: 1 },
+      uRipe: { value: 1 },
       uSkinGlint: { value: new Color() },
       uSkinPattern: { value: new Vector4() },
       uSkinDeep: { value: new Color() },
@@ -1324,7 +1379,10 @@ export class Peach {
     return Array.from({ length: count }, () => new Vector4(0, 0, 0, -1e4));
   }
 
-  load(onProgress) {
+  async load(onProgress) {
+    const preview = await skinTexture(SKIN_PREVIEW);
+    this.uniforms.uSkinLow.value = preview;
+    this.uniforms.uSkinSharp.value = 0;
     return new Promise((resolve) => {
       new GLTFLoader().load(
         peachyModel,
@@ -1333,7 +1391,7 @@ export class Peach {
           gltf.scene.traverse((child) => {
             if (child.isMesh && !found) found = child;
           });
-          this.install(gltf.scene, found, found.material.map);
+          this.install(gltf.scene, found, preview);
           resolve(this.mesh);
         },
         (event) => {
@@ -1348,6 +1406,55 @@ export class Peach {
         },
       );
     });
+  }
+
+  loadSkin(onProgress) {
+    const loader = new FileLoader().setResponseType("blob");
+    return new Promise((resolve) => {
+      loader.load(
+        peachySkin,
+        async (blob) => {
+          const url = URL.createObjectURL(blob);
+          try {
+            this.applySkin(await skinTexture(url));
+          } catch (error) {
+            this.keepPreview(error);
+          }
+          URL.revokeObjectURL(url);
+          resolve();
+        },
+        (event) => {
+          if (event.total) onProgress(event.loaded / event.total);
+        },
+        (error) => {
+          this.keepPreview(error);
+          resolve();
+        },
+      );
+    });
+  }
+
+  keepPreview(error) {
+    // eslint-disable-next-line no-console
+    console.error("Peach skin failed to load, keeping the preview:", error);
+    this.uniforms.uSkinSharp.value = 1;
+  }
+
+  applySkin(map) {
+    if (!this.material.map) this.material.needsUpdate = true;
+    this.material.map = map;
+    this.mesh.customDepthMaterial.map = map;
+    this.sharpening = true;
+    const stemBase = computeStiffness(
+      this.mesh.geometry,
+      map,
+      this.uniforms.uStemY.value,
+    );
+    if (stemBase) {
+      this.uniforms.uStemBase.value.copy(stemBase.stemBase);
+      if (stemBase.leafAxis)
+        this.uniforms.uLeafAxis.value.set(...stemBase.leafAxis.toArray(), 0);
+    }
   }
 
   install(root, mesh, map) {
@@ -2505,6 +2612,11 @@ export class Peach {
   }
 
   update(delta, heat) {
+    if (this.sharpening) {
+      const sharp = Math.min(1, this.uniforms.uSkinSharp.value + delta / 0.7);
+      this.uniforms.uSkinSharp.value = sharp;
+      this.sharpening = sharp < 1;
+    }
     this.applyOil(delta);
     this.updateFade(delta);
     this.uniforms.uTime.value += delta;

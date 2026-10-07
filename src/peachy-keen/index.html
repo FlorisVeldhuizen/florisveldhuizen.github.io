@@ -159,13 +159,9 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..900,0..100,0..1;1,9..144,300..900,0..100,0..1&display=swap"
     />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Satisfy&text=J&display=swap"
-    />
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
+  <body class="is-intro">
     <section class="score">
       <p class="score-count">
         <span id="count">0</span> <span id="count-unit">smacks</span>
@@ -348,12 +344,17 @@
     <div id="cursor" class="cursor" aria-hidden="true"><span></span></div>
 
     <div id="intro" class="ui intro">
-      <h1 id="intro-title" class="intro-title"><span class="intro-j">J</span>iggle Peach</h1>
-      <p id="intro-status" class="intro-status">Loading the peach</p>
-      <p class="segmented intro-modes" role="group" aria-label="Game mode">
-        <button type="button" data-mode="classic">Classic</button>
-        <button type="button" data-mode="idle">Idle</button>
-      </p>
+      <div id="intro-shape" class="intro-shape" aria-hidden="true"></div>
+      <h1 id="intro-title" class="intro-title">Jiggle Peach</h1>
+      <div class="intro-foot">
+        <p class="segmented intro-modes" role="group" aria-label="Game mode">
+          <button type="button" data-mode="classic">Classic</button>
+          <button type="button" data-mode="idle">Idle</button>
+        </p>
+        <p id="intro-status" class="intro-status" aria-live="polite">
+          Getting the shape
+        </p>
+      </div>
       <p class="intro-copyright">© 2026 Maanraket. All rights reserved.</p>
     </div>
 

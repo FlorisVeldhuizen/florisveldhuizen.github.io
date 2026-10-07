@@ -124,7 +124,9 @@ export class Interaction {
     this.phaseTime = 0;
     this.clock = 0;
     this.sway = 0;
-    this.swayRate = 1;
+    this.swayRate = 0;
+    // The intro outline is drawn from the rest pose, so the peach stays put until it fades.
+    this.holdStill = true;
     this.idle = 0;
     this.twerk = null;
 
@@ -364,6 +366,15 @@ export class Interaction {
 
   begin() {
     this.enter();
+    this.phase = "live";
+    this.squashVelocity.x += 1.6;
+    this.squashAxis.set(0, 1);
+  }
+
+  nudge(size = 1) {
+    this.squashVelocity.x += 0.7 * size;
+    this.squashAxis.set(0, 1);
+    this.spin.z += (Math.random() - 0.5) * 0.5 * size;
   }
 
   timeScale(realDelta) {
@@ -2107,7 +2118,8 @@ export class Interaction {
       !this.carrying &&
       (this.grab || this.recoil || (p.pressed && p.downOnPeach && !p.rubbing));
     this.swayRate +=
-      ((held ? 0 : 1) - this.swayRate) * (1 - Math.exp(-delta * 8));
+      ((held || this.holdStill ? 0 : 1) - this.swayRate) *
+      (1 - Math.exp(-delta * 8));
     this.sway += delta * this.swayRate;
   }
 
@@ -2195,8 +2207,9 @@ export class Interaction {
   updateCamera(delta) {
     const still = reducedMotion.matches;
     const p = this.pointer;
-    const tx = still || !p.present ? 0 : (p.x / window.innerWidth - 0.5) * 0.5;
-    const ty = still || !p.present ? 0 : (p.y / viewHeight() - 0.5) * -0.3;
+    const steady = still || !p.present || this.holdStill;
+    const tx = steady ? 0 : (p.x / window.innerWidth - 0.5) * 0.5;
+    const ty = steady ? 0 : (p.y / viewHeight() - 0.5) * -0.3;
     const ease = 1 - Math.exp(-delta * 3);
     this.parallax.x += (tx - this.parallax.x) * ease;
     this.parallax.y += (ty - this.parallax.y) * ease;

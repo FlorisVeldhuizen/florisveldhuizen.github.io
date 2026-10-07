@@ -15,13 +15,17 @@ import { Shock } from "./shock";
 import { SkinRings } from "./rings";
 import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
+import IntroTitle from "./intro-title";
 
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["classic", "idle"];
 const SWITCH_KEY = "peachy-keen-switching";
+// Roughly the shape's share of the bytes; the skin is the rest.
+const SHAPE_SHARE = 0.6;
+const SHAPE_FADE_MS = 1100;
 
 const intro = document.getElementById("intro");
-const introTitle = document.getElementById("intro-title");
+const introTitle = new IntroTitle(document.getElementById("intro-title"));
 const introStatus = document.getElementById("intro-status");
 const modeButtons = [...document.querySelectorAll("[data-mode]")];
 
@@ -139,8 +143,24 @@ const skinRings = new SkinRings(scene, interaction);
 settings.applyAll();
 let idle = null;
 
-function setProgress(fraction) {
-  introTitle.style.setProperty("--progress", `${Math.round(fraction * 100)}%`);
+let ripeStep = 0;
+function ripen(fraction) {
+  peach.uniforms.uRipe.value = fraction;
+  introTitle.fill(SHAPE_SHARE + fraction * (1 - SHAPE_SHARE));
+  const step = Math.floor(fraction * 10);
+  if (step <= ripeStep) return;
+  ripeStep = step;
+  if (!interaction.holdStill) interaction.nudge(0.3);
+}
+
+let statusTimer = 0;
+function sayForAMoment(text) {
+  const before = introStatus.textContent;
+  introStatus.textContent = text;
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => {
+    if (!started) introStatus.textContent = before;
+  }, 1400);
 }
 
 const clearColor = new Color();
@@ -260,34 +280,62 @@ async function startIdle() {
   idle.ready();
 }
 
-peach.load(setProgress).then(async () => {
-  setProgress(1);
-  interaction.prepareHalves();
-  await warm();
-  juice.clear();
-  loadSounds();
-  keepAudioUnlocked();
-
-  const start = async () => {
-    started = true;
-    intro.classList.remove("is-ready");
-    saveMode(mode);
-    if (mode === "idle") await startIdle();
-    interaction.requestShake();
-    intro.classList.add("is-leaving");
-    setTimeout(() => intro.remove(), 700);
-    interaction.begin();
-    idle?.begin();
-  };
-
-  if (switching) {
-    start();
+let startGame = null;
+intro.addEventListener("click", (e) => {
+  if (started || e.target.closest("[data-mode]")) return;
+  const onPeach = peach.mesh && interaction.raycastAt(e.clientX, e.clientY);
+  if (!onPeach) {
+    if (group.visible && !interaction.holdStill) interaction.nudge();
     return;
   }
-  introStatus.textContent = "Click anywhere to begin. Sound on.";
-  intro.classList.add("is-ready");
-  intro.addEventListener("click", start, { once: true });
+  if (startGame) startGame();
+  else {
+    sayForAMoment("Not ripe yet");
+    if (!interaction.holdStill) interaction.nudge(0.6);
+  }
 });
+
+peach
+  .load((fraction) => introTitle.fill(fraction * SHAPE_SHARE))
+  .then(async () => {
+    introTitle.fill(SHAPE_SHARE);
+    peach.uniforms.uRipe.value = 0;
+    group.visible = true;
+    intro.classList.add("has-shape");
+    introStatus.textContent = "Ripening";
+    setTimeout(() => {
+      interaction.holdStill = false;
+    }, SHAPE_FADE_MS);
+    await peach.loadSkin(ripen);
+    ripen(1);
+    interaction.prepareHalves();
+    await warm();
+    juice.clear();
+    loadSounds();
+    keepAudioUnlocked();
+
+    const start = async () => {
+      started = true;
+      interaction.holdStill = false;
+      intro.classList.remove("is-ready");
+      saveMode(mode);
+      if (mode === "idle") await startIdle();
+      interaction.requestShake();
+      intro.classList.add("is-leaving");
+      document.body.classList.remove("is-intro");
+      setTimeout(() => intro.remove(), 700);
+      interaction.begin();
+      idle?.begin();
+    };
+
+    if (switching) {
+      start();
+      return;
+    }
+    introStatus.textContent = "Ripe. Tap the peach. Sound on.";
+    intro.classList.add("is-ready");
+    startGame = start;
+  });
 
 const SHADOW_HOLD = 1.5;
 let shadowHold = 0;
@@ -302,6 +350,7 @@ const clock = new Clock();
 renderer.setAnimationLoop(() => {
   if (warming) return;
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
+  if (!started || intro.isConnected) introTitle.update(realDelta);
   shadowHold = castersInPlay()
     ? SHADOW_HOLD
     : Math.max(0, shadowHold - realDelta);
