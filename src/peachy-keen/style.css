@@ -85,6 +85,12 @@ button:focus-visible {
   display: block;
   width: 100%;
   height: 100%;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+#stage.is-drawn {
+  opacity: 1;
 }
 
 .score {
@@ -455,7 +461,7 @@ button:focus-visible {
   display: grid;
   grid-template-rows: auto 1fr auto;
   justify-items: center;
-  padding: calc(var(--edge-top) + 28px) var(--edge-right)
+  padding: var(--edge-top) var(--edge-right)
     calc(var(--gutter) + env(safe-area-inset-bottom)) var(--edge-left);
   text-align: center;
   cursor: progress;
@@ -483,8 +489,10 @@ button:focus-visible {
   opacity: 0;
 }
 
+/* Idle replaces the intro padding, so the room above the title sits here. */
 .intro-title {
-  margin: 0;
+  margin: 28px 0 0;
+  color: var(--peach);
   font-size: clamp(44px, 7.5vw, 104px);
   font-style: italic;
   font-weight: 560;
@@ -496,7 +504,27 @@ button:focus-visible {
   line-height: 1;
   padding: 0 0.08em 0.1em;
   white-space: nowrap;
-  transition: transform 0.7s cubic-bezier(0.5, 0, 0.2, 1);
+  transition:
+    opacity 0.5s ease,
+    transform 0.7s cubic-bezier(0.5, 0, 0.2, 1);
+}
+
+/* Text waits for its font, so it does not swap shape while you watch. */
+.intro-title,
+.intro-foot,
+.intro-copyright {
+  opacity: 0;
+}
+
+.intro-foot,
+.intro-copyright {
+  transition: opacity 0.5s ease;
+}
+
+.intro.has-fonts .intro-title,
+.intro.has-fonts .intro-foot,
+.intro.has-fonts .intro-copyright {
+  opacity: 1;
 }
 
 .intro-letter {
@@ -528,6 +556,12 @@ button:focus-visible {
 .intro-modes {
   justify-content: center;
   margin: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.intro-modes.is-set {
+  opacity: 1;
 }
 
 .intro-modes button {

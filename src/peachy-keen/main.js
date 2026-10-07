@@ -27,6 +27,17 @@ const RIPEN_SECONDS = 2.4;
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
 const introStatus = document.getElementById("intro-status");
+function setStatus(text) {
+  if (introStatus.textContent === text) return;
+  introStatus.textContent = text;
+  introStatus.animate([{ opacity: 0 }, { opacity: 1 }], {
+    duration: 350,
+    easing: "ease-out",
+  });
+}
+const showText = () => intro.classList.add("has-fonts");
+document.fonts.load("italic 560 44px Fraunces").then(showText, showText);
+setTimeout(showText, 2000);
 const modeButtons = [...document.querySelectorAll("[data-mode]")];
 
 function readMode() {
@@ -90,6 +101,7 @@ modeButtons.forEach((b) =>
   }),
 );
 showMode();
+document.querySelector(".intro-modes").classList.add("is-set");
 
 const { scene, camera, renderer, lights } = initScene();
 const quality = new QualityGovernor(renderer);
@@ -140,6 +152,7 @@ const interaction = new Interaction({
   settings,
   talk,
 });
+interaction.bottle.view.group.visible = false;
 const naughty = new Naughty(interaction, talk);
 const wild = new Wild({ scene, camera, interaction, talk, backdrop });
 const shock = new Shock(renderer, interaction);
@@ -164,10 +177,10 @@ function showRipeness(delta) {
 let statusTimer = 0;
 function sayForAMoment(text) {
   const before = introStatus.textContent;
-  introStatus.textContent = text;
+  setStatus(text);
   clearTimeout(statusTimer);
   statusTimer = setTimeout(() => {
-    if (!started) introStatus.textContent = before;
+    if (!started) setStatus(before);
   }, 1400);
 }
 
@@ -270,7 +283,7 @@ renderer.domElement.addEventListener("webglcontextrestored", async () => {
 // Building the shop and compiling its shaders freezes the page, so it happens before the tap.
 async function prepareIdle() {
   const status = introStatus.textContent;
-  introStatus.textContent = "Opening the shop";
+  setStatus("Opening the shop");
   const { createIdle } = await import("./idle");
   idle = createIdle({
     interaction,
@@ -288,7 +301,7 @@ async function prepareIdle() {
   idle.prepare();
   await warm();
   idle.ready();
-  introStatus.textContent = status;
+  setStatus(status);
 }
 
 const HUD = [".score", ".hints", ".settings-dock", ".bottle", ".panel"];
@@ -326,10 +339,9 @@ peach.load().then(async () => {
   else await warm();
   await idleReady;
   peachReady = true;
-  interaction.bottle.view.group.visible = false;
   group.visible = true;
   intro.classList.add("has-shape");
-  introStatus.textContent = "Ripening";
+  setStatus("Ripening");
   setTimeout(() => {
     interaction.holdStill = false;
   }, SHAPE_FADE_MS);
@@ -366,7 +378,7 @@ peach.load().then(async () => {
     start();
     return;
   }
-  introStatus.textContent = "Ripe. Tap the peach. Sound on.";
+  setStatus("Ripe. Tap the peach. Sound on.");
   intro.classList.add("is-ready");
   startGame = start;
 });
@@ -416,6 +428,8 @@ renderer.setAnimationLoop(() => {
   skinRings.update(delta);
   shock.update(realDelta);
   backdrop.render();
+  if (!renderer.domElement.classList.contains("is-drawn"))
+    requestAnimationFrame(() => renderer.domElement.classList.add("is-drawn"));
   lens.render([juice, droplets]);
   shock.render();
 });
