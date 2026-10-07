@@ -399,6 +399,35 @@ function showHud() {
   );
 }
 
+// Once ripe, the peach answers the pointer the way the game will, so it reads as touchable.
+let overPeach = false;
+let lastPointer = null;
+intro.addEventListener("pointermove", (e) => {
+  if (!startGame || started) return;
+  const over = !!interaction.raycastAt(e.clientX, e.clientY);
+  if (over && !overPeach) interaction.nudge(0.6);
+  overPeach = over;
+  intro.classList.toggle("is-over", over);
+  if (over && lastPointer) {
+    const dx = Math.max(-40, Math.min(40, e.clientX - lastPointer.x));
+    const dy = Math.max(-40, Math.min(40, e.clientY - lastPointer.y));
+    interaction.spin.z -= dx * 0.004;
+    interaction.spin.x += dy * 0.003;
+  }
+  lastPointer = { x: e.clientX, y: e.clientY };
+});
+intro.addEventListener("pointerleave", () => {
+  overPeach = false;
+  lastPointer = null;
+  intro.classList.remove("is-over");
+});
+intro.addEventListener("pointerdown", (e) => {
+  if (!startGame || started || !interaction.raycastAt(e.clientX, e.clientY))
+    return;
+  interaction.squashVelocity.x -= 1.4;
+  interaction.squashAxis.set(0, 1);
+});
+
 intro.addEventListener("click", (e) => {
   if (started || e.target.closest("[data-mode]")) return;
   const onPeach = peach.mesh && interaction.raycastAt(e.clientX, e.clientY);

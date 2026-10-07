@@ -487,6 +487,10 @@ button:focus-visible {
   cursor: default;
 }
 
+.intro.is-ready.is-over {
+  cursor: pointer;
+}
+
 /* The game camera shows 6.4 units of height, or 5.2 of width on narrow screens; the outline follows the same rule. */
 .intro-shape {
   position: fixed;
