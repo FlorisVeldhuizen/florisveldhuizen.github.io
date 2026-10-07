@@ -77,8 +77,8 @@ function takeFlag(key) {
 
 let mode = readMode();
 let started = false;
-let peachReady = false;
 let idleReady = null;
+let preparedMode = null;
 let startGame = null;
 const switching = takeFlag(SWITCH_KEY);
 const skipLoading = takeFlag(SKIP_KEY) || switching;
@@ -88,14 +88,14 @@ const showMode = () =>
   );
 modeButtons.forEach((b) =>
   b.addEventListener("click", () => {
-    if (!started && !(idleReady && b.dataset.mode === "classic")) {
-      mode = b.dataset.mode;
+    const picked = b.dataset.mode;
+    // Building the other mode freezes the page, so it happens behind a reload that shows the still peach.
+    if (!started && (preparedMode === null || picked === preparedMode)) {
+      mode = picked;
       showMode();
-      // eslint-disable-next-line no-use-before-define
-      if (mode === "idle" && peachReady) idleReady ??= prepareIdle();
       startGame?.();
-    } else if (b.dataset.mode !== mode) {
-      saveMode(b.dataset.mode);
+    } else if (!started || picked !== mode) {
+      saveMode(picked);
       try {
         sessionStorage.setItem(
           started || startGame ? SWITCH_KEY : SKIP_KEY,
@@ -411,11 +411,11 @@ peach
   .then(async () => {
     loaded.shape = 1;
     interaction.prepareHalves();
+    preparedMode = mode;
     if (mode === "idle") idleReady = prepareIdle();
     else await warm();
     await idleReady;
     loaded.prepare = 1;
-    peachReady = true;
     group.visible = true;
     intro.classList.add("has-shape");
     setStatus("Ripening");
@@ -436,13 +436,13 @@ peach
     keepAudioUnlocked();
 
     const start = async () => {
+      // The shop panel reserves its space as it appears; the fading intro keeps its place.
+      intro.style.padding = getComputedStyle(intro).padding;
       started = true;
       interaction.holdStill = false;
       saveMode(mode);
       await idleReady;
       interaction.requestShake();
-      // The shop panel reserves its space as it appears; the fading intro keeps its place.
-      intro.style.padding = getComputedStyle(intro).padding;
       intro.classList.add("is-leaving");
       showHud();
       setTimeout(() => intro.remove(), 700);
