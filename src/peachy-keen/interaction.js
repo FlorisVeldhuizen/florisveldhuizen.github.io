@@ -365,10 +365,10 @@ export class Interaction {
     this.wake();
   }
 
-  begin() {
+  begin(squash = 1.6) {
     this.enter();
     this.phase = "live";
-    this.squashVelocity.x += 1.6;
+    this.squashVelocity.x += squash;
     this.squashAxis.set(0, 1);
   }
 

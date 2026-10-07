@@ -130,17 +130,18 @@ html.is-switching .intro .intro-status {
   font-weight: 600;
 }
 
-/* A compositor animation, so the peach keeps breathing while the page is busy building the mode. */
-.is-switching .intro-shape {
-  background-image: url("/peachy-keen/intro-peach-ripe.webp");
+.intro-shape {
   transform-origin: 50% 74%;
-  animation: intro-breathe 1.4s ease-in-out infinite;
 }
 
-@keyframes intro-breathe {
-  50% {
-    transform: scale(1.025, 0.975);
-  }
+/* While the live peach fades back in under it, the still stays fully shown and the text stays away. */
+html.is-handing .intro .intro-shape {
+  opacity: 1;
+  transition: none;
+}
+
+html.is-handing #intro > :not(.intro-shape) {
+  opacity: 0;
 }
 
 .is-switching .intro.has-shape .intro-shape {

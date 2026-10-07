@@ -22,6 +22,7 @@ const MODE_KEY = "peachy-keen-mode";
 const MODES = ["classic", "idle"];
 const SWITCH_KEY = "peachy-keen-switching";
 const SHAPE_FADE_MS = 350;
+const STAGE_FADE_MS = 800;
 // Each step's share of the fill: shape download, skin download, building and warming the scene.
 const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
 
@@ -265,6 +266,43 @@ function showRipeness(delta) {
   if (fill.shown >= 1) onRipe?.();
 }
 
+const wait = (ms) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+const introShape = document.getElementById("intro-shape");
+// Web animations of transform run on the compositor, so the peach keeps breathing while the page is busy.
+let breathing = null;
+const breathe = () => {
+  breathing = introShape.animate(
+    [
+      { transform: "scale(1, 1)" },
+      { transform: "scale(1.025, 0.975)" },
+      { transform: "scale(1, 1)" },
+    ],
+    { duration: 1400, iterations: Infinity, easing: "ease-in-out" },
+  );
+};
+// The still eases back to rest, the live peach (held in the same pose) fades in under it, then the still goes.
+const handOver = async () => {
+  if (breathing) {
+    const from = getComputedStyle(introShape).transform;
+    breathing.cancel();
+    breathing = null;
+    await introShape.animate([{ transform: from }, { transform: "none" }], {
+      duration: 250,
+      easing: "ease-out",
+    }).finished;
+  }
+  const root = document.documentElement;
+  root.classList.add("is-handing");
+  root.classList.remove("is-switching");
+  await wait(STAGE_FADE_MS);
+  intro.classList.add("is-quiet");
+  root.classList.remove("is-handing");
+};
+if (switching) breathe();
+
 let statusTimer = 0;
 function sayForAMoment(text) {
   const before = introStatus.textContent;
@@ -470,7 +508,7 @@ peach
     intro.classList.add("has-shape");
     setStatus(switching ? openingText(mode) : "Ripening");
     setTimeout(() => {
-      interaction.holdStill = false;
+      if (!switching) interaction.holdStill = false;
       stillGone = true;
       fillWorker?.postMessage({ stop: true });
     }, SHAPE_FADE_MS);
@@ -480,16 +518,10 @@ peach
     peach.applySkin(await skinImage);
     loaded.skin = 1;
     await ripe;
-    if (switching) intro.classList.add("is-leaving", "is-quiet");
-    document.documentElement.classList.remove("is-switching");
     juice.clear();
     loadSounds();
     keepAudioUnlocked();
 
-    const wait = (ms) =>
-      new Promise((resolve) => {
-        setTimeout(resolve, ms);
-      });
     // Starting the mode that was not prepared: the peach stays as the one fixed point while the rest
     // fades to a calm screen, and the slow work happens behind it.
     let opening = false;
@@ -505,18 +537,19 @@ peach
         reloadInto("classic");
         return;
       }
+      interaction.holdStill = true;
+      interaction.sway = 0;
+      interaction.swayWake = 0;
+      breathe();
       preparedMode = "idle";
       idleReady = prepareIdle();
       await idleReady;
-      intro.classList.add("is-quiet");
+      await handOver();
       // eslint-disable-next-line no-use-before-define
-      start();
-      requestAnimationFrame(() =>
-        document.documentElement.classList.remove("is-switching"),
-      );
+      start(true);
     };
 
-    const start = async () => {
+    const start = async (afterOpening = false) => {
       if (mode !== preparedMode) {
         openOther();
         return;
@@ -532,14 +565,15 @@ peach
       showHud();
       setTimeout(() => intro.remove(), 700);
       peach.fitPlant();
-      interaction.begin();
+      interaction.begin(afterOpening ? 0 : 1.6);
       interaction.bottle.view.group.visible = true;
       interaction.bottle.screen.x -= 220;
       idle?.begin();
     };
 
     if (switching) {
-      start();
+      await handOver();
+      start(true);
       return;
     }
     setStatus("Ripe. Tap the peach to play. Sound on.");
