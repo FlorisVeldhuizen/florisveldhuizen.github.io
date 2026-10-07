@@ -183,6 +183,7 @@ const loadedShare = () =>
     0,
   );
 let ripeShown = 0;
+let ripeMotion = 0;
 let stillGone = false;
 let onRipe = null;
 
@@ -206,8 +207,10 @@ function drawFill(level, time) {
   const surface = (x) => {
     const across = (x - size / 2) / height;
     const wave =
-      Math.sin(across * 15 + time * 3) * 0.015 +
-      Math.sin(across * 12 - time * 2.2) * 0.01;
+      (Math.sin(across * 15 + time * 3) * 0.015 +
+        Math.sin(across * 12 - time * 2.2) * 0.01) *
+        (1 + ripeMotion * 1.5) +
+      Math.sin(time * 1.4) * 0.03 * across;
     return top + height * (1 - (level * 1.2 - 0.1 + wave));
   };
   fillContext.clearRect(0, 0, size, size);
@@ -223,6 +226,7 @@ function drawFill(level, time) {
 
 function showRipeness(delta, time) {
   const target = loadedShare();
+  const before = ripeShown;
   // Follows the loading at an even pace: it eases toward each new step and never jumps.
   const speed = Math.min(
     1 / RIPEN_MIN_SECONDS,
@@ -232,7 +236,10 @@ function showRipeness(delta, time) {
     ripeShown = skipLoading
       ? target
       : Math.min(target, ripeShown + delta * speed);
+  const step = delta ? (ripeShown - before) / delta : 0;
+  ripeMotion += (Math.min(1, step * 1.5) - ripeMotion) * Math.min(1, delta * 4);
   peach.uniforms.uRipe.value = ripeShown;
+  peach.uniforms.uRipeMotion.value = ripeMotion;
   drawFill(skipLoading ? 1 : ripeShown, time);
   if (ripeShown >= 1) onRipe?.();
 }
