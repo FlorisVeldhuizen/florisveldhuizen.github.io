@@ -74,6 +74,7 @@ let mode = readMode();
 let started = false;
 let peachReady = false;
 let idleReady = null;
+let startGame = null;
 const switching = takeSwitch();
 const showMode = () =>
   modeButtons.forEach((b) =>
@@ -86,10 +87,11 @@ modeButtons.forEach((b) =>
       showMode();
       // eslint-disable-next-line no-use-before-define
       if (mode === "idle" && peachReady) idleReady ??= prepareIdle();
+      startGame?.();
     } else if (b.dataset.mode !== mode) {
       saveMode(b.dataset.mode);
       try {
-        if (started) sessionStorage.setItem(SWITCH_KEY, "1");
+        if (started || startGame) sessionStorage.setItem(SWITCH_KEY, "1");
       } catch {
         // Without session storage the start screen shows after the switch.
       }
@@ -317,7 +319,6 @@ function showHud() {
   );
 }
 
-let startGame = null;
 intro.addEventListener("click", (e) => {
   if (started || e.target.closest("[data-mode]")) return;
   const onPeach = peach.mesh && interaction.raycastAt(e.clientX, e.clientY);
@@ -378,8 +379,13 @@ peach.load().then(async () => {
     start();
     return;
   }
-  setStatus("Ripe. Tap the peach. Sound on.");
+  setStatus("Ripe. Tap the peach to play. Sound on.");
   intro.classList.add("is-ready");
+  interaction.nudge(1.4);
+  const invite = setInterval(() => {
+    if (started) clearInterval(invite);
+    else interaction.nudge(0.35);
+  }, 3500);
   startGame = start;
 });
 

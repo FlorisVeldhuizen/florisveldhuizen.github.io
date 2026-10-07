@@ -551,6 +551,7 @@ button:focus-visible {
   color: var(--blush-dim);
   font-size: 19px;
   font-style: italic;
+  transition: color 0.6s ease;
 }
 
 .intro-modes {
@@ -561,7 +562,17 @@ button:focus-visible {
 }
 
 .intro-modes.is-set {
+  opacity: 0.3;
+}
+
+.intro.is-ready .intro-modes {
   opacity: 1;
+}
+
+.intro.is-ready .intro-status {
+  color: var(--peach);
+  font-style: normal;
+  font-weight: 600;
 }
 
 .intro-modes button {
