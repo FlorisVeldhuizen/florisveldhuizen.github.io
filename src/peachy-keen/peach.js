@@ -1446,6 +1446,8 @@ export class Peach {
 
   applySkin(image) {
     const { map } = this.material;
+    // The GPU storage is sized for the preview, so it has to be freed before the bigger image goes in.
+    map.dispose();
     map.image = image;
     map.needsUpdate = true;
     this.sharpenTime = 0;
