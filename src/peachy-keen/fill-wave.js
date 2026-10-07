@@ -13,22 +13,32 @@ export function waveOffset(across, time, motion) {
   );
 }
 
-// Follows the loading at an even pace: it eases toward each new step and never jumps.
+const GLIDE_SECONDS = 0.45;
+
+// A damped glide toward the loaded amount: it eases in and out, never overshoots, and stays under a top speed.
 export function stepFill(state, target, delta, instant) {
-  const before = state.shown;
-  const speed = Math.min(
-    1 / RIPEN_MIN_SECONDS,
-    Math.max(0.25, (target - state.shown) * 2.5),
-  );
-  if (state.shown < target)
-    // eslint-disable-next-line no-param-reassign
-    state.shown = instant
-      ? target
-      : Math.min(target, state.shown + delta * speed);
-  const step = delta ? (state.shown - before) / delta : 0;
-  // eslint-disable-next-line no-param-reassign
+  /* eslint-disable no-param-reassign */
+  if (instant) {
+    state.shown = target;
+    state.velocity = 0;
+  } else if (delta > 0) {
+    const omega = 2 / GLIDE_SECONDS;
+    const x = omega * delta;
+    const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const reach = 1 / RIPEN_MIN_SECONDS;
+    const gap = Math.max(
+      -reach * GLIDE_SECONDS,
+      Math.min(reach * GLIDE_SECONDS, state.shown - target),
+    );
+    const temp = (state.velocity + omega * gap) * delta;
+    state.velocity = (state.velocity - omega * temp) * decay;
+    state.shown = Math.min(target, target + (gap + temp) * decay);
+    if (target - state.shown < 0.002 && target >= 1) state.shown = 1;
+  }
   state.motion +=
-    (Math.min(1, step * 1.5) - state.motion) * Math.min(1, delta * 4);
+    (Math.min(1, Math.max(0, state.velocity) * 1.5) - state.motion) *
+    Math.min(1, delta * 3);
+  /* eslint-enable no-param-reassign */
 }
 
 export function drawFill(context, image, size, level, time, motion) {

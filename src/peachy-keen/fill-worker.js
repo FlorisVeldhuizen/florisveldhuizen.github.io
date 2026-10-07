@@ -1,7 +1,7 @@
 import { stepFill, drawFill } from "./fill-wave";
 
 // Runs off the main thread, so the still keeps filling while the game compiles its graphics.
-const state = { shown: 0, motion: 0 };
+const state = { shown: 0, motion: 0, velocity: 0 };
 let context = null;
 let image = null;
 let size = 0;
@@ -25,7 +25,10 @@ function frame() {
   if (drawing && image) {
     drawFill(context, image, size, state.shown, time, state.motion);
   }
-  globalThis.postMessage({ shown: state.shown, motion: state.motion });
+  globalThis.postMessage({
+    ...state,
+    at: performance.timeOrigin + performance.now(),
+  });
   nextFrame(frame);
 }
 

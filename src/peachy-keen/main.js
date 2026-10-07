@@ -179,7 +179,7 @@ const loadedShare = () =>
     (sum, k) => sum + LOAD_SHARE[k] * loaded[k],
     0,
   );
-const fill = { shown: 0, motion: 0 };
+const fill = { shown: 0, motion: 0, velocity: 0, at: 0 };
 const ripeCentre = new Vector3();
 let stillGone = false;
 let onRipe = null;
@@ -234,7 +234,17 @@ function showRipeness(delta) {
       drawFill(fillContext, ripeRender, size, fill.shown, time, fill.motion);
     }
   }
-  peach.uniforms.uRipe.value = fill.shown;
+  // Messages arrive unevenly, so the level carries on along its last speed in between.
+  const ahead = fillWorker
+    ? Math.min(
+        0.1,
+        Math.max(
+          0,
+          (performance.timeOrigin + performance.now() - fill.at) / 1000,
+        ),
+      )
+    : 0;
+  peach.uniforms.uRipe.value = Math.min(1, fill.shown + fill.velocity * ahead);
   peach.uniforms.uRipeMotion.value = fill.motion;
   peach.uniforms.uRipeTime.value = time;
   if (peach.mesh) {
