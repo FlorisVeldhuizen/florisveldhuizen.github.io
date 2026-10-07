@@ -23,6 +23,8 @@ const SWITCH_KEY = "peachy-keen-switching";
 // Roughly the shape's share of the bytes; the skin is the rest.
 const SHAPE_SHARE = 0.6;
 const SHAPE_FADE_MS = 350;
+// The skin usually lands in a blink, so the ripening rises at this pace at the fastest.
+const RIPEN_SECONDS = 1.6;
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
@@ -144,13 +146,24 @@ settings.applyAll();
 let idle = null;
 
 let ripeStep = 0;
+let ripeLoaded = 0;
+let ripeShown = 0;
+let onRipe = null;
 function ripen(fraction) {
-  peach.uniforms.uRipe.value = fraction;
-  introTitle.fill(SHAPE_SHARE + fraction * (1 - SHAPE_SHARE));
-  const step = Math.floor(fraction * 10);
-  if (step <= ripeStep) return;
-  ripeStep = step;
-  if (!interaction.holdStill) interaction.nudge(0.3);
+  ripeLoaded = Math.max(ripeLoaded, fraction);
+}
+
+function showRipeness(delta) {
+  if (ripeShown >= ripeLoaded) return;
+  ripeShown = Math.min(ripeLoaded, ripeShown + delta / RIPEN_SECONDS);
+  peach.uniforms.uRipe.value = ripeShown;
+  introTitle.fill(SHAPE_SHARE + ripeShown * (1 - SHAPE_SHARE));
+  const step = Math.floor(ripeShown * 10);
+  if (step > ripeStep) {
+    ripeStep = step;
+    if (!interaction.holdStill) interaction.nudge(0.3);
+  }
+  if (ripeShown >= 1) onRipe?.();
 }
 
 let statusTimer = 0;
@@ -306,10 +319,13 @@ peach
     setTimeout(() => {
       interaction.holdStill = false;
     }, SHAPE_FADE_MS);
+    const ripe = new Promise((resolve) => {
+      onRipe = resolve;
+    });
     await peach.loadSkin(ripen);
     ripen(1);
     interaction.prepareHalves();
-    await warm();
+    await Promise.all([warm(), ripe]);
     juice.clear();
     loadSounds();
     keepAudioUnlocked();
@@ -350,7 +366,10 @@ const clock = new Clock();
 renderer.setAnimationLoop(() => {
   if (warming) return;
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
-  if (!started || intro.isConnected) introTitle.update(realDelta);
+  if (!started || intro.isConnected) {
+    showRipeness(realDelta);
+    introTitle.update(realDelta);
+  }
   shadowHold = castersInPlay()
     ? SHADOW_HOLD
     : Math.max(0, shadowHold - realDelta);
