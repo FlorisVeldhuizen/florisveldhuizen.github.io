@@ -20,7 +20,8 @@ function frame() {
   const now = performance.timeOrigin + performance.now();
   const delta = Math.min(0.05, (now - last) / 1000);
   last = now;
-  stepFill(state, target, delta, instant);
+  // Holds at the bottom until the ripe image can be drawn, so the first part rises instead of popping in.
+  if (image) stepFill(state, target, delta, instant);
   const time = (now - epoch) / 1000;
   if (drawing && image) {
     drawFill(context, image, size, state.shown, time, state.motion);

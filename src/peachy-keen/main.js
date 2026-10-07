@@ -224,7 +224,7 @@ function showRipeness(delta) {
   const time = waveTime();
   if (fillWorker) fillWorker.postMessage({ target });
   else {
-    stepFill(fill, target, delta, skipLoading);
+    if (ripeRender.complete) stepFill(fill, target, delta, skipLoading);
     const size = fillSize();
     if (!stillGone && ripeRender.complete && size) {
       if (fillCanvas.width !== size) {
