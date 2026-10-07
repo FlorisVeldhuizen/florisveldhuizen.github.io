@@ -33,9 +33,22 @@ const introStatus = document.getElementById("intro-status");
 const openingText = (picked) =>
   picked === "idle" ? "Opening the shop" : "Opening Classic";
 
+// Each letter is its own span, so the line can carry a wave while the game loads.
+function writeStatus(text) {
+  introStatus.replaceChildren(
+    ...[...text].map((ch, i) => {
+      const span = document.createElement("span");
+      span.className = ch === " " ? "status-letter is-space" : "status-letter";
+      span.style.setProperty("--i", i);
+      span.textContent = ch;
+      return span;
+    }),
+  );
+}
+
 function setStatus(text) {
   if (introStatus.textContent === text) return;
-  introStatus.textContent = text;
+  writeStatus(text);
   introStatus.animate([{ opacity: 0 }, { opacity: 1 }], {
     duration: 350,
     easing: "ease-out",
@@ -85,7 +98,7 @@ let jiggleText = null;
 const switching = takeFlag(SWITCH_KEY);
 const skipLoading = switching;
 if (switching) {
-  introStatus.textContent = openingText(mode);
+  writeStatus(openingText(mode));
   document.documentElement.classList.add("has-status");
 }
 const showMode = () =>

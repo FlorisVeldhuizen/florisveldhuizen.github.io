@@ -638,6 +638,39 @@ html.is-handing .intro .intro-shape {
   transition: color 0.6s ease;
 }
 
+/* While it loads the status line carries a slow lift wave, a CSS animation so it keeps moving when the page is busy. */
+.status-letter {
+  display: inline-block;
+}
+
+.status-letter.is-space {
+  display: inline;
+}
+
+.intro:not(.is-ready) .status-letter,
+html.is-opening .intro .status-letter {
+  animation: status-lift 1.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.07s);
+}
+
+@keyframes status-lift {
+  0%,
+  60%,
+  100% {
+    transform: none;
+  }
+
+  30% {
+    transform: translateY(-0.3em);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-letter {
+    animation: none !important;
+  }
+}
+
 .intro-modes {
   justify-content: center;
   margin: 0;

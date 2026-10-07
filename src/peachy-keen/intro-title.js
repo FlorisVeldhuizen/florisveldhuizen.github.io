@@ -14,7 +14,6 @@ export default class IntroTitle {
     const text = element.textContent.trim();
     this.element.setAttribute("aria-label", text);
     this.element.textContent = "";
-    const firstSpace = text.indexOf(" ");
     this.letters = [...text].map((ch, i) => {
       const span = document.createElement("span");
       span.className = ch === " " ? "intro-letter is-space" : "intro-letter";
@@ -24,7 +23,6 @@ export default class IntroTitle {
       const letter = {
         span,
         ch,
-        jiggly: firstSpace < 0 || i < firstSpace,
         y: new Spring(STIFFNESS, DAMPING),
         r: new Spring(STIFFNESS * 0.85, DAMPING * 0.9),
         s: new Spring(STIFFNESS * 1.2, DAMPING * 1.25),
@@ -34,7 +32,6 @@ export default class IntroTitle {
       return letter;
     });
     this.queue = [];
-    this.idleIn = 1.5;
   }
 
   kick() {
@@ -98,13 +95,6 @@ export default class IntroTitle {
           }
         }
       }
-    }
-    this.idleIn -= delta;
-    if (this.idleIn <= 0 && !reducedMotion.matches) {
-      this.idleIn = 1.6 + Math.random() * 1.6;
-      const jiggly = this.letters.filter((l) => l.jiggly && l.ch !== " ");
-      const pick = jiggly[Math.floor(Math.random() * jiggly.length)];
-      if (pick) this.poke(this.letters.indexOf(pick), 0.5);
     }
     this.letters.forEach((letter) => {
       const { span } = letter;
