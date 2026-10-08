@@ -2002,7 +2002,8 @@ export class Interaction {
     const p = this.pointer;
     const held = performance.now() - p.downAt > CFG.GRAB_HOLD_MS;
     let gripped = held || p.travel > CFG.GRAB_START_PX;
-    if (p.touch) gripped = held;
+    if (p.touch)
+      gripped = performance.now() - p.downAt > CFG.TOUCH_GRAB_HOLD_MS;
     if (p.onWaistband) gripped = p.travel > 28;
     return this.toolName === "hand" && p.armed && p.downOnPeach && gripped;
   }
