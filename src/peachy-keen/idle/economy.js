@@ -346,6 +346,17 @@ export function helperCost(m, state, id, count = 1) {
   );
 }
 
+const SELL_REFUND = 0.5;
+
+export function helperRefund(m, state, id, count = 1) {
+  const h = HELPER_BY_ID[id];
+  const owned = state.helpers[id] || 0;
+  return (
+    SELL_REFUND *
+    bulkCost(h.cost * m.helperDiscount, COST_GROWTH, owned - count + 1, count)
+  );
+}
+
 export function helperMax(m, state, id) {
   const h = HELPER_BY_ID[id];
   const n = maxAffordable(

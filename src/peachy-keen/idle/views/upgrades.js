@@ -1,5 +1,6 @@
 import { UPGRADE_BY_ID } from "../data/upgrades";
 import { TOYS, TOY_BY_ID } from "../data/toys";
+import { dropIcon } from "../syrup";
 
 const PICKERS = [
   {
@@ -118,13 +119,14 @@ export class UpgradesView {
           <span class="row-name">${u.name}</span>
           <span class="row-about">${u.about}</span>
         </span>
-        <span class="row-price"></span>`;
+        <span class="row-price"><span></span>${dropIcon()}</span>`;
       b.addEventListener("click", () => {
         if (!this.game.buyUpgrade(u.id)) nudge(b.querySelector(".row-price"));
       });
       this.rows.set(u.id, {
         button: b,
         price: b.querySelector(".row-price"),
+        priceText: b.querySelector(".row-price > span"),
         u,
       });
     });
@@ -143,7 +145,7 @@ export class UpgradesView {
           <span class="row-name">${toy.name}</span>
           <span class="row-about">${toy.about}</span>
         </span>
-        <span class="row-price"></span>`;
+        <span class="row-price"><span></span>${dropIcon()}</span>`;
       b.addEventListener("click", () => {
         if (this.game.state.toys.includes(toy.id))
           this.game.emit("toy-toggle", toy);
@@ -153,6 +155,7 @@ export class UpgradesView {
       this.toyRows.set(toy.id, {
         button: b,
         price: b.querySelector(".row-price"),
+        priceText: b.querySelector(".row-price > span"),
         toy,
       });
     });
@@ -203,10 +206,11 @@ export class UpgradesView {
     this.tray.hidden = !shown;
     this.upgradesTitle.hidden = !shown;
     let affordable = 0;
-    this.toyRows.forEach(({ button, price, toy }) => {
+    this.toyRows.forEach(({ button, price, priceText, toy }) => {
       if (s.toys.includes(toy.id)) {
         const on = this.game.activeToys.includes(toy.id);
-        setText(price, on ? "On" : "Off");
+        setText(priceText, on ? "On" : "Off");
+        toggle(price, "no-drop", true);
         toggle(button, "is-affordable", true);
         toggle(button, "is-owned-toy", true);
         toggle(price, "is-on", on);
@@ -216,7 +220,8 @@ export class UpgradesView {
       }
       const ok = toy.cost <= s.juice;
       if (ok) affordable += 1;
-      setText(price, format(toy.cost));
+      setText(priceText, format(toy.cost));
+      toggle(price, "no-drop", false);
       toggle(button, "is-affordable", ok);
       button.setAttribute("aria-disabled", String(!ok));
     });
@@ -276,11 +281,11 @@ export class UpgradesView {
     setText(this.valet, `Valet ${options.valet ? "on" : "off"}`);
     this.valet.setAttribute("aria-pressed", String(options.valet));
     let affordable = 0;
-    this.rows.forEach(({ button, price, u }) => {
+    this.rows.forEach(({ button, priceText, u }) => {
       const cost = game.upgradePrice(u);
       const ok = !locked && cost <= game.state.juice;
       if (ok) affordable += 1;
-      setText(price, format(cost));
+      setText(priceText, format(cost));
       toggle(button, "is-affordable", ok);
       button.setAttribute("aria-disabled", String(!ok));
     });

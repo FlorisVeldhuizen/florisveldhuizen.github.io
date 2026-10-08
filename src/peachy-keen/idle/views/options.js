@@ -173,7 +173,7 @@ export class OptionsView {
     }, 250);
     actionRow(box, "Every helper", "Own one each", () => {
       HELPERS.forEach((h) => {
-        game.state.helpers[h.id] ||= 1;
+        if (!game.state.helpers[h.id]) game.setHelpers(h.id, 1);
       });
       game.refresh();
     });
