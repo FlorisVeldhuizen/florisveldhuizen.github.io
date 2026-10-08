@@ -999,6 +999,7 @@ body.is-storm::after {
   border: 1px solid var(--harvest);
   border-radius: 9px;
   pointer-events: none;
+  transition: opacity 0.2s ease;
 }
 
 .plot[data-stage="5"] {
@@ -1030,6 +1031,37 @@ body.is-storm::after {
 
 .plot.is-armed .growth {
   filter: grayscale(0.75) brightness(0.55);
+}
+
+.plot-block {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  z-index: 4;
+  width: clamp(24px, 27%, 36px);
+  aspect-ratio: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.6);
+  transition:
+    opacity 0.15s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.plot.is-drop-blocked .plot-block {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+.plus-face.is-block {
+  background: #d98a94;
+}
+
+.plot .plus-face.is-block svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
 }
 
 .plot-x {
@@ -1186,6 +1218,12 @@ body.is-storm::after {
     0 0 18px rgba(217, 138, 148, 0.3);
 }
 
+.plot.is-drop-blocked::before,
+.plot.is-drop-blocked .plot-label,
+.plot.is-drop-blocked > svg {
+  opacity: 0;
+}
+
 .plot.is-drop-blocked .growth {
   filter: grayscale(0.6) brightness(0.6);
 }
@@ -1209,6 +1247,7 @@ body.is-storm::after {
   pointer-events: none;
   transition:
     filter 0.2s ease,
+    opacity 0.2s ease,
     scale 0.2s ease;
 }
 
@@ -1225,7 +1264,7 @@ body.is-storm::after {
 
 .seed-ghost.is-blocked {
   filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5)) saturate(0.6);
-  opacity: 0.9;
+  opacity: 0.35;
   scale: 0.85;
 }
 
