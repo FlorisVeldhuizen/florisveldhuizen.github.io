@@ -1,6 +1,6 @@
 import { Color } from "three";
 import { SEEDS, SEED_BY_ID, RIPE, ROTTEN } from "../data/orchard";
-import { plantFx, petalShower, soilPuff } from "./plant";
+import { plantFx, petalShower } from "./plant";
 import { renders, PICKED, blossomColor } from "../renders";
 
 const VARIANTS = 5;
@@ -40,6 +40,7 @@ const LAYER_ANIMATIONS = [
   "is-outgrown",
   "is-cleared",
   "is-harvested",
+  "is-uprooted",
 ];
 
 function animate(layer, name, hideAfter = false) {
@@ -81,13 +82,30 @@ function plantSize(info) {
 }
 
 function burst(button, html, life) {
-  if (calm.matches) return;
+  if (calm.matches) return null;
   const node = el("span", "plot-burst", button, html);
   setTimeout(() => node.remove(), life);
+  return node;
 }
 
 const shade = (hex, by) =>
   `#${new Color(hex).multiplyScalar(by).getHexString()}`;
+
+function dropPit(button, seed) {
+  const node = burst(
+    button,
+    '<img class="drop-pit" alt=""><span class="dust"></span>',
+    1200,
+  );
+  if (node)
+    renders.seedIcon(seed, (url) => {
+      node.querySelector("img").src = url;
+    });
+}
+
+function kickDust(button) {
+  burst(button, '<span class="dust is-early"></span>', 1200);
+}
 
 function shedPetals(button, seed) {
   const petal = `#${blossomColor(seed).getHexString()}`;
@@ -466,14 +484,18 @@ export class OrchardView {
         if (!first && p.button.dataset.stage === "3" && info?.stage === 4)
           shedPetals(p.button, info.seed);
         if (!first && !p.button.dataset.stage && info?.stage === 0)
-          burst(p.button, soilPuff(), 900);
+          dropPit(p.button, info.seed);
         // eslint-disable-next-line no-param-reassign
         if (info) p.seed = info.seed;
         if (!info) {
           const harvested = p.button.dataset.stage === "5";
           if (harvested && p.shown && p.picked) showPlant(p.shown, p.picked);
-          if (p.shown)
-            animate(p.shown, harvested ? "is-harvested" : "is-cleared", true);
+          const dug = !harvested && p.button.dataset.stage !== "6";
+          let exit = "is-cleared";
+          if (harvested) exit = "is-harvested";
+          else if (dug) exit = "is-uprooted";
+          if (p.shown) animate(p.shown, exit, true);
+          if (dug && !first) kickDust(p.button);
           if (!first) rest(p.button, p.seed, harvested);
           // eslint-disable-next-line no-param-reassign
           p.shown = null;

@@ -20,15 +20,3 @@ export function petalShower(colors) {
   });
   return `<svg viewBox="0 0 60 60" aria-hidden="true">${petals.join("")}</svg>`;
 }
-
-export function soilPuff() {
-  const crumbs = Array.from({ length: 12 }, (_, n) => {
-    const angle = Math.PI * (1.05 + (n / 11) * 0.9);
-    const reach = 10 + Math.random() * 8;
-    const dx = Math.cos(angle) * reach;
-    const dy = Math.sin(angle) * reach * 0.7;
-    const fill = n % 2 ? "#b07a4e" : "#8a5634";
-    return `<circle class="crumb" cx="30" cy="47" r="${(0.8 + Math.random() * 0.7).toFixed(2)}" style="fill:${fill};--dx:${dx.toFixed(1)}px;--dy:${dy.toFixed(1)}px"/>`;
-  });
-  return `<svg viewBox="0 0 60 60" aria-hidden="true">${crumbs.join("")}</svg>`;
-}
