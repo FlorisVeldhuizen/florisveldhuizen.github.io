@@ -155,8 +155,6 @@ export class OrchardView {
     Object.assign(this, { game, orchard, root });
     this.selected = "cling";
     this.focus = -1;
-    this.balance = el("p", "seed-balance", root);
-    this.balance.setAttribute("role", "img");
     this.seeds = el("div", "seeds", root);
     this.seeds.setAttribute("role", "group");
     this.seeds.setAttribute("aria-label", "Seed to plant");
@@ -500,11 +498,6 @@ export class OrchardView {
     if (this.shownSize !== this.orchard.size) this.buildGrid();
     if (this.shownPits !== state.pits) {
       this.shownPits = state.pits;
-      this.balance.innerHTML = pitTag(format(state.pits, { whole: true }));
-      this.balance.setAttribute(
-        "aria-label",
-        `You have ${pitCount(state.pits)}`,
-      );
       this.seedButtons.forEach((b, id) => {
         const seed = SEED_BY_ID[id];
         const short = seed.pits - state.pits;
