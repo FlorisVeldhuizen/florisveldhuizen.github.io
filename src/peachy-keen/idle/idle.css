@@ -443,6 +443,18 @@ body.is-storm::after {
   border-color: var(--gold);
   background: var(--gold);
   color: var(--velvet);
+.shop-amounts button[aria-pressed="true"] {
+  background: none;
+}
+
+.shop-amounts .shop-thumb {
+  width: var(--w, 0);
+  transform: translateX(var(--x, 0));
+  transition:
+    transform 0.22s cubic-bezier(0.3, 1.3, 0.5, 1),
+    width 0.22s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+
 }
 
 .shop-title {
@@ -456,6 +468,7 @@ body.is-storm::after {
 }
 
 .shop-note,
+  .shop-amounts .shop-thumb,
 .shop-intro,
 .shop-empty {
   margin-bottom: 12px;

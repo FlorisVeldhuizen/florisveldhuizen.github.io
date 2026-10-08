@@ -43,9 +43,10 @@ export class HelpersView {
       b.dataset.sell = String(label === "Sell");
       b.addEventListener("click", () => this.setSelling(label === "Sell"));
     });
-    this.amounts = el("span", "joined", head);
+    this.amounts = el("span", "joined shop-amounts", head);
     this.amounts.setAttribute("role", "group");
     this.amounts.setAttribute("aria-label", "Amount");
+    this.amountThumb = el("i", "shop-thumb", this.amounts);
     AMOUNTS.forEach((amount) => {
       const b = el("button", "", this.amounts);
       b.type = "button";
@@ -107,6 +108,22 @@ export class HelpersView {
     window.addEventListener("blur", () => hold({}));
     this.armed = null;
     this.syncAmounts();
+    new ResizeObserver(() => this.placeAmountThumb(false)).observe(
+      this.amounts,
+    );
+  }
+
+  placeAmountThumb(animate) {
+    const on = this.amounts.querySelector('button[aria-pressed="true"]');
+    if (!on || !on.offsetWidth) return;
+    const thumb = this.amountThumb;
+    if (!animate) thumb.style.transition = "none";
+    thumb.style.setProperty("--x", `${on.offsetLeft - 2}px`);
+    thumb.style.setProperty("--w", `${on.offsetWidth}px`);
+    if (!animate) {
+      thumb.offsetWidth;
+      thumb.style.transition = "";
+    }
   }
 
   setSelling(on) {
@@ -162,7 +179,7 @@ export class HelpersView {
     toggle(this.mode, "is-selling", options.sell);
     toggle(this.list, "is-selling", options.sell);
     const amount = this.game.held || options.buy;
-    [...this.amounts.children].forEach((b) => {
+    this.amounts.querySelectorAll("button").forEach((b) => {
       const value =
         b.dataset.amount === "max" ? "max" : Number(b.dataset.amount);
       b.setAttribute("aria-pressed", String(value === amount));
@@ -171,6 +188,7 @@ export class HelpersView {
         b.setAttribute("aria-label", options.sell ? "All" : "Max");
       }
     });
+    this.placeAmountThumb(true);
     const unlocked = this.game.model.unlocks.has("butler");
     this.butler.hidden = !unlocked;
     this.butler.textContent = `Butler ${options.butler ? "on" : "off"}`;
