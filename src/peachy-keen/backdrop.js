@@ -32,6 +32,13 @@ export function createBackdrop(scene, renderer) {
 
   return {
     texture: target.texture,
+    get time() {
+      return material.uniforms.time.value;
+    },
+    set time(value) {
+      material.uniforms.time.value = value;
+      blit.uniforms.time.value = value;
+    },
     resize() {
       material.uniforms.resolution.value.set(window.innerWidth, viewHeight());
     },

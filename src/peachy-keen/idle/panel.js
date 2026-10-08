@@ -1,6 +1,6 @@
 import { el, setText, animate, sidePanel } from "./dom";
 import { iconSvg } from "./icons";
-import { clamp, viewHeight } from "../util";
+import { clamp, viewHeight, reducedMotion } from "../util";
 import { HelpersView } from "./views/helpers";
 import { UpgradesView } from "./views/upgrades";
 import { OrchardView } from "./views/orchard";
@@ -235,6 +235,21 @@ export class Panel {
     this.collapse.setAttribute("aria-expanded", String(open));
     this.collapse.setAttribute("aria-label", label);
     this.collapse.title = label;
+  }
+
+  // The layout measures the panel every frame, so the peach reframes in step with the slide.
+  slide(shown) {
+    const out = reducedMotion.matches
+      ? { opacity: 0 }
+      : { translate: sidePanel.matches ? "100% 0" : "0 100%" };
+    const frames = shown ? [out, {}] : [{}, out];
+    return this.root.animate(frames, {
+      duration: shown ? 650 : 450,
+      easing: shown
+        ? "cubic-bezier(0.2, 0.8, 0.2, 1)"
+        : "cubic-bezier(0.4, 0, 0.2, 1)",
+      fill: shown ? "backwards" : "forwards",
+    }).finished;
   }
 
   sheetStops() {

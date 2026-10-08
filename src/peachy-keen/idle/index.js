@@ -24,6 +24,7 @@ import { clamp, reducedMotion } from "../util";
 const BEADS = { smack: 4, crit: 5.2, other: 4.6 };
 
 const SHEET_SQUASH = 0.012;
+const SETTLE_LIMIT_MS = 1000;
 
 export function createIdle({
   interaction,
@@ -298,9 +299,17 @@ export function createIdle({
     },
     begin() {
       started = true;
+      panel.slide(true);
       if (game.away) addAway(game.away);
       game.away = null;
       flushAway();
+    },
+    async leave() {
+      await panel.slide(false);
+      const until = performance.now() + SETTLE_LIMIT_MS;
+      while (!layout.settled() && performance.now() < until)
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(requestAnimationFrame);
     },
     frame(realDelta) {
       layout.update(realDelta);

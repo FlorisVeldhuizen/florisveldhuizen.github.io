@@ -11,15 +11,10 @@ const KICK_PER_PX = 170 / 44;
 export default class IntroTitle {
   constructor(element) {
     this.element = element;
-    const text = element.textContent.trim();
-    this.element.setAttribute("aria-label", text);
-    this.element.textContent = "";
-    this.letters = [...text].map((ch, i) => {
-      const span = document.createElement("span");
-      span.className = ch === " " ? "intro-letter is-space" : "intro-letter";
-      span.textContent = ch === " " ? " " : ch;
-      span.setAttribute("aria-hidden", "true");
-      this.element.append(span);
+    // The letters are written in the page, so the title looks the same before and after this script runs.
+    const spans = [...element.querySelectorAll(".intro-letter")];
+    this.letters = spans.map((span, i) => {
+      const ch = span.classList.contains("is-space") ? " " : span.textContent;
       const letter = {
         span,
         ch,

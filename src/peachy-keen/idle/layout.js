@@ -37,6 +37,16 @@ export class Layout {
     this.top = opened * this.rate.getBoundingClientRect().bottom;
   }
 
+  settled() {
+    const [z, x, y] = this.shown;
+    return (
+      !this.arrive &&
+      Math.abs(z.value - this.targetZ) < 0.01 &&
+      Math.abs(x.value - this.side / 2) < 0.5 &&
+      Math.abs(y.value - (this.frameBottom() - this.top) / 2) < 0.5
+    );
+  }
+
   // A sheet pulled past its open height covers the peach, so the peach stays framed for the open sheet.
   frameBottom() {
     return Math.min(this.bottom, viewHeight() * OPEN_SHARE);
@@ -104,6 +114,8 @@ export class Layout {
       const root = document.documentElement.style;
       root.setProperty("--panel-side", `${this.side}px`);
       root.setProperty("--panel-bottom", `${this.bottom}px`);
+      const [closed] = this.panel.sheetStops();
+      root.setProperty("--sheet-shown", clamp(this.bottom / closed, 0, 1));
     }
   }
 }

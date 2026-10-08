@@ -2103,8 +2103,12 @@ body.is-storm::after {
     transition: none;
   }
 
+  /* Rises with the sheet as it slides in, from the spot the hints hold in Classic. */
   .hints {
-    bottom: calc(76px + env(safe-area-inset-bottom) + 44px);
+    bottom: calc(
+      var(--gutter) + env(safe-area-inset-bottom) + var(--sheet-shown, 0) *
+        (120px - var(--gutter))
+    );
     transition: opacity 0.15s ease 0.1s;
   }
 

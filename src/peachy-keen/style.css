@@ -159,6 +159,29 @@ html.is-opening .intro .intro-status {
   font-weight: inherit;
 }
 
+/* A switch from inside the game keeps the frame and what both modes share; only the mode's own parts leave. */
+html.is-swapping body {
+  background:
+    var(--swap-shot) center / 100% 100% no-repeat,
+    #362c3f;
+}
+
+html.is-swapping .intro .intro-title {
+  visibility: hidden;
+}
+
+html.is-swapping body.is-intro .score,
+html.is-swapping body.is-intro .hints {
+  visibility: visible;
+}
+
+html.is-swapping body.is-intro .score > *,
+html.is-leaving-mode .score > *,
+html.is-leaving-mode .settings-dock {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
 .intro-shape {
   transform-origin: 50% 74%;
 }
@@ -679,7 +702,8 @@ html.is-handing .intro .intro-shape {
 
 /* A continuous swell: every letter rides the same slow curve, a little after its neighbour. */
 .intro:not(.is-ready) .status-letter,
-html.is-opening .intro .status-letter {
+html.is-opening .intro .status-letter,
+.swap-status .status-letter {
   animation: status-lift 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   animation-delay: calc(var(--i) * 0.09s - 2.4s);
 }
@@ -1106,5 +1130,38 @@ html.is-opening .intro .status-letter {
 @media (prefers-reduced-motion: reduce) {
   .cursor[data-buzzing="true"] span {
     animation: none;
+  }
+}
+
+.swap-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  background: center / 100% 100% no-repeat;
+}
+
+.swap-cover .intro-shape {
+  background-image: url("/peachy-keen/intro-peach-ripe.webp");
+}
+
+/* Sits where the opening screen puts its loading line. */
+.swap-status {
+  position: fixed;
+  right: 0;
+  bottom: calc(var(--gutter) + env(safe-area-inset-bottom) + 34px);
+  left: 0;
+  text-align: center;
+}
+
+/* On phones the loading line would sit on the hints, so they step aside while it shows. */
+@media (max-width: 899px) and (orientation: portrait), (max-width: 639px) {
+  .hints {
+    transition: opacity 0.3s ease;
+  }
+
+  html.is-leaving-mode .hints,
+  html.is-swapping body.is-intro .hints,
+  body:has(.swap-cover) .hints {
+    opacity: 0;
   }
 }

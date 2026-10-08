@@ -12,8 +12,16 @@
     <script>
       // A mode switch reloads the page; it stays hidden until the peach is back.
       try {
-        if (sessionStorage.getItem("peachy-keen-switching") === "1")
-          document.documentElement.classList.add("is-switching", "is-opening");
+        if (sessionStorage.getItem("peachy-keen-switching") === "1") {
+          const root = document.documentElement;
+          root.classList.add("is-switching", "is-opening");
+          // A switch from inside the game shows the last frame without the peach, so only the peach stands in.
+          const shot = sessionStorage.getItem("peachy-keen-swap-shot");
+          if (shot) {
+            root.classList.add("is-swapping");
+            root.style.setProperty("--swap-shot", `url(${shot})`);
+          }
+        }
       } catch {}
     </script>
     <link
@@ -361,7 +369,20 @@
       <div id="intro-shape" class="intro-shape" aria-hidden="true">
         <canvas id="intro-fill"></canvas>
       </div>
-      <h1 id="intro-title" class="intro-title">Jiggle Peach</h1>
+      <h1 id="intro-title" class="intro-title" aria-label="Jiggle Peach">
+        <span class="intro-letter" aria-hidden="true">J</span
+        ><span class="intro-letter" aria-hidden="true">i</span
+        ><span class="intro-letter" aria-hidden="true">g</span
+        ><span class="intro-letter" aria-hidden="true">g</span
+        ><span class="intro-letter" aria-hidden="true">l</span
+        ><span class="intro-letter" aria-hidden="true">e</span
+        ><span class="intro-letter is-space" aria-hidden="true">&nbsp;</span
+        ><span class="intro-letter" aria-hidden="true">P</span
+        ><span class="intro-letter" aria-hidden="true">e</span
+        ><span class="intro-letter" aria-hidden="true">a</span
+        ><span class="intro-letter" aria-hidden="true">c</span
+        ><span class="intro-letter" aria-hidden="true">h</span>
+      </h1>
       <div class="intro-foot">
         <p class="segmented intro-modes" role="group" aria-label="Game mode">
           <button type="button" data-mode="classic">Classic</button>
