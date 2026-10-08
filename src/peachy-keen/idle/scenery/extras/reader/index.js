@@ -216,6 +216,9 @@ function reader(ctx) {
   let scoreCheck = 0;
   const scoreText = score && document.createRange();
   scoreText?.selectNodeContents(score);
+  const rate = document.getElementById("rate");
+  const rateText = rate && document.createRange();
+  let rateLine = 0;
   const probe = document.createElement("div");
   probe.style.cssText =
     "position:fixed;top:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none";
@@ -340,15 +343,21 @@ function reader(ctx) {
       const tallest = Math.min(345, (F.w * 0.7) / 0.625);
       const below = peachTop - F.t - 12;
       const over = below < MIN_READ;
-      const readTop = over ? TOP_MARGIN + safeTop : F.t + 4;
+      let readTop = over ? TOP_MARGIN + safeTop : F.t + 4;
       const edgeW = (frame.width - 2 * EDGE) / 0.625;
       const fit = Math.max(100, Math.min(tallest, peachTop - readTop - 8));
       const wideMin = F.w > F.h ? F.h * 0.38 : 0;
-      const readH = Math.min(
+      let readH = Math.min(
         F.b - readTop - EDGE + 10,
         edgeW,
         Math.max(fit * 1.36, wideMin),
       );
+      // On phones the gap under the counter is too small, so a mid-size card hangs from the rate line instead of covering the count.
+      const hang = over && F.w < F.h && rateLine > 0;
+      if (hang) {
+        readH = (Math.max(90, peachTop - F.t - 12) + readH) / 2;
+        readTop = rateLine;
+      }
       const readX = F.cx;
       const readY = readTop + readH / 2;
       const showing = RAISED.has(reading?.state) ? 1 : 0;
@@ -356,9 +365,13 @@ function reader(ctx) {
       if (score && scoreCheck <= 0) {
         scoreCheck = 0.5;
         scoreBox = scoreText.getBoundingClientRect();
+        // The rate text is rebuilt as it changes, so the range is pointed at it again before each read.
+        rateText?.selectNodeContents(rate);
+        rateLine = rateText?.getClientRects()[0]?.bottom ?? 0;
       }
       const halfW = (readH * (CARD_W / CARD_H)) / 2 + 8;
       const covers =
+        !hang &&
         scoreBox &&
         readX - halfW < scoreBox.right &&
         readX + halfW > scoreBox.left &&
@@ -509,7 +522,8 @@ function reader(ctx) {
         const arcX = anchor.x + ux * px1 * f;
         const arcY = anchor.y - uy * px1 * f;
         const m = card.mesh;
-        const dRead = depth - 0.9;
+        // A hanging card overlaps the peach, so it reads in front of the peach's bulge.
+        const dRead = depth - (hang ? 2.4 : 0.9);
         const sx = arcX + (readX - arcX) * lift;
         const sy = arcY + (readY + Math.sin(t * 1.1) * 2 * still - arcY) * lift;
         const mine = card === reading && lift > 0.99;
