@@ -113,7 +113,16 @@ function shedPetals(button, seed) {
 }
 
 function shedLeaves(button, seed) {
-  burst(button, petalShower([seed.leaf, shade(seed.leaf, 0.78)]), 2600);
+  burst(
+    button,
+    petalShower([seed.leaf, shade(seed.leaf, 0.78)], {
+      count: 6,
+      start: 0.9,
+      gap: 0.14,
+      dur: 2.2,
+    }),
+    4200,
+  );
 }
 
 const resting = new Map();
@@ -122,13 +131,16 @@ function rest(button, seed, harvested) {
   clearTimeout(resting.get(button));
   toggle(button, "is-resting", true);
   toggle(button, "was-ripe", harvested);
-  if (harvested) shedLeaves(button, seed);
+  if (harvested) {
+    shedLeaves(button, seed);
+    burst(button, '<span class="dust is-late"></span>', 2800);
+  }
   resting.set(
     button,
     setTimeout(() => {
       toggle(button, "is-resting", false);
       toggle(button, "was-ripe", false);
-    }, 1600),
+    }, 2600),
   );
 }
 

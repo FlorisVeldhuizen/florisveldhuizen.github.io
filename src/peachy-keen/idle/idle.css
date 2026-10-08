@@ -1339,30 +1339,34 @@ body.is-storm::after {
 }
 
 .growth.is-harvested {
-  animation: harvested 1.2s ease-in-out both;
+  animation: harvested 2s ease-in-out both;
 }
 
 @keyframes harvested {
-  16% {
-    scale: 1.05 0.96;
-  }
-  32% {
-    scale: 0.98 1.03;
-  }
-  48% {
-    opacity: 1;
+  0%,
+  45% {
     scale: 1;
-    translate: 0 0;
+    animation-timing-function: ease-in-out;
+  }
+  56% {
+    scale: 1.04 0.95;
+    animation-timing-function: ease-out;
+  }
+  68% {
+    scale: 0.97 1.05;
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.6);
+  }
+  92% {
+    opacity: 1;
   }
   to {
     opacity: 0;
-    scale: 0.92;
-    translate: 0 5%;
+    scale: 0.08;
   }
 }
 
 .plot.was-ripe {
-  transition-duration: 1.2s;
+  transition-duration: 1.8s;
 }
 
 .plot.was-ripe::before {
@@ -1373,15 +1377,13 @@ body.is-storm::after {
   border: 1px solid var(--harvest);
   border-radius: 9px;
   pointer-events: none;
-  animation: frame-out 1.2s ease forwards;
+  animation: frame-out 1.8s ease-in-out forwards;
 }
 
 @keyframes frame-out {
-  0% {
-    border-color: #ffe3a6;
-    box-shadow:
-      0 0 14px rgba(212, 162, 76, 0.75),
-      inset 0 0 10px rgba(212, 162, 76, 0.35);
+  0%,
+  30% {
+    opacity: 1;
   }
   to {
     opacity: 0;
@@ -1525,7 +1527,7 @@ body.is-storm::after {
 
 .plot-burst .petal {
   opacity: 0;
-  animation: petal-drop 1.9s var(--d) ease-in forwards;
+  animation: petal-drop var(--dur, 1.9s) var(--d) ease-in forwards;
 }
 
 @keyframes petal-drop {
@@ -2818,4 +2820,8 @@ body.is-storm::after {
 
 .dust.is-early {
   animation-delay: 0.12s;
+}
+
+.dust.is-late {
+  animation-delay: 1.75s;
 }

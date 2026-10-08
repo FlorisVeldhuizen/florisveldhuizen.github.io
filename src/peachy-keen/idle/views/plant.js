@@ -10,13 +10,16 @@ export function plantFx(stage) {
 
 const PETAL = "M0 0c1.2-1 2.6-.4 2.2.8C1.8 2 .4 1.4 0 0z";
 
-export function petalShower(colors) {
-  const petals = Array.from({ length: 12 }, (_, n) => {
+export function petalShower(
+  colors,
+  { count = 12, start = 0, gap = 0.06, dur = 1.9 } = {},
+) {
+  const petals = Array.from({ length: count }, (_, n) => {
     const x = 16 + Math.random() * 28;
     const y = 10 + Math.random() * 16;
     const drift = (Math.random() - 0.5) * 16;
-    const delay = n * 0.06 + Math.random() * 0.2;
-    return `<path class="petal" d="${PETAL}" style="fill:${colors[n % colors.length]};--x:${x.toFixed(1)}px;--y:${y.toFixed(1)}px;--dx:${drift.toFixed(1)}px;--d:${delay.toFixed(2)}s"/>`;
+    const delay = start + n * gap + Math.random() * 0.2;
+    return `<path class="petal" d="${PETAL}" style="fill:${colors[n % colors.length]};--x:${x.toFixed(1)}px;--y:${y.toFixed(1)}px;--dx:${drift.toFixed(1)}px;--d:${delay.toFixed(2)}s;--dur:${dur}s"/>`;
   });
   return `<svg viewBox="0 0 60 60" aria-hidden="true">${petals.join("")}</svg>`;
 }
