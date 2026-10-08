@@ -149,7 +149,8 @@ export class Panel {
     this.tabs.setAttribute("role", "tablist");
     this.tabs.setAttribute("aria-label", "Shop");
     this.body = el("div", "panel-body", this.root);
-    this.title = el("h2", "panel-title", this.body);
+    const titleRow = el("div", "panel-title-row", this.body);
+    this.title = el("h2", "panel-title", titleRow);
     this.sections = {};
     this.buttons = {};
     this.scrolls = {};
@@ -191,6 +192,9 @@ export class Panel {
       stats: new StatsView(game, this.sections.stats),
       options: new OptionsView(game, this.sections.options, settings, confirm),
     };
+    Object.values(this.views).forEach((view) => {
+      if (view.titleTool) titleRow.append(view.titleTool);
+    });
     this.settings = settings;
     this.timer = 0;
     this.open = sidePanel.matches;
@@ -356,12 +360,15 @@ export class Panel {
   show(id, fromTap = false) {
     if (this.current) this.scrolls[this.current] = this.body.scrollTop;
     if (this.current && (id !== this.current || fromTap)) this.celebrate(id);
+    if (this.current && id !== this.current) this.views[this.current].leave?.();
     this.current = id;
     Object.entries(this.sections).forEach(([key, section]) => {
       // eslint-disable-next-line no-param-reassign
       section.hidden = key !== id;
       this.buttons[key].setAttribute("aria-selected", String(key === id));
       this.buttons[key].tabIndex = key === id ? 0 : -1;
+      const tool = this.views[key].titleTool;
+      if (tool) tool.hidden = key !== id;
     });
     this.body.scrollTop = this.scrolls[id] || 0;
     setText(this.title, TABS.find(([key]) => key === id)[1]);

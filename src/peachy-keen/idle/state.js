@@ -34,6 +34,8 @@ export function freshRun(state) {
     juice: 0,
     juiceRun: 0,
     helpers: {},
+    peak: {},
+    butlerSkip: [],
     upgrades: [],
     runTime: 0,
     runSmacks: 0,
@@ -60,6 +62,7 @@ export function freshState() {
     options: {
       notation: "short",
       buy: 1,
+      sell: false,
       butler: false,
       valet: false,
       skin: "classic",
@@ -110,6 +113,7 @@ export function decode(text) {
   if (state.version < 2 && state.toys.includes("talk")) state.toys.push("shy");
   if (state.options.helperStyle === "props") state.options.helperStyle = "room";
   if (state.version < 3) rescaleNectar(state);
+  state.options.sell = false;
   state.version = VERSION;
   return state;
 }

@@ -168,9 +168,8 @@ export function createIdle({
       "seed",
     );
   });
-  game.on("bought", ({ kind, id, count }) => {
+  game.on("bought", ({ kind, id, first }) => {
     const helper = kind === "helper" && HELPERS.find((h) => h.id === id);
-    const first = helper && game.state.helpers[id] === count;
     if (first && game.state.options.helperStyle === "room")
       popups.toast(`First ${helper.name}`, helper.room, "", "seed");
     if (kind === "helper")
@@ -269,13 +268,17 @@ export function createIdle({
   game.on("change", syncSkin);
   game.on("change", syncStyle);
   game.on("replace", syncSkin);
+  const pageTitle = document.title;
+  setInterval(() => {
+    document.title = `${format(game.state.juice)} juice · ${pageTitle}`;
+  }, 1000);
 
   if (import.meta.env.DEV)
     window.peachy = {
       game,
       golden: () => golden.spawn(),
       give(id, count) {
-        game.state.helpers[id] = count;
+        game.setHelpers(id, count);
         game.refresh();
       },
       juice(amount) {

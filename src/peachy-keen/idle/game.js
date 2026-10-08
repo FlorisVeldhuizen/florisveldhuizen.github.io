@@ -13,6 +13,7 @@ import {
   smackValue,
   helperCost,
   helperMax,
+  helperRefund,
   upgradeCost,
   burstPayout,
   nectarFor,
@@ -380,7 +381,11 @@ export class IdleGame {
   }
 
   buyCount(id) {
-    const want = this.state.options.buy;
+    const want = this.held || this.state.options.buy;
+    if (this.state.options.sell) {
+      const owned = this.state.helpers[id] || 0;
+      return want === "max" ? owned : Math.min(want, owned);
+    }
     if (want === "max")
       return Math.max(1, helperMax(this.model, this.state, id));
     const room = this.model.maxOwned - (this.state.helpers[id] || 0);
@@ -389,7 +394,26 @@ export class IdleGame {
 
   helperPrice(id) {
     const count = this.buyCount(id);
+    if (this.state.options.sell)
+      return { count, cost: helperRefund(this.model, this.state, id, count) };
     return { count, cost: helperCost(this.model, this.state, id, count) };
+  }
+
+  setHelpers(id, count) {
+    const s = this.state;
+    s.helpers[id] = count;
+    s.peak[id] = Math.max(s.peak[id] || 0, count);
+  }
+
+  sellHelper(id, count = this.buyCount(id)) {
+    const s = this.state;
+    const owned = s.helpers[id] || 0;
+    if (count < 1 || count > owned) return false;
+    s.juice += helperRefund(this.model, s, id, count);
+    s.helpers[id] = owned - count;
+    if (!s.butlerSkip.includes(id)) s.butlerSkip.push(id);
+    this.refresh();
+    return true;
   }
 
   buyHelper(id, count = this.buyCount(id)) {
@@ -399,9 +423,11 @@ export class IdleGame {
     const cost = helperCost(this.model, s, id, count);
     if (cost > s.juice) return false;
     s.juice -= cost;
-    s.helpers[id] = owned + count;
+    const first = !(s.peak[id] || owned);
+    this.setHelpers(id, owned + count);
+    s.butlerSkip = s.butlerSkip.filter((skipped) => skipped !== id);
     this.refresh();
-    this.emit("bought", { kind: "helper", id, count });
+    this.emit("bought", { kind: "helper", id, count, first });
     return true;
   }
 
@@ -456,6 +482,7 @@ export class IdleGame {
         let best = null;
         this.visibleHelpers().forEach(({ helper, known }) => {
           if (!known || (s.helpers[helper.id] || 0) >= m.maxOwned) return;
+          if (s.butlerSkip.includes(helper.id)) return;
           const cost = helperCost(m, s, helper.id, 1);
           const score = cost / Math.max(1e-9, m.rates[helper.id]);
           if (!best || score < best.score)
@@ -515,7 +542,7 @@ export class IdleGame {
     s.dares.active = dare;
     this.model = buildModel(s, Date.now(), this.activeToys);
     Object.entries(this.model.start).forEach(([id, n]) => {
-      s.helpers[id] = Math.min(n, this.model.maxOwned);
+      this.setHelpers(id, Math.min(n, this.model.maxOwned));
     });
     const i = this.i;
     if (i.phase === "live") {

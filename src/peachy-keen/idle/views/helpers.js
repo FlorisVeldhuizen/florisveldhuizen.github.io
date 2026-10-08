@@ -14,8 +14,16 @@ import {
 } from "../dom";
 import { iconSvg } from "../icons";
 import { format } from "../numbers";
+import { dropIcon } from "../syrup";
 
 const AMOUNTS = [1, 10, 100, "max"];
+const ARM_MS = 3000;
+const touch = window.matchMedia("(pointer: coarse)");
+
+function heldAmount(e) {
+  if (e.ctrlKey || e.metaKey) return 100;
+  return e.shiftKey ? 10 : null;
+}
 
 export class HelpersView {
   constructor(game, root) {
@@ -24,20 +32,36 @@ export class HelpersView {
     this.rows = new Map();
     this.signature = "";
     const head = el("div", "shop-head", root);
-    this.amounts = el("span", "segmented", head);
+    this.mode = el("span", "joined shop-mode", head);
+    this.mode.setAttribute("role", "group");
+    this.mode.setAttribute("aria-label", "Buy or sell");
+    el("i", "shop-thumb", this.mode);
+    ["Buy", "Sell"].forEach((label) => {
+      const b = el("button", "", this.mode);
+      b.type = "button";
+      b.textContent = label;
+      b.dataset.sell = String(label === "Sell");
+      b.addEventListener("click", () => this.setSelling(label === "Sell"));
+    });
+    this.amounts = el("span", "joined", head);
     this.amounts.setAttribute("role", "group");
-    this.amounts.setAttribute("aria-label", "Buy amount");
+    this.amounts.setAttribute("aria-label", "Amount");
     AMOUNTS.forEach((amount) => {
       const b = el("button", "", this.amounts);
       b.type = "button";
-      b.textContent = amount === "max" ? "Max" : `×${amount}`;
+      if (amount === "max")
+        b.innerHTML = `<span class="amount-swap" aria-hidden="true"><span>Max</span><span>All</span></span>`;
+      else b.textContent = `×${amount}`;
       b.addEventListener("click", () => {
+        this.disarm();
         game.setOption("buy", amount);
         this.syncAmounts();
+        this.update();
       });
       b.dataset.amount = amount;
     });
-    this.butler = el("button", "switch shop-auto", head);
+    this.titleTool = el("span", "shop-title-tool");
+    this.butler = el("button", "switch shop-auto", this.titleTool);
     this.butler.type = "button";
     this.butler.addEventListener("click", () => {
       game.setOption("butler", !game.state.options.butler);
@@ -71,7 +95,44 @@ export class HelpersView {
       if (!this.pinned || e.target.closest(".row-info")) return;
       if (!this.detail.contains(e.target)) this.close();
     });
+    const hold = (e) => {
+      const held = heldAmount(e);
+      if (held === this.game.held) return;
+      this.game.held = held;
+      this.syncAmounts();
+      this.update();
+    };
+    window.addEventListener("keydown", hold);
+    window.addEventListener("keyup", hold);
+    window.addEventListener("blur", () => hold({}));
+    this.armed = null;
     this.syncAmounts();
+  }
+
+  setSelling(on) {
+    this.disarm();
+    this.game.setOption("sell", on);
+    this.syncAmounts();
+    this.update();
+  }
+
+  leave() {
+    if (this.game.state.options.sell) this.setSelling(false);
+  }
+
+  arm(id) {
+    this.disarm();
+    this.armed = id;
+    this.armTimer = setTimeout(() => {
+      this.armed = null;
+      this.update();
+    }, ARM_MS);
+    this.update();
+  }
+
+  disarm() {
+    clearTimeout(this.armTimer);
+    this.armed = null;
   }
 
   close() {
@@ -92,10 +153,23 @@ export class HelpersView {
 
   syncAmounts() {
     const { options } = this.game.state;
+    this.mode.querySelectorAll("button").forEach((b) => {
+      b.setAttribute(
+        "aria-pressed",
+        String(b.dataset.sell === String(options.sell)),
+      );
+    });
+    toggle(this.mode, "is-selling", options.sell);
+    toggle(this.list, "is-selling", options.sell);
+    const amount = this.game.held || options.buy;
     [...this.amounts.children].forEach((b) => {
       const value =
         b.dataset.amount === "max" ? "max" : Number(b.dataset.amount);
-      b.setAttribute("aria-pressed", String(value === options.buy));
+      b.setAttribute("aria-pressed", String(value === amount));
+      if (value === "max") {
+        toggle(b, "is-all", options.sell);
+        b.setAttribute("aria-label", options.sell ? "All" : "Max");
+      }
     });
     const unlocked = this.game.model.unlocks.has("butler");
     this.butler.hidden = !unlocked;
@@ -115,8 +189,8 @@ export class HelpersView {
       b.innerHTML = `
         <span class="row-icon">${iconSvg(known ? helper.id : "lock")}<svg class="hold-ring" viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="20.5"/></svg></span>
         <span class="row-main">
-          <span class="row-name">${known ? helper.name : "???"}<span class="row-qty"></span></span>
-          <span class="row-meta"><span class="row-cost"></span><span class="row-each"></span></span>
+          <span class="row-name">${known ? helper.name : "???"}<span class="row-qty"></span><span class="row-skip" hidden>Butler skips</span></span>
+          <span class="row-meta"><span class="row-cost"><span></span>${dropIcon()}</span><span class="row-each"></span></span>
         </span>
         <span class="row-count"></span>
         <span class="row-bar" aria-hidden="true"><i></i></span>`;
@@ -124,15 +198,28 @@ export class HelpersView {
         button: b,
         qty: b.querySelector(".row-qty"),
         cost: b.querySelector(".row-cost"),
+        costText: b.querySelector(".row-cost > span"),
         each: b.querySelector(".row-each"),
         count: b.querySelector(".row-count"),
+        skip: b.querySelector(".row-skip"),
         bar: b.querySelector(".row-bar i"),
         helper,
         known,
       };
       if (known) {
         b.addEventListener("click", () => {
-          if (this.game.buyHelper(helper.id)) this.flash(b);
+          const { game } = this;
+          const { sell, buy } = game.state.options;
+          const all = sell && !game.held && buy === "max";
+          if (all && this.armed !== helper.id && game.buyCount(helper.id) > 1) {
+            this.arm(helper.id);
+            return;
+          }
+          this.disarm();
+          const done = sell
+            ? game.sellHelper(helper.id)
+            : game.buyHelper(helper.id);
+          if (done) this.flash(b);
           else nudge(b.querySelector(".row-meta"));
         });
         inspectOn(b, () => {
@@ -195,11 +282,22 @@ export class HelpersView {
         `${owned} ${owned === 1 ? helper.name : helper.plural} make ${format(each * owned)} juice per second (${share}% of your helpers).`,
       );
     else lines.push(`Each one makes ${format(each)} juice per second.`);
+    if (this.butlerSkips(id))
+      lines.push(
+        `The Butler stopped buying ${helper.plural} because you sold some. Buy one yourself to let the Butler buy them again.`,
+      );
     setDetail(this.detail, helper.name, lines);
     const after = sidePanel.matches ? this.list : parts.info;
     if (after.nextElementSibling !== this.detail) after.after(this.detail);
     floatBeside(this.detail, parts.button);
     this.syncInfo();
+  }
+
+  butlerSkips(id) {
+    const game = this.game;
+    return (
+      game.model.unlocks.has("butler") && game.state.butlerSkip.includes(id)
+    );
   }
 
   update() {
@@ -217,21 +315,43 @@ export class HelpersView {
     this.rows.forEach((parts, id) => {
       const owned = s.helpers[id] || 0;
       if (!parts.known) {
-        setText(parts.cost, `Earn ${format(parts.helper.cost)} juice in total`);
+        toggle(parts.cost, "no-drop", true);
+        setText(
+          parts.costText,
+          `Earn ${format(parts.helper.cost)} juice in total`,
+        );
         return;
       }
       const { count, cost } = game.helperPrice(id);
-      const capped = owned >= game.model.maxOwned;
+      const selling = s.options.sell;
+      const capped = !selling && owned >= game.model.maxOwned;
+      const rate = format(game.model.rates[id] * count);
       setText(parts.count, owned ? format(owned, { whole: true }) : "");
       setText(parts.qty, count > 1 && !capped ? `×${count}` : "");
-      setText(parts.cost, capped ? "Full" : format(cost));
-      setText(parts.each, `+${format(game.model.rates[id] * count)}/s`);
-      const affordable = !capped && cost <= s.juice;
+      parts.skip.toggleAttribute("hidden", !this.butlerSkips(id));
+      const armed = selling && this.armed === id;
+      toggle(parts.button, "is-armed", armed);
+      toggle(parts.cost, "no-drop", armed || capped || (selling && !count));
+      if (armed) {
+        setText(
+          parts.costText,
+          `${touch.matches ? "Tap" : "Click"} again to sell all ${count}`,
+        );
+        setText(parts.each, "");
+      } else if (selling) {
+        setText(parts.costText, count ? `+${format(cost)}` : "None to sell");
+        setText(parts.each, count ? `−${rate}/s` : "");
+      } else {
+        setText(parts.costText, capped ? "Full" : format(cost));
+        setText(parts.each, `+${rate}/s`);
+      }
+      const affordable = selling ? count > 0 : !capped && cost <= s.juice;
       toggle(parts.button, "is-affordable", affordable);
       parts.button.setAttribute("aria-disabled", String(!affordable));
-      const next = TIER_AT.find((n) => n > owned);
-      const prev = [...TIER_AT].reverse().find((n) => n <= owned) || 0;
-      const fill = next ? (owned - prev) / (next - prev) : 1;
+      const reached = Math.max(owned, s.peak[id] || 0);
+      const next = TIER_AT.find((n) => n > reached);
+      const prev = [...TIER_AT].reverse().find((n) => n <= reached) || 0;
+      const fill = next ? (reached - prev) / (next - prev) : 1;
       parts.bar.style.transform = `scaleX(${fill})`;
     });
     if (this.focused) this.showDetail();

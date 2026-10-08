@@ -1,6 +1,7 @@
 import { HELPERS, HELPER_BY_ID, TIER_AT, TIER_PRICE } from "./helpers";
 
 const owned = (s, id) => s.helpers[id] || 0;
+const reached = (s, id) => Math.max(owned(s, id), s.peak[id] || 0);
 const nonFeathers = (s) =>
   HELPERS.reduce(
     (sum, h) => sum + (h.id === "feather" ? 0 : owned(s, h.id)),
@@ -15,7 +16,7 @@ const tierUpgrades = HELPERS.flatMap((helper) =>
     group: "helper",
     icon: helper.id,
     cost: helper.cost * TIER_PRICE[tier],
-    unlock: (s) => owned(s, helper.id) >= TIER_AT[tier],
+    unlock: (s) => reached(s, helper.id) >= TIER_AT[tier],
     effects: [{ kind: "helper", helper: helper.id, mult: 2 }],
   })),
 );
@@ -37,7 +38,7 @@ const TICKLE = [
   group: "smack",
   icon: "feather",
   cost,
-  unlock: (s) => owned(s, "feather") >= need,
+  unlock: (s) => reached(s, "feather") >= need,
   effects: [
     n === 0 ? { kind: "tickle", add: value } : { kind: "tickle", mult: value },
   ],
@@ -141,7 +142,7 @@ const OIL = [
     name: "Glazed",
     about: "Oil shine also boosts every helper by up to +25%.",
     cost: 2e8,
-    unlock: (s) => owned(s, "baron") >= 10,
+    unlock: (s) => reached(s, "baron") >= 10,
     effects: [{ kind: "glaze", add: 0.25 }],
   },
   {
@@ -149,7 +150,7 @@ const OIL = [
     name: "Standing order",
     about: "Oil Barons keep the peach at least 40% oiled.",
     cost: 5e9,
-    unlock: (s) => owned(s, "baron") >= 50,
+    unlock: (s) => reached(s, "baron") >= 50,
     effects: [{ kind: "oilFloor", value: 0.4 }],
   },
   {
@@ -192,7 +193,7 @@ const HEAT = [
     name: "Warm hands",
     about: "Your helpers slowly heat the peach up on their own.",
     cost: 3e4,
-    unlock: (s) => owned(s, "paddle") >= 5 && s.stats.bursts >= 1,
+    unlock: (s) => reached(s, "paddle") >= 5 && s.stats.bursts >= 1,
     effects: [{ kind: "autoHeat", add: 1 }],
   },
   {
@@ -200,7 +201,7 @@ const HEAT = [
     name: "Hot hands",
     about: "Helpers heat the peach three times as fast.",
     cost: 3e7,
-    unlock: (s) => owned(s, "coach") >= 10,
+    unlock: (s) => reached(s, "coach") >= 10,
     effects: [{ kind: "autoHeat", add: 2 }],
   },
   {
@@ -208,7 +209,7 @@ const HEAT = [
     name: "Molten hands",
     about: "Helpers heat the peach twice as fast again.",
     cost: 3e11,
-    unlock: (s) => owned(s, "spa") >= 25,
+    unlock: (s) => reached(s, "spa") >= 25,
     effects: [{ kind: "autoHeat", add: 3 }],
   },
   {
@@ -459,7 +460,7 @@ const PAIRS = [
   group: "helper",
   icon: a,
   cost: (HELPER_BY_ID[a].cost + HELPER_BY_ID[b].cost) * 150,
-  unlock: (s) => owned(s, a) >= 15 && owned(s, b) >= 15,
+  unlock: (s) => reached(s, a) >= 15 && reached(s, b) >= 15,
   effects: [
     { kind: "pair", helper: a, per: b, value: 0.05 },
     { kind: "pair", helper: b, per: a, value: 0.001 },
