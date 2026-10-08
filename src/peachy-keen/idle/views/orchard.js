@@ -131,7 +131,10 @@ function rest(button, seed, harvested) {
   clearTimeout(resting.get(button));
   toggle(button, "is-resting", true);
   toggle(button, "was-ripe", harvested);
-  if (harvested) shedLeaves(button, seed);
+  if (harvested) {
+    shedLeaves(button, seed);
+    burst(button, '<span class="dust is-late"></span>', 2800);
+  }
   resting.set(
     button,
     setTimeout(() => {
