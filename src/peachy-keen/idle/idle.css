@@ -865,15 +865,18 @@ body.is-storm::after {
   aspect-ratio: 1;
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, -50%) scale(0.5);
+  transform: translate(-50%, -50%) scale(0.6);
   transition:
-    opacity 0.2s ease,
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    opacity 0.12s ease-out,
+    transform 0.14s ease-in;
 }
 
 .plot.is-armed .plot-x {
   opacity: 1;
   transform: translate(-50%, -50%);
+  transition:
+    opacity 0.2s ease,
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .plus-face.is-cross {
@@ -946,8 +949,11 @@ body.is-storm::after {
 }
 
 @media (hover: hover) {
-  .plot[data-stage=""]:hover .plus-face,
   .plot.is-armed:hover .plus-face {
+    transform: scale(1.12);
+  }
+
+  .plot[data-stage=""]:hover .plus-face {
     box-shadow: 0 9px 14px rgba(12, 1, 6, 0.5);
     transform: translateY(-5px) scale(1.05);
   }
