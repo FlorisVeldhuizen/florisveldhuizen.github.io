@@ -815,21 +815,12 @@ body.is-storm::after {
   display: none;
 }
 
-.plot[data-stage="5"] {
-  --frame: var(--harvest);
-}
-
-.plot.is-armed {
-  --frame: #d98a94;
-}
-
-.plot[data-stage="5"]::before,
-.plot.is-armed::before {
+.plot[data-stage="5"]::before {
   content: "";
   position: absolute;
   inset: 7px;
   z-index: 2;
-  border: 1px solid var(--frame);
+  border: 1px solid var(--harvest);
   border-radius: 9px;
   pointer-events: none;
 }
@@ -838,8 +829,7 @@ body.is-storm::after {
   border-color: rgba(212, 162, 76, 0.45);
 }
 
-.plot[data-stage="5"] .plot-label,
-.plot.is-armed .plot-label {
+.plot[data-stage="5"] .plot-label {
   top: auto;
   right: auto;
   bottom: 1.5px;
@@ -851,11 +841,53 @@ body.is-storm::after {
     transparent 74%
   );
   text-shadow: 0 1px 3px rgba(12, 1, 6, 0.8);
-  color: var(--frame);
+  color: var(--harvest);
   font-size: 12.5px;
   font-weight: 600;
   line-height: 15px;
   translate: -50% 0;
+}
+
+.plot .growth {
+  transition: filter 0.3s ease;
+}
+
+.plot.is-armed .growth {
+  filter: grayscale(0.75) brightness(0.55);
+}
+
+.plot-x {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: clamp(24px, 27%, 36px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #d98a94;
+  box-shadow: 0 2px 6px rgba(12, 1, 6, 0.45);
+  color: var(--velvet-deep);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.5);
+  transition:
+    opacity 0.2s ease,
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.plot.is-armed .plot-x {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+.plot .plot-x svg {
+  position: static;
+  width: 58%;
+  height: 58%;
+  fill: currentColor;
+  rotate: 45deg;
 }
 
 .plots {
@@ -1241,6 +1273,7 @@ body.is-storm::after {
 }
 
 .growth.is-uprooted {
+  filter: grayscale(0.75) brightness(0.55);
   animation: uprooted 0.9s ease-in both;
 }
 
