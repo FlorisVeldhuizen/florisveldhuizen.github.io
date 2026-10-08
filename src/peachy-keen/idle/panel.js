@@ -240,7 +240,14 @@ export class Panel {
   sheetStops() {
     const h = viewHeight();
     const closed = 76 + parseFloat(getComputedStyle(this.root).paddingBottom);
-    const full = h - parseFloat(getComputedStyle(this.score).top) - SCORE_PEEK;
+    const pits = document.getElementById("pits");
+    const peek = pits?.hidden
+      ? SCORE_PEEK
+      : pits.getBoundingClientRect().bottom -
+        this.score.getBoundingClientRect().top +
+        8;
+    this.root.style.setProperty("--score-peek", `${peek}px`);
+    const full = h - parseFloat(getComputedStyle(this.score).top) - peek;
     return [closed, Math.min(h * 0.6, 600), full];
   }
 
