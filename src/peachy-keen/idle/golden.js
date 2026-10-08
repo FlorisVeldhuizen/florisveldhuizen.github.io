@@ -319,7 +319,7 @@ export class GoldenPeach {
   }
 
   burst() {
-    if (reducedMotion.matches) return;
+    if (reducedMotion.matches || !this.look.sparkle) return;
     const h = this.holder;
     for (let n = 0; n < SPARKS; n += 1) {
       const s = this.emit(0.16, 0.6 + Math.random() * 0.2, 3, 0.5);
@@ -500,9 +500,11 @@ export class GoldenPeach {
       this.look.glowLevel * (1 + Math.sin(g.age * 4) * 0.3);
     this.updateFlies(delta);
     this.trailTimer -= delta;
-    const fall = this.look.sparkle ? 0 : 0.6;
     const s =
-      this.trailTimer <= 0 && fade > 0.5 && this.emit(0.12, 0.9, 0, fall);
+      this.look.sparkle &&
+      this.trailTimer <= 0 &&
+      fade > 0.5 &&
+      this.emit(0.12, 0.9, 0, 0);
     if (s) {
       this.trailTimer = 0.16;
       const a = Math.random() * Math.PI * 2;
