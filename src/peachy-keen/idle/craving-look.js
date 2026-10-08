@@ -1,18 +1,20 @@
 import { Raycaster, Vector3 } from "three";
 import { playHeartbeat } from "../audio";
 import { TOOLS } from "../config";
-import { CRAVE_SECONDS } from "./data/cravings";
+import { CRAVE_REPLIES, CRAVE_SECONDS } from "./data/cravings";
 import { el } from "./dom";
 
 const REPLY_SECONDS = 2;
-const YES = ["Mm. Exactly that.", "Good. So good.", "Yes. Just like that."];
-const NO = ["Too slow.", "Never mind, then."];
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
 export class CravingLook {
   constructor(game, interaction) {
     Object.assign(this, { game, i: interaction });
     this.talk = el("div", "talk craving-talk", document.body);
+    this.talk.innerHTML =
+      '<svg class="craving-clock" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 12V6.5"/></svg><span></span>';
+    this.text = this.talk.querySelector("span");
+    this.hand = this.talk.querySelector("path");
     this.ray = new Raycaster();
     this.from = new Vector3();
     this.down = new Vector3(0, 0, -1);
@@ -21,14 +23,23 @@ export class CravingLook {
     game.on("craving", (e) => this.react(e));
   }
 
+  voice() {
+    const { level } = this.i.talk;
+    return CRAVE_REPLIES[level] ? level : "off";
+  }
+
   react({ craving, done }) {
+    const voice = this.voice();
+    this.talk.classList.toggle("is-plain", voice === "off");
     if (done === null) {
       this.side = Math.random() < 0.5 ? -1 : 1;
-      this.talk.textContent = craving.ask;
+      this.text.textContent = craving.ask[voice];
+      this.talk.classList.add("is-asking");
       this.cue = 0;
       return;
     }
-    this.talk.textContent = pick(done ? YES : NO);
+    this.text.textContent = pick(CRAVE_REPLIES[voice][done ? "yes" : "no"]);
+    this.talk.classList.remove("is-asking");
     this.reply = REPLY_SECONDS;
   }
 
@@ -89,6 +100,7 @@ export class CravingLook {
     this.reply = Math.max(0, this.reply - delta);
     const shown = Boolean(c) || this.reply > 0;
     this.talk.classList.toggle("is-visible", shown);
+    this.i.talk.hold(shown);
     if (!shown) return;
     const anchor = this.from.copy(this.i.offset);
     anchor.x -= 0.75;
@@ -96,5 +108,6 @@ export class CravingLook {
     const at = this.i.toScreen(anchor);
     this.talk.style.translate = `${Math.max(this.talk.offsetWidth + 16, at.x)}px ${Math.max(16, at.y)}px`;
     this.talk.style.setProperty("--left", `${left * 100}%`);
+    this.hand.setAttribute("transform", `rotate(${(1 - left) * 360} 12 12)`);
   }
 }

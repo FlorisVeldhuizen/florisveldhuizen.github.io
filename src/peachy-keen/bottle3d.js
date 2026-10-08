@@ -11,6 +11,8 @@ import {
   Plane,
   Color,
   DoubleSide,
+  BackSide,
+  FrontSide,
   CanvasTexture,
   SRGBColorSpace,
   AdditiveBlending,
@@ -282,6 +284,8 @@ function glass(tint) {
     clearcoat: 0.4,
     clearcoatRoughness: 0.03,
     side: DoubleSide,
+    // Additive blending ignores draw order, and two passes would rebuild the shader state every frame.
+    forceSinglePass: true,
   });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, { uRim: { value: rim } });
@@ -414,11 +418,20 @@ export class BottleModel {
     this.level = level;
     this.fill = 1;
     this.surface = new Plane(new Vector3(0, -1, 0), 0);
-    liquid.material.clippingPlanes = [this.surface];
     liquid.material.clipShadows = true;
-    liquid.renderOrder = 0;
+    // A two-pass double-sided material rebuilds its shader state every frame, so each side gets its own mesh.
+    const front = new Mesh(liquid.geometry, liquid.material.clone());
+    liquid.material.side = BackSide;
+    liquid.material.shadowSide = DoubleSide;
+    front.material.side = FrontSide;
+    [liquid, front].forEach((mesh) => {
+      // eslint-disable-next-line no-param-reassign
+      mesh.material.clippingPlanes = [this.surface];
+      // eslint-disable-next-line no-param-reassign
+      mesh.renderOrder = 0;
+    });
     body.renderOrder = 1;
-    this.group.add(liquid, body, stopper);
+    this.group.add(liquid, front, body, stopper);
   }
 
   updateLiquid(slosh = 0) {

@@ -822,7 +822,7 @@ const PRINT_SHAPES = {
         [96, 128, -0.2, 78, 22],
         [121, 122, -0.06, 92, 23],
         [146, 124, 0.08, 84, 22],
-        [169, 134, 0.24, 62, 18],
+        [163, 141, 0.3, 70, 18],
         [86, 180, -0.95, 62, 25],
       ];
       fingers.forEach(([fx, fy, angle, length, width]) => {
@@ -835,6 +835,14 @@ const PRINT_SHAPES = {
         );
         ctx.stroke();
       });
+      // Fills the notch where the pinky's outer edge meets the palm.
+      ctx.beginPath();
+      ctx.moveTo(128 + x, 150);
+      ctx.lineTo(163 + x, 141);
+      ctx.lineTo(175 + x, 132);
+      ctx.bezierCurveTo(178 + x, 148, 179 + x, 160, 176 + x, 174);
+      ctx.closePath();
+      ctx.fill();
     },
   },
   lips: {
@@ -2505,28 +2513,32 @@ export class Peach {
     m.color.copy(this.skinTint).lerp(this.wetTint, gloss ? 0 : shine * 0.12);
   }
 
+  // Built before the warm-up so the first skin switch does not compile the fade shader.
+  prepareSkinFade() {
+    if (!this.mesh || this.fade) return;
+    const uniforms = { ...this.uniforms };
+    SKIN_UNIFORMS.forEach((key) => {
+      uniforms[key] = { value: this.uniforms[key].value.clone() };
+    });
+    uniforms.uSkinFade = { value: 0 };
+    uniforms.uSkinFadeGlow = { value: new Color() };
+    const material = this.material.clone();
+    material.defines = { ...material.defines, SKIN_FADE: "" };
+    material.onBeforeCompile = (shader) => {
+      this.material.onBeforeCompile(shader);
+      Object.assign(shader.uniforms, uniforms);
+    };
+    const mesh = new Mesh(this.mesh.geometry, material);
+    mesh.renderOrder = 0.5;
+    mesh.raycast = () => {};
+    mesh.visible = false;
+    this.mesh.add(mesh);
+    this.fade = { mesh, uniforms, time: 0 };
+  }
+
   fadeSkin(glow, beats) {
     if (!this.mesh) return;
-    if (!this.fade) {
-      const uniforms = { ...this.uniforms };
-      SKIN_UNIFORMS.forEach((key) => {
-        uniforms[key] = { value: this.uniforms[key].value.clone() };
-      });
-      uniforms.uSkinFade = { value: 0 };
-      uniforms.uSkinFadeGlow = { value: new Color() };
-      const material = this.material.clone();
-      material.defines = { ...material.defines, SKIN_FADE: "" };
-      material.onBeforeCompile = (shader) => {
-        this.material.onBeforeCompile(shader);
-        Object.assign(shader.uniforms, uniforms);
-      };
-      const mesh = new Mesh(this.mesh.geometry, material);
-      mesh.renderOrder = 0.5;
-      mesh.raycast = () => {};
-      mesh.visible = false;
-      this.mesh.add(mesh);
-      this.fade = { mesh, uniforms, time: 0 };
-    }
+    this.prepareSkinFade();
     const { fade } = this;
     this.matchSkin(fade.mesh.material);
     SKIN_UNIFORMS.forEach((key) =>

@@ -312,8 +312,15 @@ export class Talk {
     this.show(line, event === "burst");
   }
 
+  // Only one text bubble shows at a time, so another bubble can hold the peach's lines back.
+  hold(held) {
+    if (held === this.held) return;
+    this.held = held;
+    if (held) this.hide();
+  }
+
   show(line, soft = false) {
-    if (this.level === "off") return;
+    if (this.level === "off" || this.held) return;
     const now = performance.now();
     this.snap = !this.showing;
     this.last = line;

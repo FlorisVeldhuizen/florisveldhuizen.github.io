@@ -353,6 +353,8 @@ export class ShootingStars {
           blending: AdditiveBlending,
           depthWrite: false,
           side: DoubleSide,
+          // Additive blending ignores draw order, and two passes would rebuild the shader state every frame.
+          forceSinglePass: true,
         }),
       );
       group.add(mesh);
