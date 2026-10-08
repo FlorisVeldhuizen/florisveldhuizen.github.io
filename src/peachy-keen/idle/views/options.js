@@ -85,6 +85,14 @@ export class OptionsView {
       switchRow(box, "Helpers on screen", () => opts().cast, set("cast")),
       switchRow(box, "Helper sounds", () => opts().castSound, set("castSound")),
     ];
+    this.crate = switchRow(
+      box,
+      "Fresh crate: no bruises, no overripe bonus",
+      () => opts().freshCrate,
+      set("freshCrate"),
+    );
+    this.controls.push(this.crate);
+    this.showCrate();
     this.skinBox = el("div", "", box);
     this.skinCount = 0;
 
@@ -210,7 +218,15 @@ export class OptionsView {
     this.skinControl?.sync();
   }
 
+  showCrate() {
+    const { state } = this.game;
+    this.crate.row.hidden = !(
+      state.upgrades.includes("overripe-0") || state.options.freshCrate
+    );
+  }
+
   update() {
+    this.showCrate();
     if (this.skinCount !== this.game.model.skins.length) {
       this.buildSkins();
       this.sync();

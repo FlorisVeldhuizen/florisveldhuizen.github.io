@@ -66,6 +66,7 @@ export function freshState() {
       cast: true,
       castSound: true,
       helperStyle: "room",
+      freshCrate: false,
     },
     seen: {},
     savedAt: Date.now(),
