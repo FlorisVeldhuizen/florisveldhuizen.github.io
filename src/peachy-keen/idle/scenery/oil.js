@@ -11,6 +11,8 @@ const TRAIL_SHRINK = 0.5 * PX;
 const HEAD_SHRINK = 0.25 * PX;
 const MIN_HEAD = 5 * PX;
 const MAX_TRAIL = 20;
+// Thinner than this the oil would only light scattered pixels, so it ends there.
+const MIN_DRAW = 1.2 * PX;
 const DRAG = 0.4;
 const LIFE = 14;
 const FADE = 1.4;
@@ -266,8 +268,19 @@ export class OilDrips {
       d.trail = d.trail.filter((t) => t.r > 0.8 * PX);
       const evaporate = Math.max(0, Math.min(1, (LIFE - d.age) / FADE));
       const grow = Math.min(1, 0.35 + d.age * 14);
-      d.trail.forEach((t) => blobs.push({ at: t.at, r: t.r * evaporate }));
-      if (d.attached) blobs.push({ at: d.head, r: d.r * grow * evaporate });
+      let joined = false;
+      const add = (at, r) => {
+        if (r < MIN_DRAW) {
+          joined = false;
+          return;
+        }
+        blobs.push({ at, r, link: joined });
+        joined = true;
+      };
+      d.trail.forEach((t) => add(t.at, t.r * evaporate));
+      // The drop stays a loose blob, so it blends into the end of the line as a teardrop.
+      joined = false;
+      if (d.attached) add(d.head, d.r * grow * evaporate);
       if (evaporate <= 0 || (!d.attached && d.trail.length === 0)) {
         Object.assign(d, {
           state: "idle",

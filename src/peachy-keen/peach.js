@@ -456,18 +456,31 @@ const FRAGMENT_HEADER = `
     return mix(0.075, 0.0, f - 4.0);
   }
 
+  // A blob with a negative radius joins the one before it, so a drip's trail reads as one line however thin it gets.
   float oilField() {
     float f = 0.0;
+    float chain = 0.0;
+    vec4 prev = vec4(0.0);
     for (int i = 0; i < ${OIL_BLOBS}; i++) {
       if (float(i) >= uOilCount) break;
       vec4 blob = uOilBlobs[i];
+      float r = abs(blob.w);
       vec3 q = vRestPosition - blob.xyz;
-      float reach = blob.w * 1.8;
+      if (blob.w < 0.0) {
+        vec3 ab = blob.xyz - prev.xyz;
+        float t = clamp(dot(vRestPosition - prev.xyz, ab) / max(dot(ab, ab), 1e-8), 0.0, 1.0);
+        q = vRestPosition - (prev.xyz + ab * t);
+        r = mix(abs(prev.w), r, t);
+      } else {
+        f += chain;
+        chain = 0.0;
+      }
+      prev = blob;
+      float reach = r * 1.8;
       float d2 = dot(q, q);
-      if (d2 >= reach * reach) continue;
-      f += oilFalloff(sqrt(d2) / reach);
+      if (d2 < reach * reach) chain = max(chain, oilFalloff(sqrt(d2) / reach));
     }
-    return min(f, 1.0);
+    return min(f + chain, 1.0);
   }
 
   vec3 oilBump(vec3 position, vec3 n, float height, float face) {
@@ -1392,8 +1405,8 @@ export class Peach {
     const slots = this.uniforms.uOilBlobs.value;
     const count = Math.min(OIL_BLOBS, blobs.length);
     for (let n = 0; n < count; n += 1) {
-      const { at, r } = blobs[n];
-      slots[n].set(at.x, at.y, at.z, r / scale);
+      const { at, r, link } = blobs[n];
+      slots[n].set(at.x, at.y, at.z, ((link ? -1 : 1) * r) / scale);
     }
     this.uniforms.uOilCount.value = count;
   }
