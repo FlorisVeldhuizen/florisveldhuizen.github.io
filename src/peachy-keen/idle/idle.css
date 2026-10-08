@@ -782,10 +782,158 @@ body.is-storm::after {
   color: var(--blush-dim);
 }
 
+.orchard-step {
+  display: flex;
+  align-items: center;
+  min-height: 2.9em;
+  margin-bottom: 8px;
+  color: var(--blush);
+  font-size: 14.5px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.tab-orchard {
+  --harvest: #d4a24c;
+}
+
+.plot-label {
+  position: absolute;
+  top: 6px;
+  right: 9px;
+  z-index: 3;
+  color: var(--blush-dim);
+  font-size: 12px;
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.plot-label:empty {
+  display: none;
+}
+
+.plot.is-armed .plot-label {
+  top: auto;
+  right: auto;
+  bottom: 8px;
+  left: 50%;
+  padding: 2px 12px 3px;
+  border-radius: 99px;
+  background: var(--welt);
+  color: var(--velvet-deep);
+  font-size: 11.5px;
+  font-style: normal;
+  font-weight: 600;
+  translate: -50% 0;
+}
+
+.plot[data-stage="5"]::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  z-index: 2;
+  border: 1px solid var(--harvest);
+  border-radius: 9px;
+  pointer-events: none;
+}
+
+.plot[data-stage="5"] {
+  border-color: rgba(212, 162, 76, 0.45);
+}
+
+.plot[data-stage="5"] .plot-label {
+  top: auto;
+  right: auto;
+  bottom: 1.5px;
+  left: 50%;
+  padding: 0 7px;
+  background: linear-gradient(
+    transparent 52%,
+    var(--velvet-deep) 52% 74%,
+    transparent 74%
+  );
+  text-shadow: 0 1px 3px rgba(12, 1, 6, 0.8);
+  color: var(--harvest);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 15px;
+  translate: -50% 0;
+}
+
 .plots {
   display: grid;
   grid-template-columns: repeat(var(--size, 3), 1fr);
   gap: 6px;
+}
+
+.plot-marker {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  z-index: 3;
+  width: clamp(24px, 27%, 36px);
+  aspect-ratio: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.4);
+  transition:
+    opacity 0.25s ease,
+    transform 0.3s ease-in;
+}
+
+.plots.can-plant .plot[data-stage=""] .plot-marker {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+  transition:
+    opacity 0.6s ease,
+    transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.plots.can-plant .plot.is-resting .plot-marker {
+  opacity: 0;
+  transform: translate(-50%, -40%) scale(0.85);
+  transition: none;
+}
+
+.plot[data-stage]:not([data-stage=""]) .plot-marker {
+  transform: translate(-50%, 40%) scale(0.2);
+}
+
+.plus-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--peach);
+  box-shadow: 0 2px 6px rgba(12, 1, 6, 0.45);
+  color: var(--velvet-deep);
+  transition:
+    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease;
+  will-change: transform;
+}
+
+.plot .plus-face svg {
+  position: static;
+  width: 58%;
+  height: 58%;
+  fill: currentColor;
+}
+
+@media (hover: hover) {
+  .plot[data-stage=""]:hover .plus-face {
+    box-shadow: 0 9px 14px rgba(12, 1, 6, 0.5);
+    transform: translateY(-5px) scale(1.05);
+  }
+}
+
+.plot[data-stage=""]:active .plus-face {
+  transform: scale(0.9);
+  transition-duration: 0.12s;
 }
 
 .plot {
@@ -911,8 +1059,8 @@ body.is-storm::after {
 }
 
 .plot.is-armed {
-  border-color: var(--welt);
-  box-shadow: 0 0 0 1px var(--welt);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--welt);
 }
 
 .plot svg {
@@ -933,6 +1081,7 @@ body.is-storm::after {
 }
 
 .growth {
+  transform: scale(var(--size, 1));
   transform-origin: var(--root, 50% 86%);
 }
 
@@ -943,11 +1092,11 @@ body.is-storm::after {
 
 .growth.is-growing {
   z-index: 1;
-  animation: grow-in 1.2s ease-out both;
+  animation: grow-in 0.75s 0.12s ease-out both;
 }
 
 .growth.is-outgrown {
-  animation: grow-out 1.2s ease-in both;
+  animation: grow-out 0.22s ease-in both;
 }
 
 .growth.is-cleared {
@@ -967,17 +1116,74 @@ body.is-storm::after {
 @keyframes grow-in {
   from {
     opacity: 0;
-    scale: 0.9;
+    scale: 0.78;
+  }
+  25% {
+    opacity: 1;
+  }
+  45% {
+    scale: 0.95 1.09;
+  }
+  70% {
+    scale: 1.04 0.97;
+  }
+  to {
+    scale: 1;
   }
 }
 
 @keyframes grow-out {
-  50% {
+  to {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+.growth.is-harvested {
+  animation: harvested 1.2s ease-in-out both;
+}
+
+@keyframes harvested {
+  16% {
+    scale: 1.05 0.96;
+  }
+  32% {
+    scale: 0.98 1.03;
+  }
+  48% {
     opacity: 1;
+    scale: 1;
+    translate: 0 0;
   }
   to {
     opacity: 0;
-    scale: 1.04;
+    scale: 0.92;
+    translate: 0 5%;
+  }
+}
+
+.petal-shower .is-leaves .petal {
+  fill: #7fae5a;
+}
+
+.plot.was-ripe {
+  transition-duration: 1.2s;
+}
+
+.plot.was-ripe::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  z-index: 2;
+  border: 1px solid var(--harvest);
+  border-radius: 9px;
+  pointer-events: none;
+  animation: frame-out 1.2s ease forwards;
+}
+
+@keyframes frame-out {
+  to {
+    opacity: 0;
   }
 }
 
@@ -1028,6 +1234,37 @@ body.is-storm::after {
   animation-delay: -0.6s;
 }
 
+.petal-shower {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.petal-shower .petal {
+  fill: #ffd0dc;
+  opacity: 0;
+  animation: petal-drop 1.9s var(--d) ease-in forwards;
+}
+
+@keyframes petal-drop {
+  0% {
+    opacity: 0;
+    transform: translate(var(--x), var(--y)) rotate(0deg) scale(1.3);
+  }
+  12% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--x) + var(--dx)), calc(var(--y) + 30px))
+      rotate(320deg) scale(1.3);
+  }
+}
+
 .plot .sparkle-star {
   fill: #fff6d0;
   transform-box: fill-box;
@@ -1037,10 +1274,6 @@ body.is-storm::after {
 
 .plot .sparkle-star.is-late {
   animation-delay: -0.8s;
-}
-
-.plot[data-stage="5"] {
-  border-color: rgba(212, 162, 76, 0.7);
 }
 
 .plot[data-stage="6"] {
@@ -2291,5 +2524,9 @@ body.is-storm::after {
 
 .settings-row[hidden],
 .settings-lab[hidden] {
+  display: none;
+}
+
+.plot.is-armed .plot-ring {
   display: none;
 }

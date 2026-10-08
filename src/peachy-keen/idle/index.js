@@ -163,7 +163,7 @@ export function createIdle({
     popups.toast(
       "Unlocked",
       "The Orchard",
-      "Plant the pits you get from bursts.",
+      "Open the sprout tab to plant your pit.",
       "seed",
     );
   });

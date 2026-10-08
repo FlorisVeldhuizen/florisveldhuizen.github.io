@@ -397,6 +397,7 @@ export class Panel {
     };
     badge("upgrades", this.views.upgrades.affordableCount());
     badge("ripen", this.game.ripenReady() ? "!" : 0);
+    if (state.orchard.open) badge("orchard", this.views.orchard.badge());
     if (this.buttons[this.current].hidden) this.show("helpers");
     this.views[this.current].update();
   }

@@ -1,9 +1,9 @@
 import { SEEDS, SEED_BY_ID, RIPE, ROTTEN } from "../data/orchard";
-import { plantFx } from "./plant";
-import { renders } from "../renders";
+import { plantFx, petalShower } from "./plant";
+import { renders, PICKED } from "../renders";
 
 const VARIANTS = 5;
-import { el, setDetail, toggle } from "../dom";
+import { el, setDetail, setText, toggle } from "../dom";
 import { format, formatTime } from "../numbers";
 import { iconSvg } from "../icons";
 import { pitIcon, dropIcon } from "../syrup";
@@ -17,6 +17,7 @@ const morePits = (n) =>
 const pitTag = (text) => `<span class="pit-tag">${text}${pitIcon()}</span>`;
 
 const canHover = window.matchMedia("(hover: hover)");
+const calm = window.matchMedia("(prefers-reduced-motion: reduce)");
 const press = () => (canHover.matches ? "Click" : "Tap");
 
 const REWARD_ICONS = {
@@ -37,6 +38,7 @@ const LAYER_ANIMATIONS = [
   "is-growing",
   "is-outgrown",
   "is-cleared",
+  "is-harvested",
 ];
 
 function animate(layer, name, hideAfter = false) {
@@ -63,22 +65,61 @@ function showPlant(layer, shot) {
   return Promise.all(images.map((img) => img.decode().catch(() => {})));
 }
 
+const STAGE_SIZE = [
+  [0.6, 1.4],
+  [0.55, 1],
+  [0.95, 1.25],
+  [0.88, 0.96],
+  [0.96, 1],
+];
+
+function plantSize(info) {
+  const range = STAGE_SIZE[info.stage];
+  if (!range) return 1;
+  return range[0] + (range[1] - range[0]) * Math.min(1, info.within);
+}
+
+function shedPetals(button, leaves = false) {
+  if (calm.matches) return;
+  const shower = el("span", "petal-shower", button, petalShower(leaves));
+  setTimeout(() => shower.remove(), 2600);
+}
+
+const resting = new Map();
+
+function rest(button, harvested) {
+  clearTimeout(resting.get(button));
+  toggle(button, "is-resting", true);
+  toggle(button, "was-ripe", harvested);
+  if (harvested) shedPetals(button, true);
+  resting.set(
+    button,
+    setTimeout(() => {
+      toggle(button, "is-resting", false);
+      toggle(button, "was-ripe", false);
+    }, 1600),
+  );
+}
+
+function plotLabel(p, info) {
+  if (!info) return "";
+  if (p.confirm) return "Dig up?";
+  if (info.stage < RIPE) return formatTime(info.left);
+  return info.stage === RIPE ? "Harvest" : "";
+}
+
 export class OrchardView {
   constructor(game, orchard, root) {
     Object.assign(this, { game, orchard, root });
     this.selected = "cling";
     this.focus = -1;
-    el(
-      "p",
-      "shop-intro",
-      root,
-      "Plant pits. Harvest the trees when they are ripe, before they rot.",
-    );
     this.balance = el("p", "seed-balance", root);
     this.balance.setAttribute("role", "img");
     this.seeds = el("div", "seeds", root);
     this.seeds.setAttribute("role", "group");
     this.seeds.setAttribute("aria-label", "Seed to plant");
+    this.step = el("p", "orchard-step", root);
+    this.step.setAttribute("aria-live", "polite");
     this.grid = el("div", "plots", root);
     this.info = el("p", "shop-detail", root);
     this.info.setAttribute("aria-live", "polite");
@@ -213,7 +254,7 @@ export class OrchardView {
       b.type = "button";
       const growth =
         '<span class="growth" hidden><img class="plant" alt="" draggable="false"><img class="plant plant-top" alt="" draggable="false"></span>';
-      b.innerHTML = `<img class="bed" alt="" draggable="false">${growth}${growth}<svg viewBox="0 0 60 60" aria-hidden="true"></svg><span class="plot-ring"></span>`;
+      b.innerHTML = `<img class="bed" alt="" draggable="false"><span class="plot-marker" aria-hidden="true"><span class="plus-face"><svg class="plus-mark" viewBox="0 0 24 24"><rect x="9.6" y="3" width="4.8" height="18" rx="2.4"/><rect x="3" y="9.6" width="18" height="4.8" rx="2.4"/></svg></span></span>${growth}${growth}<svg viewBox="0 0 60 60" aria-hidden="true"></svg><span class="plot-ring"></span><span class="plot-label" aria-hidden="true"></span>`;
       const bed = b.querySelector(".bed");
       renders.bed(index % VARIANTS, (url) => {
         bed.src = url;
@@ -230,7 +271,8 @@ export class OrchardView {
         button: b,
         layers: [...b.querySelectorAll(".growth")],
         shown: null,
-        svg: b.querySelector("svg"),
+        svg: b.querySelector(":scope > svg"),
+        label: b.querySelector(".plot-label"),
         key: "",
       });
     }
@@ -256,6 +298,7 @@ export class OrchardView {
         setDetail(this.info, info.seed.name, [
           `It isn't ripe yet. ${press()} again to dig it up.`,
         ]);
+        this.update();
         return;
       }
       const reward = this.orchard.harvest(index);
@@ -304,6 +347,58 @@ export class OrchardView {
     ]);
   }
 
+  badge() {
+    const { orchard, pits } = this.game.state;
+    const now = Date.now();
+    const ripe = orchard.plots.filter(
+      (plot, index) => plot && this.orchard.describe(index, now).stage === RIPE,
+    ).length;
+    if (ripe) return ripe;
+    const cheapest = Math.min(
+      ...orchard.discovered.map((id) => SEED_BY_ID[id].pits),
+    );
+    return orchard.plots.some(Boolean) || pits < cheapest ? 0 : "!";
+  }
+
+  showStep(now) {
+    const { state } = this.game;
+    const infos = state.orchard.plots.map((plot, index) =>
+      plot ? this.orchard.describe(index, now) : null,
+    );
+    const seed = SEED_BY_ID[this.selected];
+    let kind;
+    let text;
+    if (infos.some((info) => info?.stage === RIPE)) {
+      kind = "ripe";
+      text = `A tree is ripe. ${press()} it to harvest before it rots.`;
+    } else if (infos.includes(null) && state.pits >= seed.pits) {
+      kind = "plant";
+      text = `${press()} an empty plot to plant a ${seed.name}.`;
+    } else if (infos.some((info) => info?.stage === ROTTEN)) {
+      kind = "rotten";
+      text = `${press()} a rotten tree to clear the plot.`;
+    } else if (infos.includes(null)) {
+      kind = "short";
+      text = `You need ${morePits(seed.pits - state.pits)} for a ${seed.name}. Burst the peach to get pits.`;
+    } else {
+      kind = "wait";
+      const next = Math.min(...infos.map((info) => info.left));
+      text = `The next tree is ripe in ${formatTime(next)}.`;
+    }
+    if (this.step.dataset.kind !== kind) {
+      this.step.dataset.kind = kind;
+      if (!calm.matches)
+        this.step.animate(
+          [
+            { opacity: 0, translate: "0 4px" },
+            { opacity: 1, translate: "0 0" },
+          ],
+          { duration: 280, easing: "ease-out" },
+        );
+    }
+    setText(this.step, text);
+  }
+
   update() {
     const { state } = this.game;
     if (this.shownSeeds !== state.orchard.discovered.join()) this.buildSeeds();
@@ -333,6 +428,8 @@ export class OrchardView {
       b.setAttribute("aria-pressed", String(id === this.selected)),
     );
     const now = Date.now();
+    const seed = SEED_BY_ID[this.selected];
+    toggle(this.grid, "can-plant", state.pits >= seed.pits);
     this.plots.forEach((p, index) => {
       const plot = state.orchard.plots[index];
       const info = plot ? this.orchard.describe(index, now) : null;
@@ -342,8 +439,14 @@ export class OrchardView {
         // eslint-disable-next-line no-param-reassign
         p.key = key;
         p.svg.innerHTML = info ? plantFx(info.stage) : "";
+        if (!first && p.button.dataset.stage === "3" && info?.stage === 4)
+          shedPetals(p.button);
         if (!info) {
-          if (p.shown) animate(p.shown, "is-cleared", true);
+          const harvested = p.button.dataset.stage === "5";
+          if (harvested && p.shown && p.picked) showPlant(p.shown, p.picked);
+          if (p.shown)
+            animate(p.shown, harvested ? "is-harvested" : "is-cleared", true);
+          if (!first) rest(p.button, harvested);
           // eslint-disable-next-line no-param-reassign
           p.shown = null;
         } else
@@ -351,8 +454,18 @@ export class OrchardView {
             if (p.key !== key) return;
             const old = p.shown;
             const next = p.layers.find((layer) => layer !== old);
+            next.dataset.key = key;
+            next.style.setProperty(
+              "--size",
+              plantSize(this.orchard.describe(index)),
+            );
             // eslint-disable-next-line no-param-reassign
             p.shown = next;
+            if (info.stage === RIPE)
+              renders.plant(PICKED, info.seed, index % VARIANTS, (picked) => {
+                // eslint-disable-next-line no-param-reassign
+                p.picked = picked;
+              });
             showPlant(next, shot).then(() => {
               if (p.shown !== next) return;
               next.hidden = false;
@@ -367,11 +480,15 @@ export class OrchardView {
           info ? `${info.seed.name}, ${info.name}` : "Empty plot",
         );
       }
+      setText(p.label, plotLabel(p, info));
+      if (info && p.shown?.dataset.key === key)
+        p.shown.style.setProperty("--size", plantSize(info));
       p.button.style.setProperty(
         "--grow",
         info ? Math.min(1, info.progress) : 0,
       );
     });
+    this.showStep(now);
     if (this.focus >= 0 && document.activeElement?.closest?.(".plots"))
       this.describePlot(this.focus);
   }
