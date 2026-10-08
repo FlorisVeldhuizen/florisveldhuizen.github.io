@@ -861,14 +861,8 @@ body.is-storm::after {
   top: 44%;
   left: 50%;
   z-index: 3;
-  display: grid;
-  place-items: center;
   width: clamp(24px, 27%, 36px);
   aspect-ratio: 1;
-  border-radius: 50%;
-  background: #d98a94;
-  box-shadow: 0 2px 6px rgba(12, 1, 6, 0.45);
-  color: var(--velvet-deep);
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, -50%) scale(0.5);
@@ -882,11 +876,11 @@ body.is-storm::after {
   transform: translate(-50%, -50%);
 }
 
-.plot .plot-x svg {
-  position: static;
-  width: 58%;
-  height: 58%;
-  fill: currentColor;
+.plus-face.is-cross {
+  background: #d98a94;
+}
+
+.plus-face.is-cross svg {
   rotate: 45deg;
 }
 
@@ -952,13 +946,15 @@ body.is-storm::after {
 }
 
 @media (hover: hover) {
-  .plot[data-stage=""]:hover .plus-face {
+  .plot[data-stage=""]:hover .plus-face,
+  .plot.is-armed:hover .plus-face {
     box-shadow: 0 9px 14px rgba(12, 1, 6, 0.5);
     transform: translateY(-5px) scale(1.05);
   }
 }
 
-.plot[data-stage=""]:active .plus-face {
+.plot[data-stage=""]:active .plus-face,
+.plot.is-armed:active .plus-face {
   transform: scale(0.9);
   transition-duration: 0.12s;
 }

@@ -284,7 +284,7 @@ export class OrchardView {
       b.type = "button";
       const growth =
         '<span class="growth" hidden><img class="plant" alt="" draggable="false"><img class="plant plant-top" alt="" draggable="false"></span>';
-      b.innerHTML = `<img class="bed" alt="" draggable="false"><span class="plot-x" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9.6" y="3" width="4.8" height="18" rx="2.4"/><rect x="3" y="9.6" width="18" height="4.8" rx="2.4"/></svg></span><span class="plot-marker" aria-hidden="true"><span class="plus-face"><svg class="plus-mark" viewBox="0 0 24 24"><rect x="9.6" y="3" width="4.8" height="18" rx="2.4"/><rect x="3" y="9.6" width="18" height="4.8" rx="2.4"/></svg></span></span>${growth}${growth}<svg viewBox="0 0 60 60" aria-hidden="true"></svg><span class="plot-ring"></span><span class="plot-label" aria-hidden="true"></span>`;
+      b.innerHTML = `<img class="bed" alt="" draggable="false"><span class="plot-x" aria-hidden="true"><span class="plus-face is-cross"><svg viewBox="0 0 24 24"><rect x="9.6" y="3" width="4.8" height="18" rx="2.4"/><rect x="3" y="9.6" width="18" height="4.8" rx="2.4"/></svg></span></span><span class="plot-marker" aria-hidden="true"><span class="plus-face"><svg class="plus-mark" viewBox="0 0 24 24"><rect x="9.6" y="3" width="4.8" height="18" rx="2.4"/><rect x="3" y="9.6" width="18" height="4.8" rx="2.4"/></svg></span></span>${growth}${growth}<svg viewBox="0 0 60 60" aria-hidden="true"></svg><span class="plot-ring"></span><span class="plot-label" aria-hidden="true"></span>`;
       const bed = b.querySelector(".bed");
       renders.bed(index % VARIANTS, (url) => {
         bed.src = url;
