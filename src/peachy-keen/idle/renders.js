@@ -29,6 +29,20 @@ import {
 } from "three";
 import { RIPE, ROTTEN, SEEDS } from "./data/orchard";
 
+export const PICKED = "picked";
+
+const OTHERWORLDLY = ["ghost", "cosmic"];
+
+export function blossomColor(seed) {
+  return new Color(0xffffff).lerp(
+    new Color(0xffa8c0).lerp(
+      new Color(seed.color),
+      OTHERWORLDLY.includes(seed.shape) ? 0.9 : 0.5,
+    ),
+    0.7,
+  );
+}
+
 const PLANT_SIZE = 320;
 const ICON_SIZE = 96;
 const PER_FRAME = 2;
@@ -120,6 +134,76 @@ function canopyRadius(centre, lobes, reach) {
     }
     return lo;
   };
+}
+
+function flowerGeometry() {
+  const steps = 90;
+  const rings = [0, 0.18, 0.5, 0.82, 1];
+  const shades = [
+    [1, 0.9, 0.62],
+    [0.7, 0.62, 0.66],
+    [0.86, 0.84, 0.85],
+    [0.97, 0.97, 0.97],
+    [1, 1, 1],
+  ];
+  const edge = (a) => {
+    const t = ((a / (Math.PI * 2)) * 5) % 1;
+    const notch = 0.14 * Math.exp(-(((t - 0.5) / 0.07) ** 2));
+    return 0.3 + 0.7 * Math.sin(Math.PI * t) ** 0.6 - notch;
+  };
+  const positions = [];
+  const colors = [];
+  const index = [];
+  rings.forEach((f, ring) => {
+    const count = ring === 0 ? 1 : steps;
+    for (let i = 0; i < count; i += 1) {
+      const a = (i / steps) * Math.PI * 2;
+      const r = edge(a) * f;
+      positions.push(r * Math.cos(a), r * Math.sin(a), 0.3 * f * f);
+      colors.push(...shades[ring]);
+    }
+  });
+  const at = (ring, i) =>
+    ring === 0 ? 0 : 1 + (ring - 1) * steps + (i % steps);
+  for (let ring = 1; ring < rings.length; ring += 1)
+    for (let i = 0; i < steps; i += 1) {
+      if (ring === 1) index.push(0, at(1, i), at(1, i + 1));
+      else {
+        index.push(at(ring - 1, i), at(ring, i), at(ring, i + 1));
+        index.push(at(ring - 1, i), at(ring, i + 1), at(ring - 1, i + 1));
+      }
+    }
+  const g = new BufferGeometry();
+  g.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  g.setAttribute("color", new Float32BufferAttribute(colors, 3));
+  g.setIndex(index);
+  g.computeVertexNormals();
+  return g;
+}
+
+function blossomSpots(geometry, centre, reach, rand) {
+  const p = geometry.attributes.position;
+  const a = new Vector3();
+  const b = new Vector3();
+  const c = new Vector3();
+  const faces = [];
+  for (let i = 0; i < p.count; i += 3) {
+    a.fromBufferAttribute(p, i);
+    b.fromBufferAttribute(p, i + 1);
+    c.fromBufferAttribute(p, i + 2);
+    const at = a.clone().add(b).add(c).divideScalar(3);
+    const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+    if (normal.z > 0.5 && at.y > centre.y - reach * 0.55)
+      faces.push({ at, normal, order: rand() });
+  }
+  faces.sort((x, y) => x.order - y.order);
+  const gap = reach * 0.34;
+  const picked = [];
+  faces.forEach((f) => {
+    if (picked.length < 20 && picked.every((q) => q.at.distanceTo(f.at) > gap))
+      picked.push(f);
+  });
+  return picked;
 }
 
 function canopyGeometry(lobes, rand, centre, reach) {
@@ -267,27 +351,11 @@ export class Renders {
         vertexColors: true,
       }),
       blade: new ConeGeometry(0.016, 0.1, 3),
-      bloom: new MeshPhysicalMaterial({
-        color: 0xffc2d6,
-        vertexColors: true,
-        flatShading: true,
-        roughness: 0.8,
-        sheen: 0.4,
-        sheenRoughness: 0.5,
-        sheenColor: new Color(0xffffff),
-      }),
       withered: new MeshPhysicalMaterial({
         color: 0x7a5a30,
         vertexColors: true,
         flatShading: true,
         roughness: 0.95,
-      }),
-      unripe: new MeshPhysicalMaterial({
-        flatShading: true,
-        color: 0x9cc25a,
-        roughness: 0.5,
-        sheen: 0.6,
-        sheenColor: new Color(0xe6f2a8),
       }),
       pit: new MeshPhysicalMaterial({
         roughness: 0.7,
@@ -317,6 +385,13 @@ export class Renders {
     );
     leaves.setColorAt(0, new Color());
     group.add(leaves);
+    const flowers = new InstancedMesh(
+      this.shared.sphere,
+      this.seedMaterials(SEEDS[0]).flower,
+      1,
+    );
+    flowers.setColorAt(0, new Color());
+    group.add(flowers);
     const r = this.renderer;
     const previous = r.getRenderTarget();
     const shadows = r.shadowMap.enabled;
@@ -471,7 +546,25 @@ export class Renders {
         sheenColor: leaf.clone().lerp(new Color(0xfff2b8), 0.5),
         side: DoubleSide,
       }),
-      leafColor: leaf,
+      leafColor: leaf.clone().multiplyScalar(0.82),
+      unripe: new MeshPhysicalMaterial({
+        flatShading: true,
+        color: new Color(0x9cc25a).lerp(
+          fruit,
+          OTHERWORLDLY.includes(shape) ? 0.6 : 0.12,
+        ),
+        roughness: 0.5,
+        sheen: 0.6,
+        sheenColor: new Color(0xe6f2a8),
+      }),
+      flower: new MeshPhysicalMaterial({
+        color: blossomColor(seed),
+        vertexColors: true,
+        roughness: 0.7,
+        emissive: 0xffd6e0,
+        emissiveIntensity: 0.1,
+        side: DoubleSide,
+      }),
       canopy: new MeshPhysicalMaterial({
         color: leaf,
         vertexColors: true,
@@ -483,7 +576,6 @@ export class Renders {
       }),
       fruit: new MeshPhysicalMaterial({
         flatShading: true,
-        color: fruit,
         roughness: shape === "shiny" ? 0.18 : 0.5,
         clearcoat: shape === "shiny" ? 1 : 0,
         sheen: shape === "shiny" ? 0 : 1,
@@ -511,7 +603,7 @@ export class Renders {
     const p = g.attributes.position;
     const colors = [];
     const base = new Color(seed.color);
-    const blush = base.clone().lerp(new Color(0xc81838), 0.75);
+    const blush = base.clone().lerp(new Color(0xc81838), 0.6);
     const ghost = seed.shape === "ghost" || seed.shape === "cosmic";
     for (let i = 0; i < p.count; i += 1) {
       const x = p.getX(i);
@@ -716,8 +808,9 @@ export class Renders {
     });
     shade.scale.set(reach * 3.4, reach * 2.2, 1);
 
-    const canopy = dead ? s.withered : bloom ? s.bloom : m.canopy;
-    top.add(new Mesh(canopyGeometry(lobes, rand, centre, reach), canopy));
+    const canopy = dead ? s.withered : m.canopy;
+    const leafy = canopyGeometry(lobes, rand, centre, reach);
+    top.add(new Mesh(leafy, canopy));
 
     if (dead) {
       [-0.5, 0.58].forEach((x) => {
@@ -728,26 +821,77 @@ export class Renders {
       });
       return { base: group, top, pivot: fork };
     }
-    if (young || bloom) return { base: group, top, pivot: fork };
+    if (young || stage === PICKED) return { base: group, top, pivot: fork };
+
+    const spots = (count, scale, lift) => {
+      const turn = rand() * Math.PI * 2;
+      return Array.from({ length: count }, (_, n) => {
+        const a = turn + n * 2.39996 + (rand() - 0.5) * 0.3;
+        const r = Math.sqrt((n + 0.5) / count) * (0.92 + rand() * 0.08);
+        const dir = new Vector3(
+          Math.cos(a) * r * 0.85,
+          Math.sin(a) * r * 0.62 - 0.04,
+          0.85,
+        ).normalize();
+        const size = reach * scale * (0.9 + rand() * 0.2);
+        const at = centre
+          .clone()
+          .addScaledVector(dir, surface(dir) + size * lift);
+        return { at, size };
+      });
+    };
+
+    if (bloom) {
+      const blooms = [];
+      blossomSpots(leafy, centre, reach, rand).forEach(({ at, normal }) => {
+        const across = new Vector3().crossVectors(normal, UP);
+        if (across.lengthSq() < 1e-4) across.set(1, 0, 0);
+        across.normalize();
+        const along = new Vector3().crossVectors(normal, across);
+        const count = 1 + Math.floor(rand() * 3);
+        for (let n = 0; n < count; n += 1) {
+          const size = reach * (n === 0 ? 0.2 : 0.12 + rand() * 0.05);
+          const turn = rand() * Math.PI * 2;
+          const offset = n === 0 ? 0 : reach * 0.16;
+          blooms.push({
+            at: at
+              .clone()
+              .addScaledVector(across, Math.cos(turn) * offset)
+              .addScaledVector(along, Math.sin(turn) * offset)
+              .addScaledVector(normal, reach * (0.02 + n * 0.012)),
+            normal,
+            size,
+          });
+        }
+      });
+      const flowers = new InstancedMesh(
+        flowerGeometry(),
+        m.flower,
+        blooms.length,
+      );
+      const dummy = new Object3D();
+      const tint = new Color();
+      blooms.forEach(({ at, normal, size }, i) => {
+        dummy.position.copy(at);
+        dummy.lookAt(at.clone().add(normal));
+        dummy.rotateZ(rand() * 6);
+        dummy.scale.setScalar(size);
+        dummy.updateMatrix();
+        flowers.setMatrixAt(i, dummy.matrix);
+        flowers.setColorAt(
+          i,
+          tint.setRGB(1, 0.94 + rand() * 0.06, 0.95 + rand() * 0.05),
+        );
+      });
+      top.add(flowers);
+      return { base: group, top, pivot: fork };
+    }
 
     const geometry = this.peachGeometry(
       ripe ? seed : { ...seed, shape: "round" },
     );
-    const count = ripe ? 5 : 6;
-    const turn = rand() * Math.PI * 2;
-    for (let n = 0; n < count; n += 1) {
-      const a = turn + n * 2.39996 + (rand() - 0.5) * 0.3;
-      const r = Math.sqrt((n + 0.5) / count) * (0.92 + rand() * 0.08);
-      const dir = new Vector3(
-        Math.cos(a) * r * 0.85,
-        Math.sin(a) * r * 0.62 - 0.04,
-        0.85,
-      ).normalize();
-      const size = reach * (ripe ? 0.2 : 0.11) * (0.9 + rand() * 0.2);
-      const at = centre
-        .clone()
-        .addScaledVector(dir, surface(dir) + size * 0.55);
-      const f = new Mesh(geometry, ripe ? m.fruit : s.unripe);
+    spots(ripe ? 5 : 6, ripe ? 0.2 : 0.11, 0.55).forEach(({ at, size }) => {
+      const f = new Mesh(geometry, ripe ? m.fruit : m.unripe);
       f.scale.setScalar(size);
       f.position.copy(at);
       f.rotation.set(0.2, 0.6 + rand() * 0.4, (rand() - 0.5) * 0.4);
@@ -759,7 +903,7 @@ export class Renders {
         ring.rotation.set(1.25, 0, 0.25);
         top.add(ring);
       }
-    }
+    });
     return { base: group, top, pivot: fork };
   }
 

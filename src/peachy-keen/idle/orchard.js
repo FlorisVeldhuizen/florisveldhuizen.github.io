@@ -58,7 +58,16 @@ export class Orchard {
       stage < RIPE
         ? ((1 - p) * seed.grow) / growth
         : ((1 + RIPE_FOR - p) * seed.grow) / growth;
-    return { seed, stage, name: STAGES[stage], progress: Math.min(1, p), left };
+    const from = STAGE_AT[stage - 1] ?? 0;
+    const within = stage < RIPE ? (p - from) / (STAGE_AT[stage] - from) : 1;
+    return {
+      seed,
+      stage,
+      name: STAGES[stage],
+      progress: Math.min(1, p),
+      within,
+      left,
+    };
   }
 
   update(dt) {
