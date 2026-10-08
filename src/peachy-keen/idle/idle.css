@@ -1003,6 +1003,18 @@ body.is-storm::after {
     0 0 18px rgba(255, 168, 119, 0.35);
 }
 
+.plot.is-drop-blocked {
+  border-color: rgba(217, 138, 148, 0.8);
+}
+
+.plot.is-drop-blocked .growth {
+  filter: grayscale(0.6) brightness(0.6);
+}
+
+.is-dragging-seed .plots.can-plant .plot[data-stage=""] {
+  border-color: rgba(255, 168, 119, 0.45);
+}
+
 .seed-ghost {
   position: fixed;
   top: 0;
@@ -1016,6 +1028,14 @@ body.is-storm::after {
   background: var(--seed);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
   pointer-events: none;
+  transition:
+    filter 0.2s ease,
+    scale 0.2s ease;
+}
+
+.seed-ghost.is-blocked {
+  filter: grayscale(0.8) brightness(0.8);
+  scale: 0.8;
 }
 
 .seed-ghost.is-3d {
