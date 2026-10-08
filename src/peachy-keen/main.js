@@ -36,7 +36,7 @@ const introTitle = new IntroTitle(document.getElementById("intro-title"));
 const introStatus = document.getElementById("intro-status");
 const modeName = (picked) => (picked === "idle" ? "Idle" : "Classic");
 // eslint-disable-next-line no-use-before-define
-const readyText = () => `Ripe. Tap the peach to play ${modeName(mode)}.`;
+const readyText = () => `Tap the peach to play ${modeName(mode)}.`;
 const openingText = (picked) =>
   picked === "idle" ? "Opening the shop" : "Opening Classic";
 
