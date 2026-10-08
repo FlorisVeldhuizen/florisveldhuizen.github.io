@@ -1,6 +1,7 @@
+import { Color } from "three";
 import { SEEDS, SEED_BY_ID, RIPE, ROTTEN } from "../data/orchard";
-import { plantFx, petalShower } from "./plant";
-import { renders, PICKED } from "../renders";
+import { plantFx, petalShower, soilPuff } from "./plant";
+import { renders, PICKED, blossomColor } from "../renders";
 
 const VARIANTS = 5;
 import { el, setDetail, setText, toggle } from "../dom";
@@ -79,19 +80,31 @@ function plantSize(info) {
   return range[0] + (range[1] - range[0]) * Math.min(1, info.within);
 }
 
-function shedPetals(button, leaves = false) {
+function burst(button, html, life) {
   if (calm.matches) return;
-  const shower = el("span", "petal-shower", button, petalShower(leaves));
-  setTimeout(() => shower.remove(), 2600);
+  const node = el("span", "plot-burst", button, html);
+  setTimeout(() => node.remove(), life);
+}
+
+const shade = (hex, by) =>
+  `#${new Color(hex).multiplyScalar(by).getHexString()}`;
+
+function shedPetals(button, seed) {
+  const petal = `#${blossomColor(seed).getHexString()}`;
+  burst(button, petalShower([petal, shade(petal, 0.92)]), 2600);
+}
+
+function shedLeaves(button, seed) {
+  burst(button, petalShower([seed.leaf, shade(seed.leaf, 0.78)]), 2600);
 }
 
 const resting = new Map();
 
-function rest(button, harvested) {
+function rest(button, seed, harvested) {
   clearTimeout(resting.get(button));
   toggle(button, "is-resting", true);
   toggle(button, "was-ripe", harvested);
-  if (harvested) shedPetals(button, true);
+  if (harvested) shedLeaves(button, seed);
   resting.set(
     button,
     setTimeout(() => {
@@ -295,6 +308,17 @@ export class OrchardView {
       const info = this.orchard.describe(index);
       if (info.stage < RIPE && !this.plots[index].confirm) {
         this.arm(index, true);
+        if (!calm.matches)
+          this.plots[index].shown?.animate(
+            [
+              { rotate: "0deg" },
+              { rotate: "-3deg" },
+              { rotate: "2.5deg" },
+              { rotate: "-1deg" },
+              { rotate: "0deg" },
+            ],
+            { duration: 420, easing: "ease-in-out" },
+          );
         setDetail(this.info, info.seed.name, [
           `It isn't ripe yet. ${press()} again to dig it up.`,
         ]);
@@ -440,13 +464,17 @@ export class OrchardView {
         p.key = key;
         p.svg.innerHTML = info ? plantFx(info.stage) : "";
         if (!first && p.button.dataset.stage === "3" && info?.stage === 4)
-          shedPetals(p.button);
+          shedPetals(p.button, info.seed);
+        if (!first && !p.button.dataset.stage && info?.stage === 0)
+          burst(p.button, soilPuff(), 900);
+        // eslint-disable-next-line no-param-reassign
+        if (info) p.seed = info.seed;
         if (!info) {
           const harvested = p.button.dataset.stage === "5";
           if (harvested && p.shown && p.picked) showPlant(p.shown, p.picked);
           if (p.shown)
             animate(p.shown, harvested ? "is-harvested" : "is-cleared", true);
-          if (!first) rest(p.button, harvested);
+          if (!first) rest(p.button, p.seed, harvested);
           // eslint-disable-next-line no-param-reassign
           p.shown = null;
         } else

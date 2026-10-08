@@ -31,6 +31,18 @@ import { RIPE, ROTTEN, SEEDS } from "./data/orchard";
 
 export const PICKED = "picked";
 
+const OTHERWORLDLY = ["ghost", "cosmic"];
+
+export function blossomColor(seed) {
+  return new Color(0xffffff).lerp(
+    new Color(0xffa8c0).lerp(
+      new Color(seed.color),
+      OTHERWORLDLY.includes(seed.shape) ? 0.9 : 0.5,
+    ),
+    0.7,
+  );
+}
+
 const PLANT_SIZE = 320;
 const ICON_SIZE = 96;
 const PER_FRAME = 2;
@@ -128,10 +140,10 @@ function flowerGeometry() {
   const steps = 90;
   const rings = [0, 0.18, 0.5, 0.82, 1];
   const shades = [
-    [1, 0.88, 0.62],
-    [0.82, 0.32, 0.5],
-    [1, 0.7, 0.8],
-    [1, 0.95, 0.96],
+    [1, 0.9, 0.62],
+    [0.7, 0.62, 0.66],
+    [0.86, 0.84, 0.85],
+    [0.97, 0.97, 0.97],
     [1, 1, 1],
   ];
   const edge = (a) => {
@@ -345,13 +357,6 @@ export class Renders {
         flatShading: true,
         roughness: 0.95,
       }),
-      unripe: new MeshPhysicalMaterial({
-        flatShading: true,
-        color: 0x9cc25a,
-        roughness: 0.5,
-        sheen: 0.6,
-        sheenColor: new Color(0xe6f2a8),
-      }),
       pit: new MeshPhysicalMaterial({
         roughness: 0.7,
         clearcoat: 0.3,
@@ -542,11 +547,18 @@ export class Renders {
         side: DoubleSide,
       }),
       leafColor: leaf.clone().multiplyScalar(0.82),
-      flower: new MeshPhysicalMaterial({
-        color: new Color(0xffffff).lerp(
-          new Color(0xffb8cc).lerp(fruit, 0.3),
-          0.4,
+      unripe: new MeshPhysicalMaterial({
+        flatShading: true,
+        color: new Color(0x9cc25a).lerp(
+          fruit,
+          OTHERWORLDLY.includes(shape) ? 0.6 : 0.12,
         ),
+        roughness: 0.5,
+        sheen: 0.6,
+        sheenColor: new Color(0xe6f2a8),
+      }),
+      flower: new MeshPhysicalMaterial({
+        color: blossomColor(seed),
         vertexColors: true,
         roughness: 0.7,
         emissive: 0xffd6e0,
@@ -879,7 +891,7 @@ export class Renders {
       ripe ? seed : { ...seed, shape: "round" },
     );
     spots(ripe ? 5 : 6, ripe ? 0.2 : 0.11, 0.55).forEach(({ at, size }) => {
-      const f = new Mesh(geometry, ripe ? m.fruit : s.unripe);
+      const f = new Mesh(geometry, ripe ? m.fruit : m.unripe);
       f.scale.setScalar(size);
       f.position.copy(at);
       f.rotation.set(0.2, 0.6 + rand() * 0.4, (rand() - 0.5) * 0.4);
