@@ -176,8 +176,8 @@ export class OptionsView {
     setInterval(() => {
       if (!endless) return;
       const s = game.state;
-      s.juice = Math.max(s.juice, 1e30);
-      s.juiceTotal = Math.max(s.juiceTotal, 1e30);
+      s.juice = Math.max(s.juice, 1e100);
+      s.juiceTotal = Math.max(s.juiceTotal, 1e100);
     }, 250);
     actionRow(box, "Every helper", "Own one each", () => {
       HELPERS.forEach((h) => {
