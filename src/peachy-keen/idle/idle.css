@@ -725,14 +725,14 @@ body.is-storm::after {
   width: 0.59em;
   height: 0.86em;
   margin-left: 0.3em;
-  vertical-align: -0.04em;
+  vertical-align: -0.08em;
   opacity: 0.55;
   transition: opacity 0.15s ease;
 }
 
 .row-price .drop-icon {
   margin-left: 0.38em;
-  vertical-align: 0.02em;
+  vertical-align: -0.06em;
 }
 
 .row.is-affordable .drop-icon {
