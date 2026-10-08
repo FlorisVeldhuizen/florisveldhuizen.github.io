@@ -153,5 +153,10 @@ export const STAGES = [
   "Ripe",
   "Rotten",
 ];
+export const BUTTERFLY_HARVESTS = [0, 10, 100];
+export const butterflySlots = (state) =>
+  state.seen.butterflies
+    ? BUTTERFLY_HARVESTS.filter((n) => state.stats.harvests >= n).length
+    : 0;
 export const RIPE = 5;
 export const ROTTEN = 6;

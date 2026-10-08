@@ -21,6 +21,7 @@ export const BUFFS = {
   sweet: { name: "Sweet rot ×21", about: "All juice ×21", seconds: 15 },
   sour: { name: "Sour ×½", about: "All juice ×½", seconds: 60 },
   numb: { name: "Numb", about: "Smacks earn nothing", seconds: 10 },
+  ferment: { name: "Fermented ×77", about: "All juice ×77", seconds: 7 },
 };
 
 export function nectarFor(juiceTotal, gain = 1) {
@@ -38,7 +39,8 @@ function activeEffects(state, now, toys) {
   });
   state.upgrades.forEach((id) => {
     const u = UPGRADE_BY_ID[id];
-    if (u) effects.push(...u.effects);
+    if (u && !(u.group === "overripe" && state.options.freshCrate))
+      effects.push(...u.effects);
   });
   state.tree.forEach((id) => {
     const n = TREE_BY_ID[id];
@@ -109,6 +111,7 @@ export function buildModel(state, now = Date.now(), toys = []) {
     dare: state.dares.active,
     buzz: 0,
     edged: 1,
+    bruise: 0,
   };
   HELPERS.forEach((h) => {
     m.helperMult[h.id] = 1;
@@ -261,6 +264,9 @@ export function buildModel(state, now = Date.now(), toys = []) {
       case "unlock":
         m.unlocks.add(e.what);
         break;
+      case "bruise":
+        m.bruise = Math.max(m.bruise, e.chance);
+        break;
       default:
     }
   });
@@ -312,6 +318,7 @@ export function liveRate(m, state, { heat = 0, oil = 0 }, now = Date.now()) {
   if (buffActive(state, "frenzy", now)) rate *= 7;
   if (buffActive(state, "crave", now)) rate *= 3;
   if (buffActive(state, "sweet", now)) rate *= 21;
+  if (buffActive(state, "ferment", now)) rate *= 77;
   if (buffActive(state, "sour", now)) rate *= 0.5;
   const show = buffActive(state, "showcase", now);
   if (show) rate += m.totals[show.helper] * show.power;
@@ -330,6 +337,7 @@ export function smackValue(m, state, live, hit, now = Date.now()) {
   if (buffActive(state, "frenzy", now)) value *= 7;
   if (buffActive(state, "crave", now)) value *= 3;
   if (buffActive(state, "sweet", now)) value *= 21;
+  if (buffActive(state, "ferment", now)) value *= 77;
   if (buffActive(state, "sour", now)) value *= 0.5;
   if (buffActive(state, "numb", now)) return 0;
   if (buffActive(state, "storm", now)) value *= 777;

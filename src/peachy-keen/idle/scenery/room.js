@@ -41,6 +41,8 @@ import {
 } from "./shapes";
 import { Toucher } from "./touches";
 import { Paddles } from "./paddle";
+import Extras from "./extras";
+import Sippers from "./sippers";
 import { glowingJuiceMaterial } from "../../juice";
 import { OilDrips } from "./oil";
 import { moonMesh, setMoonPhase, ShootingStars, usePeachShape } from "./sky";
@@ -216,6 +218,7 @@ export class Room {
     backdrop,
     mood,
     renderer,
+    world,
   ) {
     Object.assign(this, {
       game,
@@ -231,6 +234,18 @@ export class Room {
     scene.add(this.group);
     this.group.matrixAutoUpdate = false;
     this.paddles = new Paddles(game, interaction, this.toucher, this.group);
+    this.extras = new Extras({
+      ...world,
+      game,
+      interaction,
+      room: this,
+      scene,
+      camera,
+      renderer,
+      backdrop,
+      mood,
+    });
+    this.sippers = new Sippers(this.extras.world);
     this.time = 0;
     this.shown = {};
     this.dummy = new Object3D();
@@ -461,6 +476,8 @@ export class Room {
           blending: AdditiveBlending,
           depthWrite: false,
           side: DoubleSide,
+          // Additive blending ignores draw order, and two passes would rebuild the shader state every frame.
+          forceSinglePass: true,
         }),
       );
       ray.position.set(-1.5 + n, 5, -1.5);
@@ -502,6 +519,8 @@ export class Room {
   }
 
   silence() {
+    this.extras.clear();
+    this.sippers.clear();
     setChoir(0);
     setChant(0);
     this.backdrop.setLens(0.5, 0.5, 0);
@@ -953,7 +972,7 @@ export class Room {
   }
 
   coachBeat(delta, owned) {
-    const i = this.i;
+    const { i } = this;
     if (!owned || i.phase !== "live") return;
     const disco = i.settings.disco ? discoBeat() : null;
     let hit = false;
@@ -1018,7 +1037,7 @@ export class Room {
   }
 
   kneadPeach(delta, owned) {
-    const i = this.i;
+    const { i } = this;
     const { peach } = i;
     const busy =
       i.grab ||
@@ -1515,7 +1534,7 @@ export class Room {
     }
     this.time += delta;
     const t = this.time;
-    const i = this.i;
+    const { i } = this;
     const still = reducedMotion.matches ? 0.15 : 1;
     const own = (id) => helpers[id] || 0;
     const center = this.followPeach(delta);
@@ -1535,6 +1554,8 @@ export class Room {
         else this.toucher.touch(id, this.toucher.randomHit());
       });
     this.paddles.update(delta);
+    this.extras.update(delta);
+    this.sippers.update(delta);
 
     this.drift(
       this.feathers,

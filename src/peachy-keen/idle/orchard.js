@@ -5,10 +5,13 @@ import {
   STAGES,
   RIPE,
   ROTTEN,
+  BUTTERFLY_HARVESTS,
+  butterflySlots,
 } from "./data/orchard";
 
 const TICK = 5;
 const STAGE_AT = [0.12, 0.3, 0.5, 0.75, 1];
+const BLOSSOM = STAGES.indexOf("Blossom");
 
 export class Orchard {
   constructor(game) {
@@ -25,7 +28,7 @@ export class Orchard {
   }
 
   fit() {
-    const plots = this.data.plots;
+    const { plots } = this.data;
     const count = this.size * this.size;
     while (plots.length < count) plots.push(null);
   }
@@ -50,7 +53,7 @@ export class Orchard {
     const seed = SEED_BY_ID[plot.seed];
     const stage = this.stage(plot, now);
     const p = this.progress(plot, now);
-    const growth = this.game.model.growth;
+    const { growth } = this.game.model;
     const left =
       stage < RIPE
         ? ((1 - p) * seed.grow) / growth
@@ -71,6 +74,17 @@ export class Orchard {
     this.fit();
     const now = Date.now();
     let changed = false;
+    if (
+      !s.seen.butterflies &&
+      s.stats.ripens > 0 &&
+      this.data.plots.some((plot) => {
+        const stage = this.stage(plot, now);
+        return stage >= BLOSSOM && stage < ROTTEN;
+      })
+    ) {
+      s.seen.butterflies = true;
+      this.game.emit("butterflies");
+    }
     this.data.plots.forEach((plot) => {
       if (plot && !plot.rotten && this.stage(plot, now) === ROTTEN) {
         // eslint-disable-next-line no-param-reassign
@@ -86,7 +100,7 @@ export class Orchard {
   }
 
   neighbours(index) {
-    const size = this.size;
+    const { size } = this;
     const x = index % size;
     const y = Math.floor(index / size);
     const found = [];
@@ -102,7 +116,7 @@ export class Orchard {
   }
 
   mutate(now) {
-    const plots = this.data.plots;
+    const { plots } = this.data;
     const boost = this.game.model.mutation;
     let changed = false;
     plots.forEach((plot, index) => {
@@ -165,7 +179,10 @@ export class Orchard {
     let reward = null;
     if (stage === RIPE) {
       reward = this.reward(SEED_BY_ID[plot.seed]);
-      this.game.state.stats.harvests += 1;
+      const s = this.game.state;
+      s.stats.harvests += 1;
+      if (s.seen.butterflies && BUTTERFLY_HARVESTS.includes(s.stats.harvests))
+        this.game.emit("butterfly-slot", butterflySlots(s));
     }
     this.game.refresh();
     this.game.emit("orchard");
@@ -173,7 +190,7 @@ export class Orchard {
   }
 
   reward(seed) {
-    const game = this.game;
+    const { game } = this;
     const s = game.state;
     const h = seed.harvest;
     if (h.kind === "juice") {

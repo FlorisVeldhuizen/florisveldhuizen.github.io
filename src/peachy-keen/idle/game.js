@@ -36,6 +36,7 @@ import {
 } from "./data/cravings";
 import { setNotation } from "./numbers";
 
+const TALK_GAP = 0.4;
 const AWAY_AFTER = 60;
 const RIPEN_READY = 0.5;
 const SAVE_EVERY = 15;
@@ -64,11 +65,13 @@ export class IdleGame {
       crave: between(CRAVE_EVERY),
     };
     this.craving = null;
+    this.talkQuiet = 0;
     this.pouring = false;
     this.pendingBurst = null;
     this.ripening = false;
     this.activeToys = [];
     this.buzzer = null;
+    this.sip = { share: 0, pot: 0 };
     this.lastTick = Date.now();
     this.refresh();
     setNotation(this.state.options.notation);
@@ -94,7 +97,7 @@ export class IdleGame {
   refresh() {
     this.model = buildModel(this.state, Date.now(), this.activeToys);
     const m = this.model;
-    const i = this.i;
+    const { i } = this;
     i.heatGain = m.heatGain;
     i.heatCap = m.heatCap;
     i.twerkAfter = 20 * m.twerkSooner;
@@ -229,7 +232,7 @@ export class IdleGame {
   advance(dt, now) {
     const s = this.state;
     const m = this.model;
-    const i = this.i;
+    const { i } = this;
     const live = i.phase === "live";
 
     if (m.dare === "dry") i.oil = 0;
@@ -241,7 +244,10 @@ export class IdleGame {
     this.live.heat = i.heat;
     this.live.oil = i.oil;
     this.rate = liveRate(m, s, this.live, now);
-    this.gain(this.rate * dt, "helpers");
+    const income = this.rate * dt;
+    const sipped = document.hidden ? 0 : income * this.sip.share;
+    this.sip.pot += sipped;
+    this.gain(income - sipped, "helpers");
 
     if (i.rubbing > 0 && live) {
       s.stats.rubSeconds += dt;
@@ -324,9 +330,11 @@ export class IdleGame {
     }
     const s = this.state;
     const m = this.model;
-    if (!live || m.handsOff || s.stats.bursts < 1) return;
+    if (!live || m.handsOff || s.stats.ripens < 1) return;
     this.timers.crave -= dt;
-    if (this.timers.crave > 0) return;
+    // A due craving waits until the peach has finished talking and its bubble has faded.
+    this.talkQuiet = this.i.talk.showing ? 0 : this.talkQuiet + dt;
+    if (this.timers.crave > 0 || this.talkQuiet < TALK_GAP) return;
     this.startCraving();
   }
 
@@ -544,7 +552,7 @@ export class IdleGame {
     Object.entries(this.model.start).forEach(([id, n]) => {
       this.setHelpers(id, Math.min(n, this.model.maxOwned));
     });
-    const i = this.i;
+    const { i } = this;
     if (i.phase === "live") {
       this.ripening = true;
       i.group.updateMatrixWorld(true);
@@ -660,6 +668,7 @@ export class IdleGame {
     const s = this.state;
     s.stats.bruises += 1;
     const effect = rollTable([
+      ["ferment", 4],
       ["sweet", 30],
       ["pits", 20],
       ["sour", 25],
@@ -667,9 +676,10 @@ export class IdleGame {
       ["numb", 10],
     ]);
     let result;
-    if (effect === "sweet") {
-      this.addBuff("sweet", BUFFS.sweet.seconds * this.model.goldenLength);
-      result = { effect, good: true, title: "Sweet rot!" };
+    if (effect === "sweet" || effect === "ferment") {
+      this.addBuff(effect, BUFFS[effect].seconds * this.model.goldenLength);
+      const title = effect === "sweet" ? "Sweet rot!" : "Fermented!";
+      result = { effect, good: true, title };
     } else if (effect === "pits") {
       const pits = 15 + Math.floor(Math.random() * 11);
       s.pits += pits;
@@ -690,6 +700,7 @@ export class IdleGame {
   setOption(key, value) {
     this.state.options[key] = value;
     if (key === "notation") setNotation(value);
+    if (key === "freshCrate") this.refresh();
     this.emit("change");
   }
 

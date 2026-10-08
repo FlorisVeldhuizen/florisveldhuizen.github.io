@@ -41,6 +41,13 @@ function context() {
   return ctx;
 }
 
+export const audioContext = context;
+
+export function audioMaster() {
+  context();
+  return master;
+}
+
 async function decode(url) {
   const response = await fetch(url);
   return context().decodeAudioData(await response.arrayBuffer());

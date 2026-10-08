@@ -37,6 +37,11 @@ export function createIdle({
   renderer,
   backdrop,
   mood,
+  lights,
+  wild,
+  lens,
+  juice,
+  droplets,
 }) {
   preparePage();
   interaction.ui.scoreboard = false;
@@ -79,6 +84,7 @@ export function createIdle({
     backdrop,
     mood,
     renderer,
+    { lights, wild, lens, juice, droplets, talk },
   );
   let style = null;
   const syncStyle = () => {
@@ -159,8 +165,25 @@ export function createIdle({
     playNotes([659, 880, 1109], { gap: 0.09, volume: 0.06 });
   });
   game.on("harvest", () => playNotes([523, 784], { gap: 0.06, volume: 0.06 }));
+  game.on("butterflies", () => {
+    popups.toast(
+      "Unlocked",
+      "Butterflies",
+      "Your blossoms draw butterflies. They sip juice; tap one to get it back with interest.",
+      "seed",
+    );
+  });
+  game.on("butterfly-slot", (slots) => {
+    popups.toast(
+      "Unlocked",
+      `${slots} butterflies`,
+      slots === 3
+        ? "Your orchard now draws three butterflies, and sometimes a rare Sunset morpho."
+        : "Your orchard now draws two butterflies at once.",
+      "seed",
+    );
+  });
   game.on("orchard-open", () => {
-    renders.warm();
     popups.toast(
       "Unlocked",
       "The Orchard",
@@ -292,10 +315,12 @@ export function createIdle({
     room,
     prepare() {
       golden.warmup(peach);
+      peach.prepareSkinFade();
     },
     ready() {
       renders.setup(renderer, scene.environment);
-      if (game.state.orchard.open) renders.warm();
+      // The first burst opens the orchard, so its shaders build now instead of mid-burst.
+      renders.warm();
       syncStyle();
       syncSkin();
       toys.sync();

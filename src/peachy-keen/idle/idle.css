@@ -135,11 +135,33 @@
 }
 
 .craving-talk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: linear-gradient(
     90deg,
     var(--blush) var(--left, 100%),
     var(--blush-dim) var(--left, 100%)
   );
+}
+
+.craving-talk.is-plain {
+  font-style: normal;
+}
+
+.craving-clock {
+  display: none;
+  flex: none;
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.craving-talk.is-asking .craving-clock {
+  display: block;
 }
 
 body::after {

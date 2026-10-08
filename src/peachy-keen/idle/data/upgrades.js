@@ -467,6 +467,44 @@ const PAIRS = [
   ],
 }));
 
+// Bruised peaches are opt-in: each step pays a clear bonus and makes more golden peaches come bruised.
+const OVERRIPE = [
+  {
+    id: "overripe-0",
+    name: "Let them overripen",
+    about:
+      "Golden peaches show up 25% more often. One in eight comes bruised: risky, sometimes very sweet.",
+    cost: 1e5,
+    unlock: (s) => s.stats.ripens >= 1,
+    effects: [
+      { kind: "goldenRate", mult: 1.25 },
+      { kind: "bruise", chance: 1 / 8 },
+    ],
+  },
+  {
+    id: "overripe-1",
+    name: "Soft spots",
+    about: "All helpers +15%. One in four golden peaches comes bruised.",
+    cost: 1e8,
+    unlock: (s) => s.stats.bruises >= 10,
+    effects: [
+      { kind: "helpersAll", mult: 1.15 },
+      { kind: "bruise", chance: 1 / 4 },
+    ],
+  },
+  {
+    id: "overripe-2",
+    name: "Rotten to the core",
+    about: "All helpers +30%. Half of all golden peaches come bruised.",
+    cost: 1e11,
+    unlock: (s) => s.stats.bruises >= 50,
+    effects: [
+      { kind: "helpersAll", mult: 1.3 },
+      { kind: "bruise", chance: 1 / 2 },
+    ],
+  },
+].map((u) => ({ group: "overripe", icon: "golden", ...u }));
+
 export const UPGRADES = [
   ...HANDS,
   ...tierUpgrades,
@@ -477,6 +515,7 @@ export const UPGRADES = [
   ...HEAT,
   ...PLAY,
   ...GOLDEN,
+  ...OVERRIPE,
   ...RECIPES,
   ...BLUSH,
   ...PAIRS,

@@ -35,7 +35,6 @@ const SPIN = 2;
 const KICK = 5;
 const ROCK = 0.5;
 const TAU = Math.PI * 2;
-const BRUISE_CHANCE = 1 / 8;
 const LOOKS = {
   golden: {
     base: new Color(0xffc94a),
@@ -76,6 +75,7 @@ const WIN_NOTES = [784, 988, 1175, 1568];
 const LOSE_NOTES = [659, 523, 440, 330];
 const BRUISE_TEXT = {
   sweet: () => "All juice ×21",
+  ferment: () => "All juice ×77",
   pits: (r) => `+${r.pits} pits`,
   sour: () => "All juice halved",
   spoil: (r) => `-${format(r.value)} juice`,
@@ -259,8 +259,7 @@ export class GoldenPeach {
   }
 
   spawn(kind) {
-    const bruised =
-      this.game.state.stats.ripens > 0 && Math.random() < BRUISE_CHANCE;
+    const bruised = Math.random() < this.game.model.bruise;
     this.paint(kind || (bruised ? "bruised" : "golden"));
     const rect = this.layout.stageRect();
     const i = this.i;

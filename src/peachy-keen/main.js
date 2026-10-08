@@ -465,6 +465,11 @@ async function prepareIdle() {
     renderer,
     backdrop,
     mood,
+    lights,
+    wild,
+    lens,
+    juice,
+    droplets,
   });
   naughty.set("achievements", false);
   idle.prepare();
