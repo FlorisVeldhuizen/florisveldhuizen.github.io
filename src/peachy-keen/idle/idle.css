@@ -1180,7 +1180,10 @@ body.is-storm::after {
 }
 
 .plot.is-drop-blocked {
-  border-color: rgba(217, 138, 148, 0.8);
+  border-color: #d98a94;
+  box-shadow:
+    0 0 0 1px #d98a94,
+    0 0 18px rgba(217, 138, 148, 0.3);
 }
 
 .plot.is-drop-blocked .growth {
@@ -1209,11 +1212,6 @@ body.is-storm::after {
     scale 0.2s ease;
 }
 
-.seed-ghost.is-blocked {
-  filter: grayscale(0.8) brightness(0.8);
-  scale: 0.8;
-}
-
 .seed-ghost.is-3d {
   width: 44px;
   height: 44px;
@@ -1223,6 +1221,12 @@ body.is-storm::after {
   box-shadow: none;
   filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5));
   scale: 1.1;
+}
+
+.seed-ghost.is-blocked {
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5)) saturate(0.6);
+  opacity: 0.9;
+  scale: 0.85;
 }
 
 .harvest-layer,
