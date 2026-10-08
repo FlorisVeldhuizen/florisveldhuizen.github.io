@@ -221,16 +221,42 @@ export class OrchardView {
       const node = document
         .elementFromPoint(e.clientX, e.clientY)
         ?.closest(".plot");
-      const index = this.plots.findIndex((p) => p.button === node);
-      return index >= 0 && !this.game.state.orchard.plots[index] ? index : -1;
+      return this.plots.findIndex((p) => p.button === node);
     };
+    const taken = (index) => Boolean(this.game.state.orchard.plots[index]);
     const mark = (index) => {
       if (index === target) return;
-      if (target >= 0)
-        toggle(this.plots[target].button, "is-drop-target", false);
+      if (target >= 0) {
+        const old = this.plots[target].button;
+        toggle(old, "is-drop-target", false);
+        toggle(old, "is-drop-blocked", false);
+      }
       target = index;
+      const blocked = target >= 0 && taken(target);
+      if (ghost) toggle(ghost, "is-blocked", blocked);
       if (target >= 0)
-        toggle(this.plots[target].button, "is-drop-target", true);
+        toggle(
+          this.plots[target].button,
+          blocked ? "is-drop-blocked" : "is-drop-target",
+          true,
+        );
+    };
+    const goHome = () => {
+      const home = button.getBoundingClientRect();
+      const node = ghost;
+      node
+        .animate(
+          [
+            {},
+            {
+              translate: `${home.left + home.width / 2}px ${home.top + home.height / 2}px`,
+              scale: 0.6,
+              opacity: 0,
+            },
+          ],
+          { duration: 320, easing: "cubic-bezier(0.4, 0, 0.6, 1)" },
+        )
+        .finished.then(() => node.remove());
     };
     const move = (e) => {
       if (e.pointerId !== pointerId) return;
@@ -259,12 +285,21 @@ export class OrchardView {
       if (!ghost) return;
       const drop = e.type === "pointerup" ? target : -1;
       mark(-1);
-      ghost.remove();
       document.body.classList.remove("is-dragging-seed");
+      if (drop >= 0 && !taken(drop)) ghost.remove();
+      else goHome();
+      if (drop >= 0 && taken(drop)) {
+        this.shake(drop);
+        this.notice = {
+          text: "That plot is taken. Drop the pit on an empty plot.",
+          until: Date.now() + 2600,
+        };
+        this.update();
+      }
       const swallow = (c) => c.stopImmediatePropagation();
       button.addEventListener("click", swallow, { capture: true, once: true });
       setTimeout(() => button.removeEventListener("click", swallow, true), 0);
-      if (drop >= 0) this.use(drop);
+      if (drop >= 0 && !taken(drop)) this.use(drop);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", end);
@@ -337,17 +372,7 @@ export class OrchardView {
       const info = this.orchard.describe(index);
       if (info.stage < RIPE && !this.plots[index].confirm) {
         this.arm(index, true);
-        if (!calm.matches)
-          this.plots[index].shown?.animate(
-            [
-              { rotate: "0deg" },
-              { rotate: "-3deg" },
-              { rotate: "2.5deg" },
-              { rotate: "-1deg" },
-              { rotate: "0deg" },
-            ],
-            { duration: 420, easing: "ease-in-out" },
-          );
+        this.shake(index);
         setDetail(this.info, info.seed.name, [
           `It isn't ripe yet. ${press()} again to dig it up.`,
         ]);
@@ -413,6 +438,20 @@ export class OrchardView {
     return orchard.plots.some(Boolean) || pits < cheapest ? 0 : "!";
   }
 
+  shake(index) {
+    if (calm.matches) return;
+    this.plots[index].shown?.animate(
+      [
+        { rotate: "0deg" },
+        { rotate: "-3deg" },
+        { rotate: "2.5deg" },
+        { rotate: "-1deg" },
+        { rotate: "0deg" },
+      ],
+      { duration: 420, easing: "ease-in-out" },
+    );
+  }
+
   showStep(now) {
     const { state } = this.game;
     const infos = state.orchard.plots.map((plot, index) =>
@@ -421,7 +460,10 @@ export class OrchardView {
     const seed = SEED_BY_ID[this.selected];
     let kind;
     let text;
-    if (infos.some((info) => info?.stage === RIPE)) {
+    if (this.notice && now < this.notice.until) {
+      kind = "notice";
+      ({ text } = this.notice);
+    } else if (infos.some((info) => info?.stage === RIPE)) {
       kind = "ripe";
       text = `A tree is ripe. ${press()} it to harvest before it rots.`;
     } else if (infos.includes(null) && state.pits >= seed.pits) {
