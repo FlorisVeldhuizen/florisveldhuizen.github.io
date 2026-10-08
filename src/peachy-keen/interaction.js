@@ -271,7 +271,7 @@ export class Interaction {
     };
 
     window.addEventListener("pointermove", (e) => {
-      p.present = !isUi(e);
+      p.present = !isUi(e) || e.target.closest(".golden") !== null;
       p.touch = e.pointerType !== "mouse";
       record(e);
     });
