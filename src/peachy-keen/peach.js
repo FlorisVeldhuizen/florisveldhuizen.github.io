@@ -1607,6 +1607,16 @@ export class Peach {
       customDepthMaterial: this.depthMaterial(this.uniforms),
     });
     this.mesh = mesh;
+    // Front faces draw first, so back faces behind them fail the depth test before the skin shader runs.
+    this.material.side = FrontSide;
+    this.material.shadowSide = DoubleSide;
+    const back = new Mesh(mesh.geometry, new MeshPhysicalMaterial());
+    back.renderOrder = 0.25;
+    back.receiveShadow = true;
+    back.raycast = () => {};
+    back.onBeforeRender = () => this.syncBack();
+    mesh.add(back);
+    this.back = back;
     this.fabric = new Mesh(mesh.geometry, this.fabricMaterial());
     this.fabric.visible = false;
     this.fabric.receiveShadow = true;
@@ -1620,6 +1630,21 @@ export class Peach {
     this.band.mesh.receiveShadow = true;
     mesh.add(this.band.mesh);
     this.group.add(model);
+  }
+
+  syncBack() {
+    const front = this.material;
+    const back = this.back.material;
+    const changed =
+      this.backVersion !== front.version ||
+      back.onBeforeCompile !== front.onBeforeCompile;
+    back.copy(front);
+    back.side = BackSide;
+    back.onBeforeCompile = front.onBeforeCompile;
+    if (changed) {
+      this.backVersion = front.version;
+      back.needsUpdate = true;
+    }
   }
 
   followSurface(material) {
@@ -2537,6 +2562,7 @@ export class Peach {
     uniforms.uSkinFade = { value: 0 };
     uniforms.uSkinFadeGlow = { value: new Color() };
     const material = this.material.clone();
+    material.side = DoubleSide;
     material.defines = { ...material.defines, SKIN_FADE: "" };
     material.onBeforeCompile = (shader) => {
       this.material.onBeforeCompile(shader);
