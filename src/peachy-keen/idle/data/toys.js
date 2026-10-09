@@ -30,7 +30,7 @@ export const TOYS = [
   {
     id: "lips",
     name: "Soft lips",
-    icon: "M3 12c3-4 6-5 9-3 3-2 6-1 9 3-3 4-6 5-9 5s-6-1-9-5zM3 12h18",
+    icon: "M2.5 12c2.6-3.4 5.2-5.3 7-4.6.9.4 1.6.6 2.5.6s1.6-.2 2.5-.6c1.8-.7 4.4 1.2 7 4.6-2.6 3.6-5.8 5.4-9.5 5.4S5.1 15.6 2.5 12zM2.5 12c3 .9 6.2 1.3 9.5 1.3s6.5-.4 9.5-1.3",
     about: "Swap your hand for lips. Kisses earn three times as much.",
     cost: 2000,
     setting: "tool",
@@ -56,7 +56,7 @@ export const TOYS = [
   {
     id: "buzz",
     name: "Good vibrations",
-    icon: "M9 3h6v12a3 3 0 0 1-6 0zM12 18v3M5 8 3 7M5 12H3M19 8l2-1M19 12h2",
+    icon: "M9.5 3.5h5v11a2.5 2.5 0 0 1-5 0zM12 17v4M9.5 8h5M5.5 7.5c-1.2 1.8-1.2 4.2 0 6M18.5 7.5c1.2 1.8 1.2 4.2 0 6",
     about: "A buzzing toy. Holding it on the peach earns juice and heat.",
     cost: 1e6,
     setting: "tool",
@@ -65,6 +65,20 @@ export const TOYS = [
     values: ["buzz"],
     unlock: (s) => s.juiceTotal >= 5e5,
     effects: [{ kind: "buzz", mult: 1 }],
+  },
+  {
+    id: "coins",
+    name: "Make it rain",
+    icon: "M4 8.5c0 2 3.6 3.6 8 3.6s8-1.6 8-3.6-3.6-3.6-8-3.6S4 6.5 4 8.5zM4 8.5v3c0 2 3.6 3.6 8 3.6s8-1.6 8-3.6v-3M4 11.5v3c0 2 3.6 3.6 8 3.6s8-1.6 8-3.6v-3",
+    about:
+      "Toss gold coins at the peach. Tap to flick one. Hold to make it rain.",
+    cost: 2e7,
+    setting: "tool",
+    on: "coins",
+    off: "hand",
+    values: ["coins"],
+    unlock: (s) => s.juiceTotal >= 1e7,
+    effects: [],
   },
   {
     id: "lingerie",
@@ -133,9 +147,10 @@ export const PICKERS = [
     label: "Tool",
     off: "hand",
     options: [
-      ["hand", "Hand"],
-      ["lips", "Lips"],
-      ["buzz", "Buzz"],
+      ["hand", "Hand", "Smack, rub and grab"],
+      ["lips", "Lips", "Tap or swipe to kiss"],
+      ["buzz", "Buzz", "Hold it on the peach"],
+      ["coins", "Coins", "Tap, flick or hold to rain"],
     ],
   },
   {

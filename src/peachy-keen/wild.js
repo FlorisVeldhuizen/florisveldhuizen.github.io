@@ -21,6 +21,7 @@ import {
   DISCO_FADE,
 } from "./audio";
 import { Buzzer } from "./toys";
+import { CoinToss } from "./coin-toss";
 import { reducedMotion } from "./util";
 
 const smooth = (t) => t * t * (3 - 2 * t);
@@ -317,9 +318,10 @@ class Disco {
 }
 
 export class Wild {
-  constructor({ scene, camera, interaction, talk, backdrop }) {
+  constructor({ scene, camera, renderer, interaction, talk, backdrop }) {
     Object.assign(this, { i: interaction, talk });
     this.buzzer = new Buzzer(interaction);
+    this.coins = new CoinToss({ scene, camera, renderer, interaction });
     this.disco = new Disco(scene, camera, interaction, talk, backdrop);
     this.tool = "hand";
   }
@@ -334,6 +336,7 @@ export class Wild {
 
   update(delta, realDelta) {
     this.buzzer.update(delta, this.tool === "buzz");
+    this.coins.update(delta, this.tool === "coins");
     this.disco.update(realDelta);
   }
 }

@@ -1,8 +1,10 @@
 import { TOYS, TOY_BY_ID, PICKERS } from "./data/toys";
 import { el, setText, sidePanel } from "./dom";
 import { iconSvg } from "./icons";
+import toolTrack from "./tool-track";
 
 const OPEN_KEY = "peachy-keen-free-toys";
+const LEAVE_WAIT = 2500;
 const PICKED = PICKERS.map((p) => p.key);
 
 function readOpen() {
@@ -54,29 +56,15 @@ export default class FreeToys {
     const owns = (id) => s.toys.includes(id);
     this.card.replaceChildren();
     this.controls = [];
-    this.modeRow();
     PICKERS.forEach((picker) => {
-      const options = picker.options.filter(
-        ([id]) => !TOY_BY_ID[id] || owns(id),
-      );
-      if (options.length < 2) return;
-      const row = el("div", "ft-pick", this.card);
-      el("span", "ft-label", row, picker.label);
-      const group = el("span", "segmented", row);
-      group.setAttribute("role", "group");
-      group.setAttribute("aria-label", picker.label);
-      options.forEach(([id, label]) => {
-        const b = el("button", "", group, label);
-        b.type = "button";
+      const track = toolTrack(this.card, picker, (id) => {
         const toy = TOY_BY_ID[id];
-        b.addEventListener("click", () =>
-          this.game.emit("toy-set", {
-            key: picker.key,
-            value: toy ? toy.on : picker.off,
-          }),
-        );
-        this.controls.push({ button: b, picker, id });
+        this.game.emit("toy-set", {
+          key: picker.key,
+          value: toy ? toy.on : picker.off,
+        });
       });
+      this.controls.push({ track, picker });
     });
     TOYS.filter(
       (t) => !t.cord && !PICKED.includes(t.setting) && owns(t.id),
@@ -95,21 +83,30 @@ export default class FreeToys {
         state: b.querySelector(".ft-state"),
       });
     });
+    this.leaveLink();
   }
 
-  modeRow() {
-    const row = el("div", "ft-pick ft-mode", this.card);
-    el("span", "ft-label", row, "Mode");
-    const group = el("span", "segmented", row);
-    group.setAttribute("role", "group");
-    group.setAttribute("aria-label", "Mode");
-    const standard = el("button", "", group, "Standard");
-    standard.type = "button";
-    standard.setAttribute("aria-pressed", "false");
-    standard.addEventListener("click", () => this.leave());
-    const free = el("button", "", group, "Free play");
-    free.type = "button";
-    free.setAttribute("aria-pressed", "true");
+  leaveLink() {
+    const foot = el("div", "ft-foot", this.card);
+    const link = el("button", "ft-leave", foot, "Leave free play");
+    link.type = "button";
+    let armed = null;
+    const disarm = () => {
+      clearTimeout(armed);
+      armed = null;
+      link.classList.remove("is-armed");
+      link.textContent = "Leave free play";
+    };
+    link.addEventListener("click", () => {
+      if (armed) {
+        disarm();
+        this.leave();
+        return;
+      }
+      link.classList.add("is-armed");
+      link.textContent = "Tap again to leave";
+      armed = setTimeout(disarm, LEAVE_WAIT);
+    });
   }
 
   update() {
@@ -119,17 +116,17 @@ export default class FreeToys {
       this.signature = signature;
       this.build();
     }
-    this.controls.forEach(({ button, picker, id, toy, state }) => {
-      let on;
-      if (picker) {
+    const owned = (id) => !TOY_BY_ID[id] || game.state.toys.includes(id);
+    this.controls.forEach(({ button, picker, track, toy, state }) => {
+      if (track) {
         const active = picker.options.find(([option]) =>
           game.activeToys.includes(option),
         );
-        on = active ? active[0] === id : id === picker.off;
-      } else {
-        on = game.activeToys.includes(toy.id);
-        setText(state, on ? "On" : "Off");
+        track.update(active ? active[0] : picker.off, owned);
+        return;
       }
+      const on = game.activeToys.includes(toy.id);
+      setText(state, on ? "On" : "Off");
       const pressed = String(on);
       if (button.getAttribute("aria-pressed") !== pressed)
         button.setAttribute("aria-pressed", pressed);

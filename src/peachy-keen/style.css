@@ -1032,6 +1032,12 @@ button:focus-visible {
   border-radius: 999px;
 }
 
+.cursor[data-tool="coins"] span {
+  border-width: 2px;
+  border-color: #ffcf5a;
+  background-color: rgba(255, 207, 90, 0.18);
+}
+
 .cursor[data-buzzing="true"] span {
   background-color: rgba(255, 95, 168, 0.3);
   box-shadow: 0 0 14px rgba(255, 95, 168, 0.6);
