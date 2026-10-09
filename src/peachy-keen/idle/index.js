@@ -363,6 +363,7 @@ export function createIdle({
     // 0 closed, 1 open, 2 open at full height.
     shop: () => (panel.open ? 1 + panel.root.classList.contains("is-full") : 0),
     room,
+    glow: golden.shine,
     lightStates() {
       const { state } = game;
       const states = [];

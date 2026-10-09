@@ -13,7 +13,7 @@ import {
   playBloop,
   playPat,
 } from "../../../audio";
-import { reducedMotion, warmedLights } from "../../../util";
+import { lightGroups, reducedMotion, warmedLights } from "../../../util";
 
 const UP = new Vector3(0, 1, 0.3).normalize();
 
@@ -203,8 +203,7 @@ export function makeContext(id, world, clock) {
       if (warming === 0) shownBeforeWarm = group.visible;
       warming += 1;
       group.visible = false;
-      const moodLights = [world.mood.candle, world.mood.halo];
-      const extra = [...moodLights, ...world.wild.disco.lights];
+      const extra = lightGroups.flat();
       const variants = [false, true].flatMap((shadows) =>
         [...warmedLights].map((lit) => [shadows, lit]),
       );
@@ -224,10 +223,12 @@ export function makeContext(id, world, clock) {
         });
         const wasShadows = renderer.shadowMap.enabled;
         renderer.shadowMap.enabled = shadows;
-        extra.forEach((l) => {
-          // eslint-disable-next-line no-param-reassign
-          l.visible = moodLights.includes(l) ? lit % 2 === 1 : lit >= 2;
-        });
+        lightGroups.forEach((members, n) =>
+          members.forEach((l) => {
+            // eslint-disable-next-line no-param-reassign
+            l.visible = Math.floor(lit / 2 ** n) % 2 === 1;
+          }),
+        );
         group.traverse(({ material }) => {
           [].concat(material ?? []).forEach((m) => {
             // eslint-disable-next-line no-param-reassign

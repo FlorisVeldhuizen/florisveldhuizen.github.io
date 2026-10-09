@@ -86,5 +86,9 @@ export const viewWidth = () => viewportWidth;
 
 export const sheet = { top: null, side: 0, moved: 0 };
 
-// Light combinations whose shaders are built: 1 = mood lights, 2 = disco lights, summed.
+// Lights that switch off together when unlit: mood lights, disco lights, the golden peach glow.
+export const lightGroups = [];
+// Light combinations whose shaders are built, one bit per light group.
 export const warmedLights = new Set();
+export const lightIndex = (shown) =>
+  shown.reduce((index, on, n) => index + (on ? 2 ** n : 0), 0);

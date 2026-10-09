@@ -17,6 +17,8 @@ import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import {
   reducedMotion,
   warmedLights,
+  lightGroups,
+  lightIndex,
   sheet,
   viewHeight,
   viewWidth,
@@ -350,10 +352,9 @@ function drawEverything() {
 }
 
 // Every lit pixel pays for each visible light, so lights that are off stay out of the shaders.
-const lightGroups = [[mood.candle, mood.halo], wild.disco.lights];
-const lightIndex = (shown) => (shown[0] ? 1 : 0) + (shown[1] ? 2 : 0);
+lightGroups.push([mood.candle, mood.halo], wild.disco.lights, []);
 // Each light combination is its own shader variant; unwarmed ones fall back to all lights on.
-const ALL_LIGHTS = [true, true];
+const ALL_LIGHTS = [true, true, true];
 let warmExtra = [];
 const showLights = (shown) =>
   lightGroups.forEach((members, n) =>
@@ -362,7 +363,7 @@ const showLights = (shown) =>
       light.visible = shown[n];
     }),
   );
-const lightsShown = [false, false];
+const lightsShown = [false, false, false];
 const showLitGroups = () => {
   lightGroups.forEach((members, n) => {
     lightsShown[n] = members.some((light) => light.intensity > 0);
@@ -398,7 +399,12 @@ async function warmLights(shown) {
 async function warm(extra = warmExtra) {
   warmExtra = extra;
   warmedLights.clear();
-  const states = [ALL_LIGHTS, [false, false], ...extra];
+  const unlit = [[false, false], ...extra];
+  const glow = lightGroups[2].length ? [false, true] : [false];
+  const states = [
+    ALL_LIGHTS,
+    ...glow.flatMap((g) => unlit.map(([m, d]) => [m, d, g])),
+  ];
   for (let n = 0; n < states.length; n += 1)
     // eslint-disable-next-line no-await-in-loop
     await warmLights(states[n]);
@@ -435,6 +441,7 @@ async function prepareIdle() {
     privacyTag,
   });
   naughty.set("achievements", false);
+  lightGroups[2].push(idle.glow);
   idle.prepare();
   await warm(idle.lightStates());
   await idle.warmFade(warm);
