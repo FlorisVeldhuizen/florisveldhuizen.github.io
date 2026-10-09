@@ -74,10 +74,7 @@ export class Privacy {
     this.shown = false;
     this.shopWasOpen = false;
     this.shopReturn = 0;
-    this.toys = new FreeToys(game, () => {
-      this.shopWasOpen = true;
-      this.set(false);
-    });
+    this.toys = new FreeToys(game, () => this.set(false));
     /* eslint-disable no-param-reassign */
     room.presence = (id) => this.presence(id);
     tag.pull = () => this.set(true);

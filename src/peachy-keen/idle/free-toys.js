@@ -26,9 +26,9 @@ function saveOpen(open) {
 }
 
 export default class FreeToys {
-  constructor(game, toShop) {
+  constructor(game, leave) {
     this.game = game;
-    this.toShop = toShop;
+    this.leave = leave;
     this.root = el("div", "ui free-toys", document.body);
     this.toggle = el("button", "ft-toggle", this.root, "Your toys");
     this.toggle.type = "button";
@@ -103,13 +103,13 @@ export default class FreeToys {
     const group = el("span", "segmented", row);
     group.setAttribute("role", "group");
     group.setAttribute("aria-label", "Mode");
+    const standard = el("button", "", group, "Standard");
+    standard.type = "button";
+    standard.setAttribute("aria-pressed", "false");
+    standard.addEventListener("click", () => this.leave());
     const free = el("button", "", group, "Free play");
     free.type = "button";
     free.setAttribute("aria-pressed", "true");
-    const shop = el("button", "", group, "Shop");
-    shop.type = "button";
-    shop.setAttribute("aria-pressed", "false");
-    shop.addEventListener("click", () => this.toShop());
   }
 
   update() {

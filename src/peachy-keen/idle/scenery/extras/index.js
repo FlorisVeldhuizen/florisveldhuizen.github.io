@@ -20,7 +20,7 @@ export default class Extras {
     setExtrasSound(!!options.castSound);
     MODULES.forEach((fx) => {
       const owned = helpers[fx.id] || 0;
-      // In free play a helper is built and kept hidden and paused; building it on return would stall the frame.
+      // In free play a helper stays built but hidden and starts nothing new; what it already started, like a flash, fades out.
       const away = this.world.room.presence(fx.id) === 0;
       let run = this.runs[fx.id];
       if (!owned) {
@@ -33,7 +33,8 @@ export default class Extras {
         this.runs[fx.id] = run;
       }
       run.ctx.group.visible = !away;
-      if (!away) run.instance.update?.(delta, this.clock.time);
+      run.ctx.away = away;
+      run.instance.update?.(delta, this.clock.time);
     });
   }
 
