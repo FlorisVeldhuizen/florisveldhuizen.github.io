@@ -1,11 +1,16 @@
 import { el, animate } from "./dom";
+import { iconSvg } from "./icons";
 import { format } from "./numbers";
 import { reducedMotion } from "../util";
 
 const POP_GAP_MS = 70;
-const TOAST_MS = 3600;
-const TOAST_RUSH_MS = 2200;
+const TOAST_MS = 4000;
+const TOAST_RUSH_MS = 2500;
 const TOAST_QUEUE = 4;
+const SWIPE_AWAY = 50;
+const AGAINST = 0.25;
+const FLING = 500;
+const FLY = 420;
 
 export class Popups {
   constructor(modal) {
@@ -86,26 +91,146 @@ export class Popups {
     if (this.showing || this.modal.open || !this.waiting.length) return;
     const [kicker, title, text, kind] = this.waiting.shift();
     this.showing = true;
-    const box = el("div", `toast-card is-${kind}`, this.toasts);
+    const box = el("div", `ui toast-card is-${kind}`, this.toasts);
     el("small", "", box).textContent = kicker;
     el("strong", "", box).textContent = title;
     if (text) el("span", "", box).textContent = text;
+    const close = el("button", "toast-close", box, iconSvg("close"));
+    close.type = "button";
+    close.setAttribute("aria-label", "Dismiss");
+    this.life(box, close, this.waiting.length ? TOAST_RUSH_MS : TOAST_MS);
+  }
+
+  // A toast leaves on its own, or sooner when swiped or closed; the pointer or keyboard focus on it holds it.
+  life(box, close, hold) {
+    const { style } = box;
+    let left = hold;
+    let since = 0;
+    let timer = 0;
+    let gone = false;
+    let drag = null;
+    let running = false;
+    let hovered = false;
+    let focused = false;
+    const leave = (dx = 0, dy = -6) => {
+      if (gone) return;
+      gone = true;
+      clearTimeout(timer);
+      animate(
+        box,
+        [
+          {
+            transform: style.transform || "none",
+            opacity: style.opacity || 1,
+          },
+          { transform: `translate(${dx}px, ${dy}px)`, opacity: 0 },
+        ],
+        {
+          duration: dx || dy > 0 ? 220 : 400,
+          easing: "ease-in",
+          fill: "forwards",
+        },
+      ).finished.then(() => {
+        box.remove();
+        this.showing = false;
+        this.next();
+      });
+    };
+    const run = () => {
+      if (running) return;
+      running = true;
+      since = performance.now();
+      timer = setTimeout(() => leave(), left);
+    };
+    const pause = () => {
+      if (!running) return;
+      running = false;
+      clearTimeout(timer);
+      left = Math.max(600, left - (performance.now() - since));
+    };
     animate(
       box,
       [
         { opacity: 0, transform: "translateY(16px)" },
-        { opacity: 1, transform: "none", offset: 0.08 },
-        { opacity: 1, transform: "none", offset: 0.88 },
-        { opacity: 0, transform: "translateY(-6px)" },
+        { opacity: 1, transform: "none" },
       ],
-      {
-        duration: this.waiting.length ? TOAST_RUSH_MS : TOAST_MS,
-        easing: "ease-out",
-      },
-    ).finished.then(() => {
-      box.remove();
-      this.showing = false;
-      this.next();
+      { duration: 300, easing: "ease-out" },
+    );
+    run();
+    const resume = () => {
+      if (!gone && !drag && !hovered && !focused) run();
+    };
+    box.addEventListener("pointerenter", () => {
+      hovered = true;
+      pause();
     });
+    box.addEventListener("pointerleave", () => {
+      hovered = false;
+      resume();
+    });
+    box.addEventListener("focusin", () => {
+      focused = true;
+      pause();
+    });
+    box.addEventListener("focusout", () => {
+      focused = false;
+      resume();
+    });
+    close.addEventListener("click", () => leave(0, 8));
+    box.addEventListener("pointerdown", (e) => {
+      if (gone || e.target.closest(".toast-close")) return;
+      box.setPointerCapture(e.pointerId);
+      drag = {
+        x: e.clientX,
+        y: e.clientY,
+        t: e.timeStamp,
+        dx: 0,
+        dy: 0,
+        vx: 0,
+        vy: 0,
+      };
+    });
+    box.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const dt = Math.max(8, e.timeStamp - drag.t) / 1000;
+      const dx = e.clientX - drag.x;
+      // Upward is toward the play area, so the toast only gives a little that way.
+      const pull = e.clientY - drag.y;
+      const dy = pull > 0 ? pull : pull * AGAINST;
+      drag.vx = (dx - drag.dx) / dt;
+      drag.vy = (dy - drag.dy) / dt;
+      Object.assign(drag, { dx, dy, t: e.timeStamp });
+      const far = Math.min(1, Math.hypot(dx, dy) / (SWIPE_AWAY * 2.5));
+      style.transform = `translate(${dx}px, ${dy}px) rotate(${dx * 0.04}deg)`;
+      style.opacity = String(1 - far * 0.7);
+    });
+    const release = () => {
+      if (!drag) return;
+      const { dx, dy, vx, vy } = drag;
+      drag = null;
+      const sideways = Math.abs(dx) >= dy;
+      const out = sideways
+        ? Math.abs(dx) > SWIPE_AWAY || Math.abs(vx) > FLING
+        : dy > SWIPE_AWAY || vy > FLING;
+      if (out) {
+        leave(
+          sideways ? Math.sign(dx || vx) * FLY : 0,
+          sideways ? dy : FLY * 0.5,
+        );
+        return;
+      }
+      animate(
+        box,
+        [
+          { transform: style.transform, opacity: style.opacity },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: 260, easing: "cubic-bezier(0.2, 0.9, 0.3, 1.2)" },
+      );
+      style.transform = "";
+      style.opacity = "";
+    };
+    box.addEventListener("pointerup", release);
+    box.addEventListener("pointercancel", release);
   }
 }
