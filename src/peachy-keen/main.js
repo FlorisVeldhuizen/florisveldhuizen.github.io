@@ -626,7 +626,18 @@ renderer.setAnimationLoop(() => {
   peach.breeze = interaction.swayAmount;
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);
-  mood.update(realDelta, interaction.heat / 100);
+  const spots = [privacyTag.spot()];
+  if (interaction.bottle.view.group.visible) {
+    const r = interaction.bottle.el.getBoundingClientRect();
+    const size = Math.max(r.width, r.height);
+    spots.push({
+      x: r.x + r.width / 2,
+      y: r.y + r.height / 2,
+      rx: size,
+      ry: size,
+    });
+  }
+  mood.update(realDelta, interaction.heat / 100, spots.filter(Boolean));
   showLitGroups();
   peach.updateRing(camera);
   quality.update(realDelta);
