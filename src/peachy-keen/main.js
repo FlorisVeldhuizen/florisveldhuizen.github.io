@@ -122,10 +122,6 @@ slideToggle(document.querySelector(".intro-modes"));
 const { scene, camera, renderer, lights } = initScene();
 const quality = new QualityGovernor(renderer);
 const backdrop = createBackdrop(scene, renderer);
-setupResizeHandler(camera, renderer, () => {
-  backdrop.resize();
-  lens.resize();
-});
 backdrop.setMotion(!reducedMotion.matches);
 
 const group = new Group();
@@ -136,6 +132,10 @@ const peach = new Peach(group);
 const juice = new Juice(scene);
 const droplets = new Droplets(scene);
 const lens = new Lens(renderer, scene, camera);
+setupResizeHandler(camera, renderer, () => {
+  backdrop.resize();
+  lens.resize();
+});
 juice.onSplat = (position, velocity) => lens.splat(position, velocity);
 lens.onHit = () => playLensHit(1);
 const ui = new UI();
@@ -144,19 +144,7 @@ const privacyTag = new PrivacyTag({ scene, camera, anchorX: cordX });
 if (import.meta.env.DEV) window.pkTag = privacyTag;
 const mood = new MoodLight(scene, renderer, lights);
 
-const settings = new Settings((key, value) => {
-  if (key === "sound") setMuted(!value);
-  if (key === "quality") quality.setMode(value);
-  if (key === "splatter") lens.enabled = value;
-  if (key === "firmness") interaction.setFirmness(value);
-  if (key === "tool") interaction.setTool(value);
-  if (key === "talk") talk.setLevel(value);
-  if (key === "moodLight") mood.set(value);
-  naughty.set(key, value);
-  wild.set(key, value);
-  if (key === "lingerie" && value) interaction.dressUp(true);
-  if (key === "lingerie" && !value) interaction.undress();
-});
+const settings = new Settings();
 
 const interaction = new Interaction({
   scene,
@@ -183,6 +171,19 @@ const wild = new Wild({
 const shock = new Shock(renderer, interaction);
 interaction.on("charge", () => quality.hold(4));
 const skinRings = new SkinRings(scene, interaction);
+settings.onChange = (key, value) => {
+  if (key === "sound") setMuted(!value);
+  if (key === "quality") quality.setMode(value);
+  if (key === "splatter") lens.enabled = value;
+  if (key === "firmness") interaction.setFirmness(value);
+  if (key === "tool") interaction.setTool(value);
+  if (key === "talk") talk.setLevel(value);
+  if (key === "moodLight") mood.set(value);
+  naughty.set(key, value);
+  wild.set(key, value);
+  if (key === "lingerie" && value) interaction.dressUp(true);
+  if (key === "lingerie" && !value) interaction.undress();
+};
 settings.applyAll();
 let idle = null;
 let idleActive = false;

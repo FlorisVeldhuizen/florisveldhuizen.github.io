@@ -26,10 +26,9 @@ function read(key) {
 }
 
 export class Settings {
-  constructor(onChange) {
+  constructor() {
     this.key = STORAGE_KEY;
     Object.assign(this, read(this.key));
-    this.onChange = onChange;
     this.panel = document.getElementById("settings");
     this.toggle = document.getElementById("settings-toggle");
     this.fps = document.getElementById("fps");
