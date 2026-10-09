@@ -22,7 +22,7 @@ export class RollingNumber {
     root.setAttribute("role", "img");
   }
 
-  build(text) {
+  build(text, suffix) {
     this.root.replaceChildren();
     this.slots = [];
     [...text].forEach((ch) => {
@@ -34,6 +34,7 @@ export class RollingNumber {
       const strip = el("span", "roll-strip", node, STRIP);
       this.slots.unshift({ strip, at: null, blur: 0 });
     });
+    [...suffix].forEach((ch) => el("span", "roll-char", this.root, ch));
   }
 
   ease(value, dt) {
@@ -53,11 +54,13 @@ export class RollingNumber {
       this.label = label;
       this.root.setAttribute("aria-label", label);
     }
-    const { text, units } = rollParts(this.shown, { whole: this.whole });
-    const shape = text.replace(/\d/g, "0");
+    const { text, suffix, units } = rollParts(this.shown, {
+      whole: this.whole,
+    });
+    const shape = text.replace(/\d/g, "0") + suffix;
     if (shape !== this.shape) {
       this.shape = shape;
-      this.build(text);
+      this.build(text, suffix);
     }
     this.slots.forEach((slot, i) => {
       const place = 10 ** i;

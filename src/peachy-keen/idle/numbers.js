@@ -106,7 +106,7 @@ export function rollParts(value, { whole = false } = {}) {
   const text = decimals
     ? `${digits.slice(0, -decimals)}.${digits.slice(-decimals)}`
     : digits;
-  return { text: text + suffix, units };
+  return { text, suffix, units };
 }
 
 export function formatTime(seconds) {
