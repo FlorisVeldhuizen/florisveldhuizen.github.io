@@ -14,6 +14,7 @@ const DEFAULTS = {
   achievements: false,
   moodLight: false,
   disco: false,
+  dnd: false,
 };
 
 function read(key) {

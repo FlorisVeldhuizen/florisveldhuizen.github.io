@@ -12,6 +12,7 @@ import { showHarvests } from "./harvest";
 import { Layout } from "./layout";
 import { applySkin, switchSkin, SKIN_NAMES } from "./skins";
 import { Toys } from "./toys";
+import { Privacy } from "./privacy";
 import { preparePage } from "./page";
 import { awayMessage } from "./away";
 import { HELPERS } from "./data/helpers";
@@ -43,6 +44,7 @@ export function createIdle({
   lens,
   juice,
   droplets,
+  privacyTag,
 }) {
   preparePage();
   interaction.ui.scoreboard = false;
@@ -95,6 +97,15 @@ export function createIdle({
     room.setActive(wanted === "room");
   };
   const toys = new Toys(game, settings);
+  const privacy = new Privacy({
+    game,
+    settings,
+    panel,
+    room,
+    talk,
+    popups,
+    tag: privacyTag,
+  });
   showHarvests(game, hud);
   let started = false;
   let skin = null;
@@ -273,7 +284,9 @@ export function createIdle({
     popups.toast(
       "New toy",
       toy.name,
-      "It's on now. Switch it off in Options.",
+      toy.cord
+        ? "Tap the tag to send it up. Pull it down to hang it again."
+        : "It's on now. Switch it off in Options.",
       "seed",
     ),
   );
@@ -357,6 +370,7 @@ export function createIdle({
       if (state.toys.includes("disco")) states.push([false, true]);
       return states;
     },
+    warmFade: (warm) => privacy.warmFade(warm),
     prepare() {
       golden.warmup(peach);
       peach.prepareSkinFade();
@@ -372,8 +386,9 @@ export function createIdle({
       showMassageHint();
     },
     bottleEarned: () => bottleEarned(game.state),
-    begin() {
+    begin(free) {
       started = true;
+      privacy.start(free);
       panel.slide(true);
       if (game.away) addAway(game.away);
       game.away = null;
@@ -402,8 +417,12 @@ export function createIdle({
       panel.update(realDelta);
       renders.update();
       if (!started) return;
+      golden.paused = privacy.shown;
       golden.update(realDelta);
+      privacy.update(realDelta);
+      privacy.restoreFade();
       room.update(realDelta);
+      privacy.applyFade();
     },
   };
 }

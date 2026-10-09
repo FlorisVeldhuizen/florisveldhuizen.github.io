@@ -2,6 +2,7 @@ export const TOYS = [
   {
     id: "talk",
     name: "Sweet talk",
+    icon: "M4 5h16v10H9l-5 4z",
     about:
       "The peach starts talking back, cheeky and bold. All juice +5% while the peach is chatty.",
     cost: 500,
@@ -15,6 +16,7 @@ export const TOYS = [
   {
     id: "shy",
     name: "Bashful whispers",
+    icon: "M4 5h16v10H9l-5 4zM12 12.5l-2.2-2.2a1.3 1.3 0 0 1 2.2-1 1.3 1.3 0 0 1 2.2 1z",
     about:
       "A softer, blushing voice for the peach. All juice +5% while the peach is chatty.",
     cost: 5000,
@@ -28,6 +30,7 @@ export const TOYS = [
   {
     id: "lips",
     name: "Soft lips",
+    icon: "M3 12c3-4 6-5 9-3 3-2 6-1 9 3-3 4-6 5-9 5s-6-1-9-5zM3 12h18",
     about: "Swap your hand for lips. Kisses earn three times as much.",
     cost: 2000,
     setting: "tool",
@@ -53,6 +56,7 @@ export const TOYS = [
   {
     id: "buzz",
     name: "Good vibrations",
+    icon: "M9 3h6v12a3 3 0 0 1-6 0zM12 18v3M5 8 3 7M5 12H3M19 8l2-1M19 12h2",
     about: "A buzzing toy. Holding it on the peach earns juice and heat.",
     cost: 1e6,
     setting: "tool",
@@ -102,6 +106,47 @@ export const TOYS = [
     values: [true],
     unlock: (s) => s.juiceTotal >= 5e7,
     effects: [{ kind: "helpersAll", mult: 1.15 }],
+  },
+  {
+    id: "dnd",
+    name: "Ryokan tag",
+    icon: "M8 9 12 4l4 5v12H8zM12 7.5v.01M12 11v5",
+    about:
+      "Hang the tag and the room goes quiet, just you and the peach. Tap it to bring everyone back. Helpers still earn 80%.",
+    cost: (s) => s.privacy.price,
+    setting: "dnd",
+    on: true,
+    off: false,
+    values: [true],
+    cord: true,
+    unlock: (s) => s.privacy.price > 0,
+    effects: [{ kind: "helpersAll", mult: 0.8 }],
+  },
+];
+
+export const toyCost = (toy, s) =>
+  typeof toy.cost === "function" ? toy.cost(s) : toy.cost;
+
+export const PICKERS = [
+  {
+    key: "tool",
+    label: "Tool",
+    off: "hand",
+    options: [
+      ["hand", "Hand"],
+      ["lips", "Lips"],
+      ["buzz", "Buzz"],
+    ],
+  },
+  {
+    key: "talk",
+    label: "Voice",
+    off: "off",
+    options: [
+      ["off", "Off"],
+      ["talk", "Cheeky"],
+      ["shy", "Shy"],
+    ],
   },
 ];
 

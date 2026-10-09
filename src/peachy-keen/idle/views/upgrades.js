@@ -1,29 +1,7 @@
 import { UPGRADE_BY_ID } from "../data/upgrades";
-import { TOYS, TOY_BY_ID } from "../data/toys";
+import { TOYS, TOY_BY_ID, PICKERS, toyCost } from "../data/toys";
 import { dropIcon } from "../syrup";
 
-const PICKERS = [
-  {
-    key: "tool",
-    label: "Tool",
-    off: "hand",
-    options: [
-      ["hand", "Hand"],
-      ["lips", "Lips"],
-      ["buzz", "Buzz"],
-    ],
-  },
-  {
-    key: "talk",
-    label: "Voice",
-    off: "off",
-    options: [
-      ["off", "Off"],
-      ["talk", "Cheeky"],
-      ["shy", "Shy"],
-    ],
-  },
-];
 const PICKED = PICKERS.map((p) => p.key);
 const TRAY_KEY = "peachy-keen-toy-tray";
 
@@ -208,7 +186,9 @@ export class UpgradesView {
     let affordable = 0;
     this.toyRows.forEach(({ button, price, priceText, toy }) => {
       if (s.toys.includes(toy.id)) {
-        const on = this.game.activeToys.includes(toy.id);
+        const on = toy.cord
+          ? s.options.dndCord
+          : this.game.activeToys.includes(toy.id);
         setText(priceText, on ? "On" : "Off");
         toggle(price, "no-drop", true);
         toggle(button, "is-affordable", true);
@@ -218,9 +198,10 @@ export class UpgradesView {
         button.removeAttribute("aria-disabled");
         return;
       }
-      const ok = toy.cost <= s.juice;
+      const cost = toyCost(toy, s);
+      const ok = cost <= s.juice;
       if (ok) affordable += 1;
-      setText(priceText, format(toy.cost));
+      setText(priceText, format(cost));
       toggle(price, "no-drop", false);
       toggle(button, "is-affordable", ok);
       button.setAttribute("aria-disabled", String(!ok));
@@ -251,7 +232,7 @@ export class UpgradesView {
     const game = this.game;
     const s = game.state;
     const toys = TOYS.filter(
-      (t) => !s.toys.includes(t.id) && t.unlock(s) && t.cost <= s.juice,
+      (t) => !s.toys.includes(t.id) && t.unlock(s) && toyCost(t, s) <= s.juice,
     ).length;
     if (game.model.noUpgrades) return toys;
     return (

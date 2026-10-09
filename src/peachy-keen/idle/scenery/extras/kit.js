@@ -98,8 +98,9 @@ export function makeContext(id, world, clock) {
     level: (full = 100) => levelOf(game.state.helpers[id] || 0, full),
     center: () => i.group.position,
     bounds: room.bounds,
+    away: false,
     get live() {
-      return i.phase === "live";
+      return i.phase === "live" && !this.away;
     },
     randomHit: () => room.toucher.randomHit(),
     hitFrom: (position) => room.toucher.hitFrom(position),

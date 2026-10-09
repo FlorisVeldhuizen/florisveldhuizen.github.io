@@ -122,90 +122,13 @@ button:focus-visible {
   opacity: 1;
 }
 
-/* While a mode switch reloads, only the ripe still peach shows. */
-.is-switching #stage,
-html.is-opening .intro .intro-copyright,
-html.is-opening .intro .intro-modes,
-html.is-opening:not(.has-status) .intro .intro-status {
-  opacity: 0;
-}
-
-.is-opening body {
-  background: radial-gradient(120% 80% at 50% 42%, #4b3a5e, #2b2036);
-}
-
 /* The fill canvas keeps its last frame once the worker stops, so the ripe render stands in. */
-.intro.is-ready .intro-shape,
-html.is-opening .intro-shape {
+.intro.is-ready .intro-shape {
   background-image: url("/peachy-keen/intro-peach-ripe.webp");
 }
 
-.intro.is-ready #intro-fill,
-html.is-opening #intro-fill {
+.intro.is-ready #intro-fill {
   visibility: hidden;
-}
-
-/* The opening screen looks the same before and after a reload, so it shows at once. */
-html.is-opening .intro .intro-title,
-html.is-opening .intro .intro-foot {
-  opacity: 1;
-  transition: none;
-}
-
-/* Opening a mode is loading too, so its line looks exactly like the loading line, wave included. */
-html.is-opening .intro .intro-status {
-  color: var(--blush-dim);
-  font-style: italic;
-  font-weight: inherit;
-}
-
-/* A switch from inside the game keeps the frame and what both modes share; only the mode's own parts leave. */
-html.is-swapping body {
-  background:
-    var(--swap-shot) center / 100% 100% no-repeat,
-    #362c3f;
-}
-
-html.is-swapping .intro .intro-title {
-  visibility: hidden;
-}
-
-html.is-swapping body.is-intro .score,
-html.is-swapping body.is-intro .hints {
-  visibility: visible;
-}
-
-html.is-swapping body.is-intro .score > *,
-html.is-leaving-mode .score > *,
-html.is-leaving-mode .settings-dock {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.intro-shape {
-  transform-origin: 50% 74%;
-}
-
-/* While the live peach fades back in under it, the still stays fully shown. */
-html.is-handing .intro .intro-shape {
-  opacity: 1;
-  transition: none;
-}
-
-/* After a switch the opening text leaves first, so it never overlaps the game coming in. */
-#intro.is-quiet > :not(.intro-shape) {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-/* Once the live peach is fully back the identical still can go at once, before the camera moves. */
-#intro.is-handed .intro-shape {
-  opacity: 0;
-  transition: none;
-}
-
-.is-opening .intro.has-shape .intro-shape {
-  opacity: 1;
 }
 
 .score {
@@ -701,9 +624,7 @@ html.is-handing .intro .intro-shape {
 }
 
 /* A continuous swell: every letter rides the same slow curve, a little after its neighbour. */
-.intro:not(.is-ready) .status-letter,
-html.is-opening .intro .status-letter,
-.swap-status .status-letter {
+.intro:not(.is-ready) .status-letter {
   animation: status-lift 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   animation-delay: calc(var(--i) * 0.09s - 2.4s);
 }
@@ -731,6 +652,10 @@ html.is-opening .intro .status-letter,
   margin: 0;
   opacity: 0;
   transition: opacity 0.4s ease;
+}
+
+.intro-modes[hidden] {
+  display: none;
 }
 
 .intro-modes.is-set {
@@ -1130,38 +1055,5 @@ html.is-opening .intro .status-letter,
 @media (prefers-reduced-motion: reduce) {
   .cursor[data-buzzing="true"] span {
     animation: none;
-  }
-}
-
-.swap-cover {
-  position: fixed;
-  inset: 0;
-  z-index: 2;
-  background: center / 100% 100% no-repeat;
-}
-
-.swap-cover .intro-shape {
-  background-image: url("/peachy-keen/intro-peach-ripe.webp");
-}
-
-/* Sits where the opening screen puts its loading line. */
-.swap-status {
-  position: fixed;
-  right: 0;
-  bottom: calc(var(--gutter) + env(safe-area-inset-bottom) + 34px);
-  left: 0;
-  text-align: center;
-}
-
-/* On phones the loading line would sit on the hints, so they step aside while it shows. */
-@media (max-width: 899px) and (orientation: portrait), (max-width: 639px) {
-  .hints {
-    transition: opacity 0.3s ease;
-  }
-
-  html.is-leaving-mode .hints,
-  html.is-swapping body.is-intro .hints,
-  body:has(.swap-cover) .hints {
-    opacity: 0;
   }
 }

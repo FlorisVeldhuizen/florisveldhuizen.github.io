@@ -26,6 +26,16 @@ export class Toys {
     game.on("toy", (toy) => this.apply(toy.setting, toy.on));
     game.on("toy-set", ({ key, value }) => this.apply(key, value));
     game.on("toy-toggle", (toy) => {
+      if (toy.cord) {
+        const show = !game.state.options.dndCord;
+        game.setOption("dndCord", show);
+        this.apply(toy.setting, show);
+        return;
+      }
+      if (toy.id === "lingerie" && settings.lingerie && !game.i.garment.worn) {
+        this.apply(toy.setting, true);
+        return;
+      }
       const on = toy.values.includes(settings[toy.setting]);
       this.apply(toy.setting, on ? toy.off : toy.on);
     });

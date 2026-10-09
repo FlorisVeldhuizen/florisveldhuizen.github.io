@@ -1204,7 +1204,7 @@ export function createSippers(ctx) {
   });
 
   return {
-    update(dt) {
+    update(dt, away = false) {
       s.time += dt;
       const { mesh } = peach;
       if (!mesh) return;
@@ -1219,7 +1219,7 @@ export function createSippers(ctx) {
         warmBatches();
       }
       if (ready) s.next -= dt * s.speed;
-      if (ready && s.next < 0) {
+      if (ready && s.next < 0 && !away) {
         s.next = rand(...s.gap);
         const active = list.filter((w) => !w.dead && !w.collected).length;
         const slots = butterflySlots(game.state);
@@ -1256,6 +1256,15 @@ export function createSippers(ctx) {
         shadows?.write(batch, batchRigs);
       });
       shadows?.render();
+    },
+    scatter() {
+      list.forEach((w) => {
+        if (w.dead || w.collected) return;
+        game.gain(w.sipped, "sippers");
+        // eslint-disable-next-line no-param-reassign
+        w.sipped = 0;
+        shoo(w);
+      });
     },
     leave() {
       list.forEach((w) => {

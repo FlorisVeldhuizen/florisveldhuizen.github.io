@@ -248,6 +248,8 @@ export class Room {
     this.sippers = new Sippers(this.extras.world);
     this.time = 0;
     this.shown = {};
+    this.presence = () => 1;
+    this.lensFade = 1;
     this.dummy = new Object3D();
     this.drifter = new Object3D();
     this.middle = new Vector3();
@@ -655,9 +657,12 @@ export class Room {
     if (!(key in this.shown)) this.shown[key] = { count: target, wait: 0 };
     const s = this.shown[key];
     s.wait -= delta;
-    if (target < s.count) s.count = target;
-    else if (target > s.count && s.wait <= 0) {
-      s.count += 1;
+    if (this.snap) s.count = target;
+    if (target < s.count && s.wait <= 0) {
+      s.count = Math.max(target, s.count - 1);
+      s.wait = ARRIVAL_GAP * 0.6;
+    } else if (target > s.count && s.wait <= 0) {
+      s.count = Math.min(target, s.count + 1);
       s.wait = ARRIVAL_GAP;
     }
     return s.count;
@@ -1536,7 +1541,7 @@ export class Room {
     const t = this.time;
     const { i } = this;
     const still = reducedMotion.matches ? 0.15 : 1;
-    const own = (id) => helpers[id] || 0;
+    const own = (id) => (helpers[id] || 0) * this.presence(id);
     const center = this.followPeach(delta);
     this.measure(delta);
     this.sweepFeathers();
@@ -1548,7 +1553,7 @@ export class Room {
 
     this.toucher
       .due(delta)
-      .filter((id) => id !== "coach")
+      .filter((id) => id !== "coach" && Math.random() < this.presence(id))
       .forEach((id) => {
         if (id === "paddle") this.paddles.swing(id);
         else this.toucher.touch(id, this.toucher.randomHit());
@@ -1734,7 +1739,7 @@ export class Room {
 
     const moon = level(own("moon"), 50);
     this.moon.visible = own("moon") > 0;
-    if (this.moon.visible && !this.moonShaped && i.peach.mesh) {
+    if (helpers.moon && !this.moonShaped && i.peach.mesh) {
       usePeachShape(this.moon, i.peach);
       this.moonShaped = true;
     }
@@ -1832,7 +1837,7 @@ export class Room {
       this.backdrop.setLens(
         this.holeScreen.x * 0.5 + 0.5,
         this.holeScreen.y * 0.5 + 0.5,
-        0.35 + level(own("singularity"), 50) * 0.65,
+        (0.35 + level(own("singularity"), 50) * 0.65) * this.lensFade,
       );
     } else {
       this.backdrop.setLens(0.5, 0.5, 0);
