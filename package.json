@@ -12,7 +12,8 @@
     "lint": "eslint",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "perf": "node scripts/perf/run.mjs"
   },
   "devDependencies": {
     "eslint": "^8.57.0",

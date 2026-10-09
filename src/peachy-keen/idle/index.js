@@ -347,6 +347,7 @@ export function createIdle({
     window.peachy = {
       game,
       golden: () => golden.spawn(),
+      burst: () => interaction.charge(),
       give(id, count) {
         game.setHelpers(id, count);
         game.refresh();

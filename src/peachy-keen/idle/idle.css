@@ -3146,12 +3146,18 @@ body.is-storm::after {
   place-items: center;
 }
 
+.track-ink svg {
+  overflow: visible;
+}
+
 .track-ink > span[hidden] {
   display: none;
 }
 
 .track.is-sliding .track-thumb,
-.track.is-sliding .track-ink {
+.track.is-sliding .track-ink,
+.track.is-still .track-thumb,
+.track.is-still .track-ink {
   transition: none;
 }
 
