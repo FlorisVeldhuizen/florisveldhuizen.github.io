@@ -296,6 +296,16 @@ export class Bottle {
     return 1 + this.lift * 0.1 + this.hover.value * 0.07;
   }
 
+  // The element's box from the values it was laid out with, so frame code need not read layout.
+  homeBox() {
+    const width = this.heightPx * WIDTH_TO_HEIGHT;
+    return {
+      x: this.homeX,
+      y: this.homeY,
+      size: Math.max(width, this.heightPx),
+    };
+  }
+
   pick() {
     this.carried = true;
     this.el.classList.add("is-carried");

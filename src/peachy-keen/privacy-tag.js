@@ -21,7 +21,7 @@ import {
   Vector2,
   Vector3,
 } from "three";
-import { reducedMotion, viewHeight } from "./util";
+import { reducedMotion, viewHeight, viewWidth } from "./util";
 import { playCord } from "./audio";
 import { sidePanel } from "./idle/dom";
 
@@ -532,7 +532,7 @@ export class PrivacyTag {
   }
 
   screenToWorld(x, y, z, out) {
-    this.ndc.set((x / window.innerWidth) * 2 - 1, -(y / viewHeight()) * 2 + 1);
+    this.ndc.set((x / viewWidth()) * 2 - 1, -(y / viewHeight()) * 2 + 1);
     this.ray.setFromCamera(this.ndc, this.camera);
     this.ray.ray.intersectPlane(this.plane, out);
     return out.addScaledVector(this.ray.ray.direction, -z * this.pixel);
@@ -559,7 +559,7 @@ export class PrivacyTag {
     }
     if (this.knotDistance(e) < TASSEL_GRAB) return true;
     this.ndc.set(
-      (e.clientX / window.innerWidth) * 2 - 1,
+      (e.clientX / viewWidth()) * 2 - 1,
       -(e.clientY / viewHeight()) * 2 + 1,
     );
     this.ray.setFromCamera(this.ndc, this.camera);
@@ -662,7 +662,7 @@ export class PrivacyTag {
     let onBoard = false;
     if (this.state === "on") {
       this.ndc.set(
-        (e.clientX / window.innerWidth) * 2 - 1,
+        (e.clientX / viewWidth()) * 2 - 1,
         -(e.clientY / viewHeight()) * 2 + 1,
       );
       this.ray.setFromCamera(this.ndc, this.camera);
