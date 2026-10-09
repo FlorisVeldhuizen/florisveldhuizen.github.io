@@ -340,8 +340,8 @@ export class Interaction {
 
   // eslint-disable-next-line class-methods-use-this
   requestShake() {
-    if (typeof DeviceMotionEvent?.requestPermission === "function")
-      DeviceMotionEvent.requestPermission().catch(() => {});
+    if (typeof window.DeviceMotionEvent?.requestPermission === "function")
+      window.DeviceMotionEvent.requestPermission().catch(() => {});
   }
 
   jolt(x, y) {
