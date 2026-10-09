@@ -1,6 +1,7 @@
 import { el, slideOn, toggle } from "./dom";
 import { iconSvg } from "./icons";
 import { reducedMotion } from "../util";
+import playToolMotion from "./tool-motion";
 
 export default function toolTrack(parent, picker, choose) {
   const row = el("div", "tool-row", parent);
@@ -16,7 +17,11 @@ export default function toolTrack(parent, picker, choose) {
     const button = el("button", "", group, icons ? iconSvg(id) : label);
     button.type = "button";
     if (icons) button.setAttribute("aria-label", label);
-    button.addEventListener("click", () => choose(id));
+    button.addEventListener("click", () => {
+      // eslint-disable-next-line no-use-before-define
+      if (id === lastPicked) play(id);
+      choose(id);
+    });
     const mark = el("span", "", ink, button.innerHTML);
     return { id, label, hint, button, mark };
   });
@@ -46,6 +51,14 @@ export default function toolTrack(parent, picker, choose) {
     (k) => say(shownAt(k)),
   );
   let look = "";
+  let lastPicked = null;
+  const play = (id) => {
+    if (!icons || reducedMotion.matches) return;
+    playToolMotion(
+      options.find((o) => o.id === id)?.mark.firstElementChild,
+      id,
+    );
+  };
   return {
     row,
     update(picked, owned) {
@@ -69,9 +82,18 @@ export default function toolTrack(parent, picker, choose) {
       const next = `${count}:${at}:${picked}`;
       if (next === look) return;
       look = next;
+      const picking = lastPicked !== null && lastPicked !== picked;
+      lastPicked = picked;
+      if (!picking) {
+        group.classList.add("is-still");
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => group.classList.remove("is-still")),
+        );
+      }
       group.style.setProperty("--n", count);
       group.style.setProperty("--i", at);
       say(options.find((o) => o.id === picked));
+      if (picking) play(picked);
     },
   };
 }
