@@ -38,20 +38,6 @@ export const TOYS = [
     effects: [{ kind: "smack", mult: 3 }],
   },
   {
-    id: "lingerie",
-    name: "Lingerie drawer",
-    icon: "M12 12 4 7v10zM12 12l8-5v10zM12 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3",
-    about:
-      "Dress the peach up, then pull it down. Smacks +25% while it's worn.",
-    cost: 2.5e4,
-    setting: "lingerie",
-    on: true,
-    off: false,
-    values: [true],
-    unlock: (s) => s.stats.bursts >= 1,
-    effects: [{ kind: "smack", mult: 1.25 }],
-  },
-  {
     id: "mood",
     name: "Candlelight",
     icon: "M10 11h4v10h-4zM12 11V9M12 3c1.6 2 2 3.4 0 5.4-2-2-1.6-3.4 0-5.4z",
@@ -75,6 +61,20 @@ export const TOYS = [
     values: ["buzz"],
     unlock: (s) => s.juiceTotal >= 5e5,
     effects: [{ kind: "buzz", mult: 1 }],
+  },
+  {
+    id: "lingerie",
+    name: "Lingerie drawer",
+    icon: "M12 12 4 7v10zM12 12l8-5v10zM12 10.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3",
+    about:
+      "Dress the peach up, then pull it down. Smacks +25% while it's worn.",
+    cost: 2.5e6,
+    setting: "lingerie",
+    on: true,
+    off: false,
+    values: [true],
+    unlock: (s) => s.stats.bursts >= 5,
+    effects: [{ kind: "smack", mult: 1.25 }],
   },
   {
     id: "edging",

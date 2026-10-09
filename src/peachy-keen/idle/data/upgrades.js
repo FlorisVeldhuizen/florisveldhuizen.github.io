@@ -22,12 +22,12 @@ const tierUpgrades = HELPERS.flatMap((helper) =>
 );
 
 const TICKLE = [
-  ["Tickle fight", 1e5, 25, 0.1],
-  ["Tickle war", 1e7, 50, 5],
-  ["Tickle apocalypse", 1e8, 100, 10],
-  ["Tickle singularity", 1e10, 150, 20],
-  ["Tickle heat death", 1e13, 200, 20],
-  ["Tickle afterlife", 1e16, 250, 20],
+  ["Tickle fight", 1e5, 30, 0.1],
+  ["Tickle war", 1e7, 55, 5],
+  ["Tickle apocalypse", 1e8, 110, 10],
+  ["Tickle singularity", 1e10, 160, 20],
+  ["Tickle heat death", 1e13, 210, 20],
+  ["Tickle afterlife", 1e16, 260, 20],
 ].map(([name, cost, need, value], n) => ({
   id: `tickle-${n}`,
   name,
@@ -45,7 +45,7 @@ const TICKLE = [
 }));
 
 const PALMS = [
-  ["Kinetic palm", 5e4, 1e3],
+  ["Kinetic palm", 5e4, 2.5e3],
   ["Seismic palm", 5e6, 5e3],
   ["Tectonic palm", 5e8, 2e4],
   ["Palm of the gods", 5e10, 5e4],
@@ -58,7 +58,7 @@ const PALMS = [
   group: "smack",
   icon: "hand",
   cost,
-  unlock: (s) => s.stats.smacks >= need,
+  unlock: (s) => s.runStats.smacks >= need,
   effects: [{ kind: "smackShare", add: 0.01 }],
 }));
 
@@ -73,7 +73,7 @@ const HANDS = [
   group: "smack",
   icon: "hand",
   cost,
-  unlock: (s) => s.stats.smacks >= need,
+  unlock: (s) => s.runStats.smacks >= need,
   effects: [{ kind: "smack", mult: 2 }],
 }));
 
@@ -83,7 +83,7 @@ const SPOTS = [
     name: "Sweet spot",
     about: "Smacks have a 5% chance to land a critical ×10.",
     cost: 2e4,
-    unlock: (s) => s.stats.smacks >= 500,
+    unlock: (s) => s.runStats.smacks >= 1500,
     effects: [{ kind: "crit", chance: 0.05 }],
   },
   {
@@ -91,7 +91,7 @@ const SPOTS = [
     name: "Sweeter spot",
     about: "Critical chance +5%.",
     cost: 2e7,
-    unlock: (s) => s.stats.crits >= 50,
+    unlock: (s) => s.runStats.crits >= 100,
     effects: [{ kind: "crit", chance: 0.05 }],
   },
   {
@@ -99,7 +99,7 @@ const SPOTS = [
     name: "The spot",
     about: "Critical smacks hit ×25 instead of ×10.",
     cost: 2e10,
-    unlock: (s) => s.stats.crits >= 250,
+    unlock: (s) => s.runStats.crits >= 250,
     effects: [{ kind: "critPower", value: 25 }],
   },
   {
@@ -107,7 +107,7 @@ const SPOTS = [
     name: "Rhythm section",
     about: "Combos build twice as much bonus.",
     cost: 5e4,
-    unlock: (s) => s.stats.bestCombo >= 10,
+    unlock: (s) => s.runStats.bestCombo >= 10,
     effects: [{ kind: "combo", mult: 2 }],
   },
   {
@@ -115,7 +115,7 @@ const SPOTS = [
     name: "Drum solo",
     about: "Combos can build up to ×100 instead of ×50.",
     cost: 5e7,
-    unlock: (s) => s.stats.bestCombo >= 30,
+    unlock: (s) => s.runStats.bestCombo >= 30,
     effects: [{ kind: "comboCap", value: 100 }],
   },
 ].map((u) => ({ group: "smack", icon: "hand", ...u }));
@@ -126,7 +126,7 @@ const OIL = [
     name: "Slick hands",
     about: "Oil boosts smacks by +50% more at full shine.",
     cost: 2000,
-    unlock: (s) => s.stats.pours > 0,
+    unlock: (s) => s.runStats.pours >= 2,
     effects: [{ kind: "oil", add: 0.5 }],
   },
   {
@@ -134,7 +134,7 @@ const OIL = [
     name: "Baby oil",
     about: "Oil boosts smacks by another +100%.",
     cost: 2e6,
-    unlock: (s) => s.stats.pours > 20,
+    unlock: (s) => s.runStats.pours >= 25,
     effects: [{ kind: "oil", add: 1 }],
   },
   {
@@ -142,7 +142,7 @@ const OIL = [
     name: "Glazed",
     about: "Oil shine also boosts every helper by up to +25%.",
     cost: 2e8,
-    unlock: (s) => reached(s, "baron") >= 10,
+    unlock: (s) => reached(s, "baron") >= 30,
     effects: [{ kind: "glaze", add: 0.25 }],
   },
   {
@@ -158,7 +158,7 @@ const OIL = [
     name: "Coconut oil",
     about: "Oil boosts smacks by another +200%. Smells like holiday.",
     cost: 5e11,
-    unlock: (s) => s.stats.pours > 100,
+    unlock: (s) => s.runStats.pours > 100,
     effects: [{ kind: "oil", add: 2 }],
   },
 ].map((u) => ({ group: "oil", icon: "baron", ...u }));
@@ -169,7 +169,7 @@ const HEAT = [
     name: "Hot flush",
     about: "While the peach is hot, all juice gets up to +50% more.",
     cost: 5000,
-    unlock: (s) => s.stats.hottest >= 75,
+    unlock: (s) => s.runStats.hottest >= 75,
     effects: [{ kind: "flush", add: 0.5 }],
   },
   {
@@ -177,7 +177,7 @@ const HEAT = [
     name: "Fever dream",
     about: "The heat bonus goes up by another +50%.",
     cost: 5e7,
-    unlock: (s) => s.stats.bursts >= 10,
+    unlock: (s) => s.runStats.bursts >= 40,
     effects: [{ kind: "flush", add: 0.5 }],
   },
   {
@@ -185,7 +185,7 @@ const HEAT = [
     name: "Spontaneous combustion",
     about: "The heat bonus goes up by another +100%.",
     cost: 5e11,
-    unlock: (s) => s.stats.bursts >= 100,
+    unlock: (s) => s.runStats.bursts >= 100,
     effects: [{ kind: "flush", add: 1 }],
   },
   {
@@ -193,7 +193,7 @@ const HEAT = [
     name: "Warm hands",
     about: "Your helpers slowly heat the peach up on their own.",
     cost: 3e4,
-    unlock: (s) => reached(s, "paddle") >= 5 && s.stats.bursts >= 1,
+    unlock: (s) => reached(s, "paddle") >= 30 && s.runStats.bursts >= 15,
     effects: [{ kind: "autoHeat", add: 1 }],
   },
   {
@@ -201,7 +201,7 @@ const HEAT = [
     name: "Hot hands",
     about: "Helpers heat the peach three times as fast.",
     cost: 3e7,
-    unlock: (s) => reached(s, "coach") >= 10,
+    unlock: (s) => reached(s, "coach") >= 15,
     effects: [{ kind: "autoHeat", add: 2 }],
   },
   {
@@ -217,7 +217,7 @@ const HEAT = [
     name: "Big finish",
     about: "Bursts pay out twice as much.",
     cost: 1000,
-    unlock: (s) => s.stats.bursts >= 1,
+    unlock: (s) => s.runStats.bursts >= 3,
     effects: [{ kind: "burst", mult: 2 }],
   },
   {
@@ -225,7 +225,7 @@ const HEAT = [
     name: "Encore",
     about: "Bursts pay out twice as much.",
     cost: 1e6,
-    unlock: (s) => s.stats.bursts >= 5,
+    unlock: (s) => s.runStats.bursts >= 25,
     effects: [{ kind: "burst", mult: 2 }],
   },
   {
@@ -233,7 +233,7 @@ const HEAT = [
     name: "Standing ovation",
     about: "Bursts pay out twice as much.",
     cost: 1e9,
-    unlock: (s) => s.stats.bursts >= 25,
+    unlock: (s) => s.runStats.bursts >= 60,
     effects: [{ kind: "burst", mult: 2 }],
   },
   {
@@ -241,7 +241,7 @@ const HEAT = [
     name: "Legendary performance",
     about: "Bursts pay out three times as much.",
     cost: 1e13,
-    unlock: (s) => s.stats.bursts >= 100,
+    unlock: (s) => s.runStats.bursts >= 100,
     effects: [{ kind: "burst", mult: 3 }],
   },
   {
@@ -249,7 +249,7 @@ const HEAT = [
     name: "Pit stop",
     about: "Each burst drops one more pit.",
     cost: 2.5e5,
-    unlock: (s) => s.stats.bursts >= 10,
+    unlock: (s) => s.runStats.bursts >= 20,
     effects: [{ kind: "pits", add: 1 }],
   },
   {
@@ -257,7 +257,7 @@ const HEAT = [
     name: "Stone cold",
     about: "Each burst drops one more pit.",
     cost: 2.5e9,
-    unlock: (s) => s.stats.bursts >= 50,
+    unlock: (s) => s.runStats.bursts >= 75,
     effects: [{ kind: "pits", add: 1 }],
   },
   {
@@ -265,7 +265,7 @@ const HEAT = [
     name: "Pitmaster",
     about: "Each burst drops two more pits.",
     cost: 2.5e13,
-    unlock: (s) => s.stats.bursts >= 200,
+    unlock: (s) => s.runStats.bursts >= 200,
     effects: [{ kind: "pits", add: 2 }],
   },
 ].map((u) => ({ group: "heat", icon: "heat", ...u }));
@@ -276,7 +276,7 @@ const PLAY = [
     name: "Deep tissue",
     about: "Rubbing and massaging earn three times as much.",
     cost: 3000,
-    unlock: (s) => s.stats.rubSeconds >= 10,
+    unlock: (s) => s.runStats.rubSeconds >= 30,
     effects: [{ kind: "rub", mult: 3 }],
   },
   {
@@ -284,7 +284,7 @@ const PLAY = [
     name: "Happy hands",
     about: "Rubbing and massaging earn three times as much.",
     cost: 3e8,
-    unlock: (s) => s.stats.rubSeconds >= 300,
+    unlock: (s) => s.runStats.rubSeconds >= 300,
     effects: [{ kind: "rub", mult: 3 }],
   },
   {
@@ -292,7 +292,7 @@ const PLAY = [
     name: "Kneading dough",
     about: "Grabs and snapbacks earn five times as much.",
     cost: 8000,
-    unlock: (s) => s.stats.grabs >= 10,
+    unlock: (s) => s.runStats.grabs >= 20,
     effects: [{ kind: "grab", mult: 5 }],
   },
   {
@@ -300,7 +300,7 @@ const PLAY = [
     name: "Shake it",
     about: "Every twerk beat while you're away earns 3× as much.",
     cost: 1e4,
-    unlock: (s) => s.stats.twerks >= 1,
+    unlock: (s) => s.runStats.twerks >= 1,
     effects: [{ kind: "twerk", mult: 3 }],
   },
   {
@@ -308,7 +308,7 @@ const PLAY = [
     name: "Drop it low",
     about: "Twerks start sooner and earn 3× as much.",
     cost: 1e8,
-    unlock: (s) => s.stats.twerks >= 25,
+    unlock: (s) => s.runStats.twerks >= 25,
     effects: [
       { kind: "twerk", mult: 3 },
       { kind: "twerkSooner", value: 0.5 },
@@ -318,16 +318,16 @@ const PLAY = [
     id: "thong-0",
     name: "Thong song",
     about: "Wedgies earn five times as much.",
-    cost: 5e4,
-    unlock: (s) => s.stats.wedgies >= 1,
+    cost: 5e6,
+    unlock: (s) => s.runStats.wedgies >= 3,
     effects: [{ kind: "wedgie", mult: 5 }],
   },
   {
     id: "strip-0",
     name: "Striptease",
     about: "Taking the lingerie off earns ten times as much.",
-    cost: 5e4,
-    unlock: (s) => s.stats.strips >= 1,
+    cost: 5e6,
+    unlock: (s) => s.runStats.strips >= 1,
     effects: [{ kind: "strip", mult: 10 }],
   },
 ].map((u) => ({ group: "play", icon: "play", ...u }));
@@ -336,14 +336,14 @@ const GOLDEN = [
   [
     "Lucky charm",
     7.7e4,
-    1,
+    3,
     [{ kind: "goldenRate", mult: 1.15 }],
     "Golden peaches show up 15% more often.",
   ],
   [
     "Four-leaf clover",
     7.7e7,
-    7,
+    9,
     [{ kind: "goldenRate", mult: 1.15 }],
     "Golden peaches show up 15% more often.",
   ],
@@ -371,7 +371,7 @@ const GOLDEN = [
   group: "golden",
   icon: "golden",
   cost,
-  unlock: (s) => s.stats.goldens >= need,
+  unlock: (s) => s.runStats.goldens >= need,
   effects,
 }));
 
@@ -414,8 +414,8 @@ const RECIPES = [
 }));
 
 const BLUSH = [
-  ["Pillow talk", 1e6, 10, 0.01],
-  ["Sweet nothings", 1e9, 25, 0.015],
+  ["Pillow talk", 1e6, 25, 0.01],
+  ["Sweet nothings", 1e9, 30, 0.015],
   ["Dirty talk", 1e12, 50, 0.02],
   ["Love bombing", 1e15, 75, 0.025],
   ["Soulmates", 1e18, 100, 0.03],

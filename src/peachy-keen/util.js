@@ -59,19 +59,26 @@ const measureViewport = () => {
   const next = installed.matches
     ? Math.max(window.innerHeight, document.documentElement.offsetHeight)
     : window.innerHeight;
-  const width = window.innerWidth;
-  if (next === viewportHeight && width === viewportWidth) return false;
+  if (next === viewportHeight && window.innerWidth === viewportWidth)
+    return false;
   viewportHeight = next;
-  viewportWidth = width;
+  viewportWidth = window.innerWidth;
   return true;
 };
-window.addEventListener("resize", measureViewport);
+// iOS fires resize mid-rotation with stale sizes and sends no event once they settle.
+const settleViewport = () =>
+  [100, 400, 1000, 2500].forEach((at) =>
+    setTimeout(() => {
+      if (measureViewport()) window.dispatchEvent(new Event("resize"));
+    }, at),
+  );
+window.addEventListener("resize", (event) => {
+  measureViewport();
+  if (event.isTrusted) settleViewport();
+});
+window.addEventListener("orientationchange", settleViewport);
 measureViewport();
-[100, 400, 1000, 2500].forEach((at) =>
-  setTimeout(() => {
-    if (measureViewport()) window.dispatchEvent(new Event("resize"));
-  }, at),
-);
+settleViewport();
 
 export const viewHeight = () => viewportHeight;
 // Reading innerWidth forces a layout, so frame code reads this copy.

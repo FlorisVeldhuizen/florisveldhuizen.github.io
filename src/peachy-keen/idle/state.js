@@ -38,8 +38,7 @@ export function freshRun(state) {
     butlerSkip: [],
     upgrades: [],
     runTime: 0,
-    runSmacks: 0,
-    runBursts: 0,
+    runStats: freshStats(),
     buffs: [],
   });
   return state;
