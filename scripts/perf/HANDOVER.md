@@ -14,6 +14,8 @@ On the owner's iPhone 17 Pro (Chrome) the game got laggy and hot: in the Orchard
 - `PERF_DEBUG=1` prints the stack of every forced layout. Today that found two new per-frame reads on master within hours.
 - Draw calls vary with which helpers are on screen. Frame times vary between page loads. Trust repeated runs and in-page on/off comparisons, not one load.
 - Mac numbers are relative. A phone GPU spends more time on pixels, so GPU savings on the Mac understate the phone gain.
+- The perf test runs with uncapped frames. Two side effects follow. First, the resolution governor drops to 1x, so the test measures CPU cost, not pixel cost. Second, Chrome queues GPU work far ahead, and the first shader link then waits for the whole queue. That gives false freezes of 0.5 to 1 s. Measure one-time stutters with normal vsync (leave out `--disable-gpu-vsync` and `--disable-frame-rate-limit`).
+- GPU timer queries (`EXT_disjoint_timer_query_webgl2`) give wrong numbers in Chrome on the Mac: 65 ms GPU per frame at a steady 60 fps. Do not use them.
 
 ## Rules that keep it fast
 
@@ -36,6 +38,7 @@ Commits `e41295c4`, `792d85d2`, `7cf7e562` and the merges around them. Measured 
 - Burst: half-peach fabric skipped without lingerie; resolution governor holds through a charge.
 - iOS: `createRenderer()` retries simpler settings when the context arrives lost; `DeviceMotionEvent` guard for http.
 - Reader: a reading waits until its cards are baked (crashed on slow, busy phones).
+- Lens drops: the blob shader is warmed for its render target. Before, it compiled on the first drop and froze one frame (about 100 ms at 4x CPU).
 
 Per-helper cost alone is now close to an empty room (2.0 ms empty, 1.7 to 3.0 ms per helper). All helpers together: 5.4 ms.
 
@@ -53,8 +56,8 @@ Per-helper cost alone is now close to an empty room (2.0 ms empty, 1.7 to 3.0 ms
 ## Open ideas, most promising first
 
 1. All-helpers room (5.4 ms): spread over three.js scene upkeep. `updateMatrixWorld` walks about 400 objects, 165 inside hidden groups. Skipping hidden subtrees is risky: code reads world matrices of hidden objects.
-2. One-time stutters: the Reader's first appearance (about 1 s on the Mac) and buying many helpers at once. Look at shader warm-up per extra (`kit.js warm`).
-3. Smacking costs about 3 ms extra, mostly the "+juice" pop-up DOM. Pool the pop-up elements.
+2. One-time stutters, measured with vsync at 4x CPU: the first Moon costs one 100 ms frame (`usePeachShape` in `sky.js` builds the peach moon geometry), the first Fractal 67 to 83 ms. Other helpers stay under 50 ms. The 1 s Reader freeze was the uncapped-frames effect above.
+3. Smacking adds about 1.5 ms main-thread time per frame at 4x CPU, 0.9 ms of it style, layout and paint of the "+juice" pop-ups. Pooling the elements saves only part of that, because paint stays.
 4. Shock pass (heat above 0.65) copies the whole frame every frame. Share one frame copy with the lens when both are active.
 5. Shadow map: 1024 PCFSoft while the bottle is carried or in disco. Try 512 or PCF on phones, then judge the look.
 

@@ -330,7 +330,10 @@ function drawEverything() {
   });
   renderer.render(lens.overlay, lens.overlayCamera);
   lens.blobGeometry.instanceCount = 1;
+  renderer.setRenderTarget(lens.target);
   renderer.render(lens.blobScene, lens.overlayCamera);
+  renderer.setRenderTarget(null);
+  lens.blobsDirty = true;
   renderer.render(shock.scene, shock.camera);
   renderer.setScissorTest(false);
   camera.layers.disable(JUICE_LAYER);
@@ -373,11 +376,15 @@ async function warmLights(shown) {
   renderer.shadowMap.enabled = true;
   const shadowed = renderer.compileAsync(scene, camera);
   renderer.shadowMap.enabled = false;
+  // A render target is its own shader variant (no tone mapping, linear colour).
+  renderer.setRenderTarget(lens.target);
+  const blobs = renderer.compileAsync(lens.blobScene, lens.overlayCamera);
+  renderer.setRenderTarget(null);
   await Promise.all([
     shadowed,
+    blobs,
     renderer.compileAsync(scene, camera),
     renderer.compileAsync(lens.overlay, lens.overlayCamera),
-    renderer.compileAsync(lens.blobScene, lens.overlayCamera),
     renderer.compileAsync(shock.scene, shock.camera),
   ]);
   // The render loop switches unlit lights off while the compile runs.
