@@ -32,8 +32,8 @@ import { stepFill, drawFill } from "./fill-wave";
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["idle", "free"];
 const SHAPE_FADE_MS = 350;
-// Each step's share of the fill: shape download, skin download, building and warming the scene.
-const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
+// Each step's share of the fill: shape download, skin download, building and warming the scene, building the helpers.
+const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.25, helpers: 0.1 };
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
@@ -190,7 +190,7 @@ settings.applyAll();
 let idle = null;
 let idleActive = false;
 
-const loaded = { shape: 0, skin: 0, prepare: 0 };
+const loaded = { shape: 0, skin: 0, prepare: 0, helpers: 0 };
 const loadedShare = () =>
   Object.keys(LOAD_SHARE).reduce(
     (sum, k) => sum + LOAD_SHARE[k] * loaded[k],
@@ -399,11 +399,13 @@ async function warmLights(shown) {
 async function warm(extra = warmExtra) {
   warmExtra = extra;
   warmedLights.clear();
-  const unlit = [[false, false], ...extra];
-  const glow = lightGroups[2].length ? [false, true] : [false];
+  // The golden glow lights only on hover, so it is warmed only with the likely mood and disco groups; other combinations fall back to all lights.
+  const glow =
+    idle && lightGroups[2].length ? [[...idle.likelyLights(), true]] : [];
   const states = [
     ALL_LIGHTS,
-    ...glow.flatMap((g) => unlit.map(([m, d]) => [m, d, g])),
+    ...[[false, false], ...extra].map(([m, d]) => [m, d, false]),
+    ...glow,
   ];
   for (let n = 0; n < states.length; n += 1)
     // eslint-disable-next-line no-await-in-loop
@@ -534,8 +536,16 @@ peach
       onRipe = resolve;
     });
     peach.applySkin(await skinImage);
+    peach.planPlant();
     loaded.skin = 1;
+    // Helpers bake from the full skin, so they build during the ripening fill; the tap waits for them.
+    const settled = idle
+      .settle((fraction) => {
+        loaded.helpers = fraction;
+      })
+      .then(drawEverything);
     await ripe;
+    await settled;
     juice.clear();
     loadSounds();
     keepAudioUnlocked();

@@ -22,6 +22,7 @@ import { format } from "./numbers";
 import { playDing, playBuy, playNotes } from "../audio";
 import { PHYSICS_CONFIG } from "../config";
 import { clamp, reducedMotion } from "../util";
+import { warmsSettled } from "./scenery/extras/kit";
 
 const BEADS = { smack: 4, crit: 5.2, other: 4.6 };
 
@@ -372,6 +373,15 @@ export function createIdle({
       if (state.toys.includes("disco")) states.push([false, true]);
       return states;
     },
+    // The mood and disco groups as play will most likely start: lit by their toy setting, or mood by cult candles.
+    likelyLights() {
+      const { state } = game;
+      return [
+        (state.toys.includes("mood") && !!settings.moodLight) ||
+          state.helpers.cult > 0,
+        state.toys.includes("disco") && !!settings.disco,
+      ];
+    },
     warmFade: (warm) => privacy.warmFade(warm),
     prepare() {
       golden.warmup(peach);
@@ -386,6 +396,12 @@ export function createIdle({
       toys.sync();
       showBottleUi(bottleEarned(game.state));
       showMassageHint();
+    },
+    async settle(progress) {
+      await room.prepare();
+      progress(0.5);
+      await warmsSettled();
+      progress(1);
     },
     bottleEarned: () => bottleEarned(game.state),
     begin(free) {

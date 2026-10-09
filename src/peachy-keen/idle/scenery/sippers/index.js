@@ -17,11 +17,20 @@ export default class Sippers {
     if (away && !this.away) this.run?.instance.scatter();
     this.away = away;
     this.clock.time += delta;
-    if (!this.run) {
-      const ctx = makeContext("sippers", this.world, this.clock);
-      this.run = { ctx, instance: createSippers(ctx) };
-    }
+    this.start();
     this.run.instance.update(delta, away);
+  }
+
+  async prepare() {
+    if (!this.world.game.state.seen.butterflies) return;
+    this.start();
+    await this.run.instance.prepare();
+  }
+
+  start() {
+    if (this.run) return;
+    const ctx = makeContext("sippers", this.world, this.clock);
+    this.run = { ctx, instance: createSippers(ctx) };
   }
 
   clear() {

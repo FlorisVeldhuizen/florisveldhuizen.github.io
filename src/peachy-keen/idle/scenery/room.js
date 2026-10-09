@@ -1529,6 +1529,18 @@ export class Room {
     });
   }
 
+  async prepare() {
+    this.extras.prepare();
+    if (this.game.state.helpers.moon) this.shapeMoon();
+    await this.sippers.prepare();
+  }
+
+  shapeMoon() {
+    if (this.moonShaped || !this.i.peach.mesh) return;
+    usePeachShape(this.moon, this.i.peach);
+    this.moonShaped = true;
+  }
+
   update(delta) {
     if (!this.active) return;
     const { helpers, options } = this.game.state;
@@ -1539,7 +1551,6 @@ export class Room {
     }
     this.time += delta;
     const t = this.time;
-    const { i } = this;
     const still = reducedMotion.matches ? 0.15 : 1;
     const own = (id) => (helpers[id] || 0) * this.presence(id);
     const center = this.followPeach(delta);
@@ -1739,10 +1750,7 @@ export class Room {
 
     const moon = level(own("moon"), 50);
     this.moon.visible = own("moon") > 0;
-    if (helpers.moon && !this.moonShaped && i.peach.mesh) {
-      usePeachShape(this.moon, i.peach);
-      this.moonShaped = true;
-    }
+    if (helpers.moon) this.shapeMoon();
     this.moonHalo.visible = this.moon.visible;
     this.moon.scale.setScalar(1.8 + moon * 0.8);
     const drift = Math.sin((t / MOON_CROSSING) * Math.PI * 2);

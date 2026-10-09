@@ -335,10 +335,14 @@ export default {
   id: "paparazzi",
   create(ctx) {
     let step = null;
+    const built = () => {
+      if (!step && ctx.peach.mesh && ctx.peach.material) step = build(ctx);
+      return step;
+    };
+    built();
     return {
       update(dt) {
-        if (!step && ctx.peach.mesh && ctx.peach.material) step = build(ctx);
-        step?.(dt);
+        built()?.(dt);
       },
       dispose() {},
     };

@@ -49,6 +49,23 @@ export function setExtrasSound(on) {
   if (out) out.gain.setTargetAtTime(on ? 1 : 0, out.context.currentTime, 0.05);
 }
 
+// Warm-ups still running, so loading can wait until every helper is ready to draw.
+const pendingWarms = new Set();
+const trackWarm = (done) => {
+  pendingWarms.add(done);
+  const settle = () => pendingWarms.delete(done);
+  done.then(settle, settle);
+  return done;
+};
+export async function warmsSettled() {
+  while (pendingWarms.size) {
+    // eslint-disable-next-line no-await-in-loop
+    await Promise.all(pendingWarms);
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise(requestAnimationFrame);
+  }
+}
+
 export function makeContext(id, world, clock) {
   const { game, interaction: i, room, scene, camera, renderer } = world;
   const group = new Group();
@@ -278,5 +295,7 @@ export function makeContext(id, world, clock) {
       });
     },
   };
+  const { warm } = ctx;
+  ctx.warm = (include) => trackWarm(warm(include));
   return ctx;
 }

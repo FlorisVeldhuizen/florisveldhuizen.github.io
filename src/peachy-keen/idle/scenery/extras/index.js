@@ -27,15 +27,27 @@ export default class Extras {
         if (run) this.stop(fx.id);
         return;
       }
-      if (!run) {
-        const ctx = makeContext(fx.id, this.world, this.clock);
-        run = { ctx, instance: fx.create(ctx) || {} };
-        this.runs[fx.id] = run;
-      }
+      if (!run) run = this.start(fx);
       run.ctx.group.visible = !away;
       run.ctx.away = away;
       run.instance.update?.(delta, this.clock.time);
     });
+  }
+
+  // Builds owned helpers while loading; they stay hidden until the first update.
+  prepare() {
+    const { helpers } = this.world.game.state;
+    MODULES.forEach((fx) => {
+      if (helpers[fx.id] && !this.runs[fx.id]) this.start(fx, false);
+    });
+  }
+
+  start(fx, shown = true) {
+    const ctx = makeContext(fx.id, this.world, this.clock);
+    ctx.group.visible = shown;
+    const run = { ctx, instance: fx.create(ctx) || {} };
+    this.runs[fx.id] = run;
+    return run;
   }
 
   stop(id) {
