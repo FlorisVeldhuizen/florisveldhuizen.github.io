@@ -15,30 +15,26 @@ import { Shock } from "./shock";
 import { SkinRings } from "./rings";
 import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import { reducedMotion } from "./util";
+import { PrivacyTag, freePlayOpen, openFreePlay, cordX } from "./privacy-tag";
 import IntroTitle from "./intro-title";
 import JiggleText from "./jiggle-text";
 import slideToggle from "./slide-toggle";
 import { stepFill, drawFill } from "./fill-wave";
 
 const MODE_KEY = "peachy-keen-mode";
-const MODES = ["classic", "idle"];
-const SWITCH_KEY = "peachy-keen-switching";
-const SWAP_SHOT_KEY = "peachy-keen-swap-shot";
-const SWAP_TIME_KEY = "peachy-keen-swap-time";
-const LEAVE_MS = 700;
+const MODES = ["idle", "free"];
 const SHAPE_FADE_MS = 350;
-const STAGE_FADE_MS = 800;
 // Each step's share of the fill: shape download, skin download, building and warming the scene.
 const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
 const introStatus = document.getElementById("intro-status");
-const modeName = (picked) => (picked === "idle" ? "Idle" : "Classic");
-// eslint-disable-next-line no-use-before-define
-const readyText = () => `Tap the peach to play ${modeName(mode)}.`;
-const openingText = (picked) =>
-  picked === "idle" ? "Opening the shop" : "Opening Classic";
+const freeOpen = freePlayOpen();
+if (freeOpen) openFreePlay();
+const readyText = () =>
+  // eslint-disable-next-line no-use-before-define
+  mode === "free" ? "Tap the peach for free play." : "Tap the peach to play.";
 
 // Each letter is its own span, so the line can carry a wave while the game loads.
 const statusLetters = (text) =>
@@ -68,15 +64,16 @@ setTimeout(showText, 2000);
 const modeButtons = [...document.querySelectorAll("[data-mode]")];
 
 function readMode() {
+  if (!freeOpen) return "idle";
   const asked = new URLSearchParams(window.location.search).get("mode");
   if (MODES.includes(asked)) return asked;
   try {
     const saved = localStorage.getItem(MODE_KEY);
     if (MODES.includes(saved)) return saved;
   } catch {
-    // Blocked storage falls back to the classic game.
+    // Blocked storage falls back to the shop.
   }
-  return "classic";
+  return "idle";
 }
 
 function saveMode(value) {
@@ -87,66 +84,20 @@ function saveMode(value) {
   }
 }
 
-function takeFlag(key) {
-  try {
-    const set = sessionStorage.getItem(key) === "1";
-    sessionStorage.removeItem(key);
-    return set;
-  } catch {
-    return false;
-  }
-}
-
 let mode = readMode();
 let started = false;
 let idleReady = null;
-let preparedMode = null;
 let startGame = null;
 let jiggleText = null;
-const switching = takeFlag(SWITCH_KEY);
-const swapping = document.documentElement.classList.contains("is-swapping");
-const swapTime = (() => {
-  try {
-    const time = sessionStorage.getItem(SWAP_TIME_KEY);
-    sessionStorage.removeItem(SWAP_TIME_KEY);
-    sessionStorage.removeItem(SWAP_SHOT_KEY);
-    return time;
-  } catch {
-    return null;
-  }
-})();
-const skipLoading = switching;
-if (switching) {
-  writeStatus(openingText(mode));
-  document.documentElement.classList.add("has-status");
-}
 const showMode = () =>
   modeButtons.forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.mode === mode)),
   );
-function reloadInto(picked) {
-  saveMode(picked);
-  try {
-    sessionStorage.setItem(SWITCH_KEY, "1");
-  } catch {
-    // Without session storage the start screen shows after the switch.
-  }
-  const url = new URL(window.location.href);
-  url.searchParams.delete("mode");
-  window.history.replaceState(null, "", url);
-  window.location.reload();
-}
-
 modeButtons.forEach((b) =>
   b.addEventListener("click", () => {
     const picked = b.dataset.mode;
-    if (started) {
-      // eslint-disable-next-line no-use-before-define
-      if (picked !== mode) leaveFor(picked);
-      return;
-    }
-    // Before the start a pick only selects; the peach is the one way to start.
-    if (picked === mode) return;
+    // A pick only selects; the peach is the one way to start.
+    if (started || picked === mode) return;
     mode = picked;
     showMode();
     if (!startGame) return;
@@ -156,6 +107,7 @@ modeButtons.forEach((b) =>
   }),
 );
 showMode();
+document.querySelector(".intro-modes").hidden = !freeOpen;
 document.querySelector(".intro-modes").classList.add("is-set");
 slideToggle(document.querySelector(".intro-modes"));
 
@@ -167,7 +119,6 @@ setupResizeHandler(camera, renderer, () => {
   lens.resize();
 });
 backdrop.setMotion(!reducedMotion.matches);
-if (swapping && swapTime !== null) backdrop.time = Number(swapTime);
 
 const group = new Group();
 group.visible = false;
@@ -181,6 +132,8 @@ juice.onSplat = (position, velocity) => lens.splat(position, velocity);
 lens.onHit = () => playLensHit(1);
 const ui = new UI();
 const talk = new Talk();
+const privacyTag = new PrivacyTag({ scene, camera, anchorX: cordX });
+if (import.meta.env.DEV) window.pkTag = privacyTag;
 const mood = new MoodLight(scene, renderer, lights);
 
 const settings = new Settings((key, value) => {
@@ -251,7 +204,6 @@ if (fillCanvas.transferControlToOffscreen) {
       size: fillSize(),
       epoch: waveEpoch,
       image: RIPE_RENDER,
-      instant: skipLoading,
     },
     [canvas],
   );
@@ -269,7 +221,7 @@ function showRipeness(delta) {
   const time = waveTime();
   if (fillWorker) fillWorker.postMessage({ target });
   else {
-    if (ripeRender.complete) stepFill(fill, target, delta, skipLoading);
+    if (ripeRender.complete) stepFill(fill, target, delta);
     const size = fillSize();
     if (!stillGone && ripeRender.complete && size) {
       if (fillCanvas.width !== size) {
@@ -305,44 +257,6 @@ function showRipeness(delta) {
   }
   if (fill.shown >= 1) onRipe?.();
 }
-
-const wait = (ms) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-const introShape = document.getElementById("intro-shape");
-// Web animations of transform run on the compositor, so the peach keeps breathing while the page is busy.
-const BREATH = [
-  [
-    { transform: "scale(1, 1)" },
-    { transform: "scale(1.025, 0.975)" },
-    { transform: "scale(1, 1)" },
-  ],
-  { duration: 1400, iterations: Infinity, easing: "ease-in-out" },
-];
-let breathing = null;
-const breathe = () => {
-  breathing = introShape.animate(...BREATH);
-};
-// The still eases back to rest, the live peach (held in the same pose) fades in under it, then the still goes.
-const handOver = async () => {
-  if (breathing) {
-    const from = getComputedStyle(introShape).transform;
-    breathing.cancel();
-    breathing = null;
-    await introShape.animate([{ transform: from }, { transform: "none" }], {
-      duration: 250,
-      easing: "ease-out",
-    }).finished;
-  }
-  const root = document.documentElement;
-  root.classList.add("is-handing");
-  if (swapping)
-    interaction.bottle.view.group.visible = idle?.bottleEarned() ?? true;
-  root.classList.remove("is-switching");
-  await wait(STAGE_FADE_MS);
-};
-if (switching) breathe();
 
 let statusTimer = 0;
 function sayForAMoment(text) {
@@ -471,110 +385,22 @@ async function prepareIdle() {
     lens,
     juice,
     droplets,
+    privacyTag,
   });
   naughty.set("achievements", false);
   idle.prepare();
   await warm();
+  await idle.warmFade(warm);
   idle.ready();
   setStatus(status);
 }
 
-// The last frame without the peach covers the reload; the breathing still stands in for the peach.
-function snapshotWithoutPeach() {
-  const shown = group.visible;
-  group.visible = false;
-  renderer.render(scene, camera);
-  group.visible = shown;
-  const shot = document.createElement("canvas");
-  shot.width = window.innerWidth;
-  shot.height = window.innerHeight;
-  shot
-    .getContext("2d")
-    .drawImage(renderer.domElement, 0, 0, shot.width, shot.height);
-  return shot.toDataURL("image/jpeg", 0.8);
-}
-
-let leaving = false;
-
-// While the shop compiles the page freezes, so a still copy of the frame with a breathing peach covers it.
-function coverFrame(text) {
-  const cover = document.createElement("div");
-  cover.className = "swap-cover";
-  cover.style.backgroundImage = `url(${snapshotWithoutPeach()})`;
-  cover.innerHTML = `<div class="intro-shape"></div><p class="intro-status swap-status"></p>`;
-  cover.querySelector(".swap-status").append(...statusLetters(text));
-  document.body.append(cover);
-  const still = cover.firstElementChild;
-  const breath = still.animate(...BREATH);
-  return async () => {
-    const from = getComputedStyle(still).transform;
-    breath.cancel();
-    await still.animate([{ transform: from }, { transform: "none" }], {
-      duration: 250,
-      easing: "ease-out",
-    }).finished;
-    await cover.animate([{ opacity: 1 }, { opacity: 0 }], {
-      duration: 300,
-      easing: "ease-out",
-    }).finished;
-    cover.remove();
-  };
-}
-
-// Classic has everything Idle needs except the shop, so the shop is built in this page instead of a reload.
-async function openIdleHere() {
-  const root = document.documentElement;
-  root.classList.add("is-leaving-mode");
-  interaction.holdStill = true;
-  await wait(LEAVE_MS);
-  const { time } = backdrop;
-  const uncover = coverFrame(openingText("idle"));
-  mode = "idle";
-  preparedMode = "idle";
-  saveMode("idle");
-  showMode();
-  idleReady = prepareIdle();
-  await idleReady;
-  backdrop.time = time;
-  root.classList.remove("is-leaving-mode");
-  await uncover();
-  document.querySelectorAll(".score > *").forEach((n) =>
-    n.animate([{ opacity: 0 }, { opacity: 1 }], {
-      duration: 500,
-      easing: "ease-out",
-    }),
-  );
-  interaction.holdStill = false;
-  idleActive = true;
-  idle.begin();
-  leaving = false;
-}
-
-async function leaveFor(picked) {
-  if (leaving) return;
-  leaving = true;
-  if (picked === "idle" && !idle) {
-    openIdleHere();
-    return;
-  }
-  document.documentElement.classList.add("is-leaving-mode");
-  interaction.holdStill = true;
-  await Promise.all([idle?.leave(), wait(LEAVE_MS)]);
-  try {
-    sessionStorage.setItem(SWAP_TIME_KEY, String(backdrop.time));
-    sessionStorage.setItem(SWAP_SHOT_KEY, snapshotWithoutPeach());
-  } catch {
-    // Without session storage the switch shows the plain opening screen.
-  }
-  reloadInto(picked);
-}
-
 const HUD = [".score", ".hints", ".settings-dock", ".bottle"];
-// After a switch from inside the game the score and hints never left, so only what is new fades in.
-const SWAP_HUD = [".score > *", ".settings-dock"];
+// Free play keeps the score and hints hidden, so they must not flash in on the way.
+const FREE_HUD = [".settings-dock", ".bottle"];
 function showHud() {
   document.body.classList.remove("is-intro");
-  (swapping ? SWAP_HUD : HUD).forEach((selector) =>
+  (mode === "free" ? FREE_HUD : HUD).forEach((selector) =>
     document
       .querySelector(selector)
       ?.animate([{ opacity: 0 }, { opacity: 1 }], {
@@ -637,16 +463,14 @@ peach
   .then(async () => {
     loaded.shape = 1;
     interaction.prepareHalves();
-    preparedMode = mode;
-    if (mode === "idle") idleReady = prepareIdle();
-    else await warm();
+    idleReady = prepareIdle();
     await idleReady;
     loaded.prepare = 1;
     group.visible = true;
     intro.classList.add("has-shape");
-    setStatus(switching ? openingText(mode) : "Ripening");
+    setStatus("Ripening");
     setTimeout(() => {
-      if (!switching) interaction.holdStill = false;
+      interaction.holdStill = false;
       stillGone = true;
       fillWorker?.postMessage({ stop: true });
     }, SHAPE_FADE_MS);
@@ -654,93 +478,35 @@ peach
       onRipe = resolve;
     });
     peach.applySkin(await skinImage);
-    if (switching) peach.fitPlant();
     loaded.skin = 1;
     await ripe;
     juice.clear();
     loadSounds();
     keepAudioUnlocked();
 
-    // Starting the mode that was not prepared: the peach stays as the one fixed point while the rest
-    // fades to a calm screen, and the slow work happens behind it.
-    let opening = false;
-    const openOther = async () => {
-      if (opening) return;
-      opening = true;
-      // The tap squash settles and the sway eases to the rest pose before the still takes over.
-      interaction.nudge(1.4);
-      interaction.holdStill = true;
-      intro.classList.remove("is-ready");
-      setStatus(openingText(mode));
-      await wait(650);
-      document.documentElement.classList.add(
-        "is-switching",
-        "is-opening",
-        "has-status",
-      );
-      await wait(450);
-      peach.fitPlant();
-      if (mode === "classic") {
-        reloadInto("classic");
-        return;
-      }
-      breathe();
-      preparedMode = "idle";
-      idleReady = prepareIdle();
-      await idleReady;
-      await handOver();
-      // eslint-disable-next-line no-use-before-define
-      start(true);
-    };
-
-    const start = async (afterOpening = false) => {
+    const start = async () => {
       if (started) return;
-      if (mode !== preparedMode) {
-        openOther();
-        return;
-      }
-      if (afterOpening) {
-        intro.classList.add("is-handed", "is-quiet");
-        await wait(300);
-      }
       // The shop panel reserves its space as it appears; the fading intro keeps its place.
       intro.style.padding = getComputedStyle(intro).padding;
       started = true;
-      idleActive = !!idle;
-      // After a switch the peach waits for the still on top of it to fade, so their leaves stay together.
-      if (afterOpening)
-        setTimeout(() => {
-          interaction.holdStill = false;
-        }, 900);
-      else interaction.holdStill = false;
+      idleActive = true;
+      interaction.holdStill = false;
       saveMode(mode);
       await idleReady;
       interaction.requestShake();
       intro.classList.add("is-leaving");
+      idle.begin(mode === "free");
+      // Applies free play's hidden score while the intro still hides it, so it never fades out in view.
+      document.body.getBoundingClientRect();
       showHud();
-      setTimeout(() => {
-        intro.remove();
-        document.documentElement.classList.remove(
-          "is-opening",
-          "is-handing",
-          "has-status",
-        );
-      }, 700);
+      setTimeout(() => intro.remove(), 700);
       peach.fitPlant();
-      interaction.begin(afterOpening ? 0 : 1.6);
+      interaction.begin(1.6);
       jiggleText ??= new JiggleText();
-      if (!swapping) {
-        interaction.bottle.view.group.visible = idle?.bottleEarned() ?? true;
-        interaction.bottle.screen.x -= 220;
-      }
-      idle?.begin();
+      interaction.bottle.view.group.visible = idle.bottleEarned();
+      interaction.bottle.screen.x -= 220;
     };
 
-    if (switching) {
-      await handOver();
-      start(true);
-      return;
-    }
     setStatus(readyText());
     intro.classList.add("is-ready");
     interaction.nudge(1.4);

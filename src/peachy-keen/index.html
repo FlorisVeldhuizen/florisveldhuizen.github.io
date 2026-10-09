@@ -9,21 +9,6 @@
     <meta name="theme-color" content="#362c3f" />
     <meta name="description" content="A peach to smack, pull and oil up." />
     <title>Jiggle Peach</title>
-    <script>
-      // A mode switch reloads the page; it stays hidden until the peach is back.
-      try {
-        if (sessionStorage.getItem("peachy-keen-switching") === "1") {
-          const root = document.documentElement;
-          root.classList.add("is-switching", "is-opening");
-          // A switch from inside the game shows the last frame without the peach, so only the peach stands in.
-          const shot = sessionStorage.getItem("peachy-keen-swap-shot");
-          if (shot) {
-            root.classList.add("is-swapping");
-            root.style.setProperty("--swap-shot", `url(${shot})`);
-          }
-        }
-      } catch {}
-    </script>
     <link
       rel="icon"
       href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍑</text></svg>"
@@ -216,13 +201,6 @@
     <div class="ui settings-dock">
       <div id="settings" class="settings" hidden>
         <div class="settings-row">
-          <span>Game mode</span>
-          <span class="segmented" role="group" aria-label="Game mode">
-            <button type="button" data-mode="classic">Classic</button>
-            <button type="button" data-mode="idle">Idle</button>
-          </span>
-        </div>
-        <div class="settings-row">
           <span>Firmness</span>
           <span class="segmented" role="group" aria-label="Firmness">
             <button type="button" data-setting="firmness" data-value="firm">
@@ -386,8 +364,8 @@
       </h1>
       <div class="intro-foot">
         <p class="segmented intro-modes" role="group" aria-label="Game mode">
-          <button type="button" data-mode="classic">Classic</button>
-          <button type="button" data-mode="idle">Idle</button>
+          <button type="button" data-mode="idle">Standard</button>
+          <button type="button" data-mode="free">Free play</button>
         </p>
         <p id="intro-status" class="intro-status" aria-live="polite">
           Ripening

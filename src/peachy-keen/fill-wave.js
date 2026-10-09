@@ -16,12 +16,9 @@ export function waveOffset(across, time, motion) {
 const GLIDE_SECONDS = 0.45;
 
 // A damped glide toward the loaded amount: it eases in and out, never overshoots, and stays under a top speed.
-export function stepFill(state, target, delta, instant) {
+export function stepFill(state, target, delta) {
   /* eslint-disable no-param-reassign */
-  if (instant) {
-    state.shown = target;
-    state.velocity = 0;
-  } else if (delta > 0) {
+  if (delta > 0) {
     const omega = 2 / GLIDE_SECONDS;
     const x = omega * delta;
     const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
