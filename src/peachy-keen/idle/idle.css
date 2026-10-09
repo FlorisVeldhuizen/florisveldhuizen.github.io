@@ -353,6 +353,15 @@ body.is-storm::after {
   margin-bottom: 10px;
 }
 
+.shop-title-tool {
+  display: flex;
+  gap: 8px;
+}
+
+.shop-title-tool[hidden] {
+  display: none;
+}
+
 .joined {
   position: relative;
   display: inline-flex;

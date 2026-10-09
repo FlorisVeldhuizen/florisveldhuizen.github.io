@@ -31,14 +31,14 @@ export class UpgradesView {
     this.root = root;
     this.rows = new Map();
     this.signature = "";
-    const head = el("div", "shop-head", root);
-    this.buyAll = el("button", "switch shop-all", head);
+    this.titleTool = el("span", "shop-title-tool");
+    this.buyAll = el("button", "switch", this.titleTool);
     this.buyAll.type = "button";
-    this.buyAll.textContent = "Buy all I can afford";
+    this.buyAll.textContent = "Buy max";
     this.buyAll.addEventListener("click", () => {
       game.availableUpgrades().forEach((u) => game.buyUpgrade(u.id));
     });
-    this.valet = el("button", "switch shop-auto", head);
+    this.valet = el("button", "switch shop-auto", this.titleTool);
     this.valet.type = "button";
     this.valet.addEventListener("click", () =>
       game.setOption("valet", !game.state.options.valet),
