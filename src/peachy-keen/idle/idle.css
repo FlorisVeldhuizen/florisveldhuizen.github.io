@@ -2255,6 +2255,7 @@ body.is-storm::after {
 }
 
 .toast-card {
+  position: relative;
   display: grid;
   gap: 2px;
   padding: 10px 18px 12px;
@@ -2262,6 +2263,53 @@ body.is-storm::after {
   border-radius: 14px;
   background: rgba(30, 5, 12, 0.96);
   text-align: center;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.toast-card:active {
+  cursor: grabbing;
+}
+
+.toast-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--blush-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
+}
+
+.toast-close .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.toast-card:hover .toast-close,
+.toast-close:focus-visible {
+  opacity: 1;
+}
+
+.toast-close:hover {
+  color: var(--blush);
+}
+
+@media (hover: none) {
+  .toast-close {
+    opacity: 0.7;
+  }
 }
 
 .toast-card.is-seed {
