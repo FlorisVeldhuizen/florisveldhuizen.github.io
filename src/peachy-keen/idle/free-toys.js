@@ -26,9 +26,9 @@ function saveOpen(open) {
 }
 
 export default class FreeToys {
-  constructor(game, leave) {
+  constructor(game, toShop) {
     this.game = game;
-    this.leave = leave;
+    this.toShop = toShop;
     this.root = el("div", "ui free-toys", document.body);
     this.toggle = el("button", "ft-toggle", this.root, "Your toys");
     this.toggle.type = "button";
@@ -54,6 +54,7 @@ export default class FreeToys {
     const owns = (id) => s.toys.includes(id);
     this.card.replaceChildren();
     this.controls = [];
+    this.modeRow();
     PICKERS.forEach((picker) => {
       const options = picker.options.filter(
         ([id]) => !TOY_BY_ID[id] || owns(id),
@@ -94,9 +95,21 @@ export default class FreeToys {
         state: b.querySelector(".ft-state"),
       });
     });
-    const back = el("button", "ft-leave", this.card, "Back to the shop");
-    back.type = "button";
-    back.addEventListener("click", () => this.leave());
+  }
+
+  modeRow() {
+    const row = el("div", "ft-pick ft-mode", this.card);
+    el("span", "ft-label", row, "Mode");
+    const group = el("span", "segmented", row);
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Mode");
+    const free = el("button", "", group, "Free play");
+    free.type = "button";
+    free.setAttribute("aria-pressed", "true");
+    const shop = el("button", "", group, "Shop");
+    shop.type = "button";
+    shop.setAttribute("aria-pressed", "false");
+    shop.addEventListener("click", () => this.toShop());
   }
 
   update() {

@@ -1737,7 +1737,7 @@ export class Room {
 
     const moon = level(own("moon"), 50);
     this.moon.visible = own("moon") > 0;
-    if (this.moon.visible && !this.moonShaped && i.peach.mesh) {
+    if (helpers.moon && !this.moonShaped && i.peach.mesh) {
       usePeachShape(this.moon, i.peach);
       this.moonShaped = true;
     }

@@ -390,6 +390,7 @@ async function prepareIdle() {
   naughty.set("achievements", false);
   idle.prepare();
   await warm();
+  await idle.warmFade(warm);
   idle.ready();
   setStatus(status);
 }

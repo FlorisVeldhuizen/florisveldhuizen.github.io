@@ -3050,21 +3050,10 @@ body.is-dnd:not(.is-shopping) .free-toys {
   color: var(--velvet);
 }
 
-.ft-leave {
-  margin-top: 4px;
-  padding: 10px 8px 4px;
-  border: 0;
-  border-top: 1px solid var(--blush-faint);
-  background: none;
-  color: var(--blush-dim);
-  font-size: 14px;
-  font-style: italic;
-  text-align: left;
-  cursor: pointer;
-}
-
-.ft-leave:hover {
-  color: var(--blush);
+.ft-mode {
+  margin-bottom: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--blush-faint);
 }
 
 @media (min-width: 900px), (orientation: landscape) and (min-width: 640px) {

@@ -326,6 +326,7 @@ export function createIdle({
 
   return {
     room,
+    warmFade: (warm) => privacy.warmFade(warm),
     prepare() {
       golden.warmup(peach);
       peach.prepareSkinFade();

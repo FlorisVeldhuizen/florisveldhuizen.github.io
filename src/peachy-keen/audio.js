@@ -24,6 +24,11 @@ let slide = null;
 let muted = false;
 let lastTime = -1;
 let stalled = false;
+let lastSlap = null;
+let choir = null;
+let chant = null;
+let buzzer = null;
+let disco = null;
 
 function context() {
   if (!ctx) {
@@ -63,82 +68,50 @@ function noiseBuffer() {
   return noise;
 }
 
-export function loadSounds() {
-  if (!loading) {
-    const sets = [
-      [AUDIO_CONFIG.slapSounds, slaps],
-      [AUDIO_CONFIG.rubSounds, rubs],
-      [AUDIO_CONFIG.grabSounds, grabs],
-      [AUDIO_CONFIG.kissSounds, kisses],
-      [AUDIO_CONFIG.glugSounds, glugs],
-      [AUDIO_CONFIG.snapSounds, snaps],
-      [AUDIO_CONFIG.sliceSounds, slices],
-      [AUDIO_CONFIG.patSounds, pats],
-      [AUDIO_CONFIG.skinBodySounds, skinBodies],
-    ];
-    loading = Promise.all([
-      ...sets.map(([urls, buffers]) =>
-        Promise.all(urls.map(decode)).then((decoded) =>
-          buffers.push(...decoded),
-        ),
-      ),
-      decode(AUDIO_CONFIG.burstSound).then((buffer) => {
-        burst = buffer;
-      }),
-      decode(AUDIO_CONFIG.massageBankSound).then((buffer) => {
-        massageBank = buffer;
-        massageMap = mapMassage(buffer);
-      }),
-    ]).catch((error) => {
-      // eslint-disable-next-line no-console
-      console.error("Could not load sounds:", error);
-    });
+function running() {
+  return ctx && ctx.state === "running" && !stalled;
+}
+
+function tone(at, { from, to, sweep, length, volume, attack = 0.01 }) {
+  const osc = ctx.createOscillator();
+  osc.frequency.setValueAtTime(from, at);
+  osc.frequency.exponentialRampToValueAtTime(to, at + (sweep ?? length));
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(volume, at + attack);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+  osc.connect(gain).connect(master);
+  osc.start(at);
+  osc.stop(at + length + 0.02);
+}
+
+function noiseHit(
+  freqFrom,
+  freqTo,
+  length,
+  volume,
+  type = "bandpass",
+  { q = 2, attack = 0 } = {},
+) {
+  if (!running()) return;
+  const now = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer();
+  const filter = ctx.createBiquadFilter();
+  filter.type = type;
+  filter.Q.value = q;
+  filter.frequency.setValueAtTime(freqFrom, now);
+  filter.frequency.exponentialRampToValueAtTime(freqTo, now + length);
+  const gain = ctx.createGain();
+  if (attack) {
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + attack);
+  } else {
+    gain.gain.setValueAtTime(volume, now);
   }
-  return loading;
-}
-
-// Mobile Safari can report "running" while its clock stops; only a new context recovers.
-function watchClock() {
-  const live = ctx?.state === "running" && !document.hidden;
-  stalled = live && ctx.currentTime === lastTime;
-  lastTime = live ? ctx.currentTime : -1;
-}
-
-function rebuildContext() {
-  const dancing = disco && !disco.stopping;
-  if (disco) dropDisco(disco);
-  ctx.close().catch(() => {});
-  ctx = null;
-  rub = null;
-  slide = null;
-  choir = null;
-  chant = null;
-  buzzer = null;
-  lastSlap = null;
-  stalled = false;
-  lastTime = -1;
-  context();
-  if (dancing) startDisco();
-}
-
-function unlockAudio() {
-  if (stalled || ctx?.state === "closed") rebuildContext();
-  const c = context();
-  if (c.state !== "running") c.resume().catch(() => {});
-  loadSounds();
-}
-
-const GESTURES = ["pointerdown", "pointerup", "touchend", "click", "keydown"];
-
-// Mobile browsers suspend audio on background or interruption, and a touch pointerdown may not resume it.
-export function keepAudioUnlocked() {
-  GESTURES.forEach((type) =>
-    window.addEventListener(type, unlockAudio, {
-      capture: true,
-      passive: true,
-    }),
-  );
-  setInterval(watchClock, 500);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + length);
+  src.connect(filter).connect(gain).connect(master);
+  src.start(now, Math.random() * 0.5, length + 0.05);
 }
 
 export function setMuted(on) {
@@ -181,8 +154,6 @@ function onset(buffer) {
   return onsets.get(buffer);
 }
 
-let lastSlap = null;
-
 export function cutSlap() {
   if (!running() || !lastSlap) return;
   lastSlap.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
@@ -208,12 +179,12 @@ export function playSlap(
   src.playbackRate.value =
     variation * pitch * (1 + heat * 0.18) * (1 - oil * 0.08);
 
-  const tone = ctx.createBiquadFilter();
-  tone.type = "lowpass";
-  tone.frequency.value = 12000 - oil * 6000;
+  const muffle = ctx.createBiquadFilter();
+  muffle.type = "lowpass";
+  muffle.frequency.value = 12000 - oil * 6000;
   const gain = ctx.createGain();
   gain.gain.value = (0.35 + intensity * 0.5) * volume;
-  cutLows(src.connect(tone), lowCut).connect(gain).connect(master);
+  cutLows(src.connect(muffle), lowCut).connect(gain).connect(master);
   src.start(now, onset(src.buffer));
   lastSlap = gain;
 
@@ -258,6 +229,7 @@ function noiseLoop() {
   return { src, band, gain, heardAt: ctx.currentTime };
 }
 
+/* eslint-disable no-param-reassign */
 function expireLoop(loop, audible) {
   const now = ctx.currentTime;
   if (audible) loop.heardAt = now;
@@ -267,6 +239,7 @@ function expireLoop(loop, audible) {
   loop.gain.disconnect();
   return null;
 }
+/* eslint-enable no-param-reassign */
 
 const HANN = Float32Array.from(
   { length: 32 },
@@ -321,43 +294,6 @@ function onePole(hz, sampleRate) {
   };
 }
 
-// Oil-massage recordings slurp; frames heavy in 300–1800 Hz versus the hiss are the slurps.
-function mapMassage(buffer) {
-  const data = buffer.getChannelData(0);
-  const sr = buffer.sampleRate;
-  const hop = Math.round(sr * 0.01);
-  const frames = Math.floor(data.length / hop);
-  const env = blur(
-    frameEnergy(data, hop, frames, (x) => x * x).map(Math.sqrt),
-    4,
-  );
-  const median = Float32Array.from(env).sort()[Math.floor(frames / 2)];
-  const lp300 = onePole(300, sr);
-  const lp1800 = onePole(1800, sr);
-  const lp3000 = onePole(3000, sr);
-  const mid = new Float32Array(frames);
-  const high = new Float32Array(frames);
-  for (let f = 0; f < frames; f += 1) {
-    for (let i = f * hop; i < (f + 1) * hop; i += 1) {
-      const m = lp1800(data[i]) - lp300(data[i]);
-      const h = data[i] - lp3000(data[i]);
-      mid[f] += m * m;
-      high[f] += h * h;
-    }
-  }
-  const slurp = blur(
-    mid.map((m, f) => m / (high[f] + 1e-9)),
-    5,
-  );
-  const wetRank = new Float32Array(frames);
-  Array.from(slurp.keys())
-    .sort((a, b) => slurp[a] - slurp[b])
-    .forEach((f, i) => {
-      wetRank[f] = i / frames;
-    });
-  return { env, median, wetRank, ticks: findTicks(data, sr) };
-}
-
 function findTicks(data, sr) {
   const hop = Math.round(sr * 0.002);
   const energy = frameEnergy(
@@ -398,6 +334,43 @@ function findTicks(data, sr) {
   const crossings = ticks.map((t) => t.crossings).sort((a, b) => a - b);
   const middle = crossings[Math.floor(crossings.length / 2)] ?? 0;
   return ticks.filter((t) => t.crossings >= middle);
+}
+
+// Oil-massage recordings slurp; frames heavy in 300–1800 Hz versus the hiss are the slurps.
+function mapMassage(buffer) {
+  const data = buffer.getChannelData(0);
+  const sr = buffer.sampleRate;
+  const hop = Math.round(sr * 0.01);
+  const frames = Math.floor(data.length / hop);
+  const env = blur(
+    frameEnergy(data, hop, frames, (x) => x * x).map(Math.sqrt),
+    4,
+  );
+  const median = Float32Array.from(env).sort()[Math.floor(frames / 2)];
+  const lp300 = onePole(300, sr);
+  const lp1800 = onePole(1800, sr);
+  const lp3000 = onePole(3000, sr);
+  const mid = new Float32Array(frames);
+  const high = new Float32Array(frames);
+  for (let f = 0; f < frames; f += 1) {
+    for (let i = f * hop; i < (f + 1) * hop; i += 1) {
+      const m = lp1800(data[i]) - lp300(data[i]);
+      const h = data[i] - lp3000(data[i]);
+      mid[f] += m * m;
+      high[f] += h * h;
+    }
+  }
+  const slurp = blur(
+    mid.map((m, f) => m / (high[f] + 1e-9)),
+    5,
+  );
+  const wetRank = new Float32Array(frames);
+  Array.from(slurp.keys())
+    .sort((a, b) => slurp[a] - slurp[b])
+    .forEach((f, i) => {
+      wetRank[f] = i / frames;
+    });
+  return { env, median, wetRank, ticks: findTicks(data, sr) };
 }
 
 function brownNoise() {
@@ -488,16 +461,16 @@ function velvetGrain(at, offset, rate, length, gain, pan, dest, curve = HANN) {
   const src = ctx.createBufferSource();
   src.buffer = massageBank;
   src.playbackRate.value = rate;
-  const envelope = ctx.createGain();
-  envelope.gain.value = 0;
-  envelope.gain.setValueCurveAtTime(
+  const fade = ctx.createGain();
+  fade.gain.value = 0;
+  fade.gain.setValueCurveAtTime(
     curve.map((v) => v * gain),
     at,
     length,
   );
   const place = ctx.createStereoPanner();
   place.pan.value = Math.max(-1, Math.min(1, pan));
-  src.connect(envelope).connect(place).connect(dest);
+  src.connect(fade).connect(place).connect(dest);
   const latest = massageBank.duration - length * rate - 0.005;
   src.start(at, Math.max(0, Math.min(latest, offset)), length * rate + 0.005);
 }
@@ -514,6 +487,7 @@ function usableMassage(chain, position) {
   );
 }
 
+/* eslint-disable no-param-reassign */
 function strokeGrain(chain, at, now, rate, length, oil, pan) {
   const end = massageBank.duration - 0.5;
   if (Math.random() < chain.settings.jump * 0.25)
@@ -542,7 +516,9 @@ function strokeGrain(chain, at, now, rate, length, oil, pan) {
     chain.highpass,
   );
 }
+/* eslint-enable no-param-reassign */
 
+/* eslint-disable no-param-reassign */
 function gritTick(chain, at, oil, pan) {
   const { ticks } = massageMap;
   const tick = ticks[Math.floor(Math.random() * ticks.length)];
@@ -558,7 +534,9 @@ function gritTick(chain, at, oil, pan) {
     TICK,
   );
 }
+/* eslint-enable no-param-reassign */
 
+/* eslint-disable no-param-reassign */
 function playVelvet(chain, now, amount, speed, oil, pan) {
   const { settings } = chain;
   const elapsed = chain.lastAt == null ? 0 : now - chain.lastAt;
@@ -614,6 +592,7 @@ function playVelvet(chain, now, amount, speed, oil, pan) {
   chain.gain.disconnect();
   return false;
 }
+/* eslint-enable no-param-reassign */
 
 export function setRub(amount, oil, pan = 0) {
   if (!running()) return;
@@ -629,35 +608,6 @@ export function setRub(amount, oil, pan = 0) {
   rub.gain.gain.setTargetAtTime(level, now, level > rub.level ? 0.08 : 0.06);
   rub.level = level;
   if (!playVelvet(rub, now, amount, speed, oil, pan)) rub = null;
-}
-
-function noiseHit(
-  freqFrom,
-  freqTo,
-  length,
-  volume,
-  type = "bandpass",
-  { q = 2, attack = 0 } = {},
-) {
-  if (!running()) return;
-  const now = ctx.currentTime;
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer();
-  const filter = ctx.createBiquadFilter();
-  filter.type = type;
-  filter.Q.value = q;
-  filter.frequency.setValueAtTime(freqFrom, now);
-  filter.frequency.exponentialRampToValueAtTime(freqTo, now + length);
-  const gain = ctx.createGain();
-  if (attack) {
-    gain.gain.setValueAtTime(0.001, now);
-    gain.gain.exponentialRampToValueAtTime(volume, now + attack);
-  } else {
-    gain.gain.setValueAtTime(volume, now);
-  }
-  gain.gain.exponentialRampToValueAtTime(0.001, now + length);
-  src.connect(filter).connect(gain).connect(master);
-  src.start(now, Math.random() * 0.5, length + 0.05);
 }
 
 export function playSlide(duration, from, to) {
@@ -812,6 +762,29 @@ export function playWobble(
   }
 }
 
+function pickVariation(buffers) {
+  const last = lastPlayed.get(buffers) ?? -1;
+  const next =
+    (last + 1 + Math.floor(Math.random() * (buffers.length - 1))) %
+    buffers.length;
+  lastPlayed.set(buffers, next);
+  return buffers[next];
+}
+
+function playVariation(buffers, { rate, volume, cutoff = 20000, lowCut = 0 }) {
+  if (!running() || !buffers.length) return;
+  const src = ctx.createBufferSource();
+  src.buffer = pickVariation(buffers);
+  src.playbackRate.value = rate;
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = cutoff;
+  const gain = ctx.createGain();
+  gain.gain.value = volume;
+  cutLows(src.connect(soften), lowCut).connect(gain).connect(master);
+  src.start();
+}
+
 export function playSettle() {
   noiseHit(500, 180, 0.12, 0.14, "lowpass");
 }
@@ -905,29 +878,6 @@ export function playSquish(amount) {
   noiseHit(2200, 700, 0.06, 0.12 + amount * 0.1);
 }
 
-function pickVariation(buffers) {
-  const last = lastPlayed.get(buffers) ?? -1;
-  const next =
-    (last + 1 + Math.floor(Math.random() * (buffers.length - 1))) %
-    buffers.length;
-  lastPlayed.set(buffers, next);
-  return buffers[next];
-}
-
-function playVariation(buffers, { rate, volume, cutoff = 20000, lowCut = 0 }) {
-  if (!running() || !buffers.length) return;
-  const src = ctx.createBufferSource();
-  src.buffer = pickVariation(buffers);
-  src.playbackRate.value = rate;
-  const soften = ctx.createBiquadFilter();
-  soften.type = "lowpass";
-  soften.frequency.value = cutoff;
-  const gain = ctx.createGain();
-  gain.gain.value = volume;
-  cutLows(src.connect(soften), lowCut).connect(gain).connect(master);
-  src.start();
-}
-
 export function playGrab(oil = 0) {
   if (!running() || !grabs.length) return;
   const now = ctx.currentTime;
@@ -942,7 +892,7 @@ export function playGrab(oil = 0) {
   const length = Math.min(0.2, src.buffer.duration / rate);
   const attack = 0.008 / length;
   const volume = 0.34 + Math.random() * 0.06;
-  const envelope = Float32Array.from({ length: 128 }, (_, n) => {
+  const curve = Float32Array.from({ length: 128 }, (_, n) => {
     const at = n / 127;
     const shape =
       at < attack
@@ -950,7 +900,7 @@ export function playGrab(oil = 0) {
         : Math.cos((Math.PI / 2) * ((at - attack) / (1 - attack)));
     return volume * shape ** 2;
   });
-  gain.gain.setValueCurveAtTime(envelope, now, length);
+  gain.gain.setValueCurveAtTime(curve, now, length);
   src.connect(soften).connect(gain).connect(master);
   src.start(now);
   src.stop(now + length);
@@ -966,13 +916,13 @@ export function playKnead(oil, amount, cutoff = 9000 - oil * 5000) {
   soften.type = "lowpass";
   soften.frequency.value = cutoff;
   const gain = ctx.createGain();
-  const swell = Float32Array.from(
+  const rise = Float32Array.from(
     { length: 32 },
     (_, n) => Math.min(1, Math.sin((Math.PI * n) / 31) * 1.4) * 0.13 * amount,
   );
   const now = ctx.currentTime;
   const length = (src.buffer.duration / rate) * 0.6;
-  gain.gain.setValueCurveAtTime(swell, now, length);
+  gain.gain.setValueCurveAtTime(rise, now, length);
   src.connect(soften).connect(gain).connect(master);
   src.start(now, 0, length * rate);
 }
@@ -1024,23 +974,6 @@ export function playCork(open) {
   });
 }
 
-function running() {
-  return ctx && ctx.state === "running" && !stalled;
-}
-
-function tone(at, { from, to, sweep, length, volume, attack = 0.01 }) {
-  const osc = ctx.createOscillator();
-  osc.frequency.setValueAtTime(from, at);
-  osc.frequency.exponentialRampToValueAtTime(to, at + (sweep ?? length));
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, at);
-  gain.gain.exponentialRampToValueAtTime(volume, at + attack);
-  gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
-  osc.connect(gain).connect(master);
-  osc.start(at);
-  osc.stop(at + length + 0.02);
-}
-
 function snapSlap(amount, crisp) {
   if (slaps.length) {
     const now = ctx.currentTime;
@@ -1057,6 +990,27 @@ function snapSlap(amount, crisp) {
       .connect(master);
     src.start(now, onset(src.buffer));
   }
+}
+
+// A soft wooden bead knock; letting go adds a short swish of the cord.
+export function playCord(release, volume = 1) {
+  if (!running()) return;
+  const pitch = 0.94 + Math.random() * 0.12;
+  noiseHit(1400 * pitch, 900 * pitch, 0.035, 0.16 * volume, "bandpass", {
+    q: 5,
+  });
+  tone(ctx.currentTime, {
+    from: (release ? 560 : 720) * pitch,
+    to: (release ? 430 : 560) * pitch,
+    length: 0.07,
+    volume: 0.05 * volume,
+    attack: 0.002,
+  });
+  if (release)
+    noiseHit(2400, 500, 0.14, 0.07 * volume, "bandpass", {
+      q: 1.2,
+      attack: 0.01,
+    });
 }
 
 export function playSnap(amount, crisp = false) {
@@ -1139,8 +1093,6 @@ function swell(now, period) {
   return Math.max(0, Math.sin((now / period) * 2 * Math.PI)) ** 2;
 }
 
-let choir = null;
-
 export function setChoir(amount) {
   if (!running()) return;
   if (!choir) {
@@ -1150,8 +1102,6 @@ export function setChoir(amount) {
   const now = ctx.currentTime;
   choir.gain.setTargetAtTime(amount * 0.018 * swell(now, 37), now, 0.8);
 }
-
-let chant = null;
 
 export function setChant(amount) {
   if (!running()) return;
@@ -1196,8 +1146,6 @@ export function playBuy(pitch = 1) {
     attack: 0.004,
   });
 }
-
-let buzzer = null;
 
 export function setBuzz(amount, contact = 0) {
   if (!running()) return;
@@ -1287,7 +1235,6 @@ const LEAD = {
     [12, 69, 4],
   ],
 };
-let disco = null;
 
 function route(
   node,
@@ -1739,6 +1686,14 @@ export function startDisco() {
   scheduleDisco();
 }
 
+function dropDisco(dropped) {
+  clearInterval(dropped.timer);
+  clearTimeout(dropped.stopping);
+  dropped.lfos.forEach((lfo) => lfo.stop());
+  dropped.nodes.forEach((node) => node.disconnect());
+  if (disco === dropped) disco = null;
+}
+
 export function stopDisco() {
   if (!disco || disco.stopping) return;
   const fading = disco;
@@ -1754,15 +1709,85 @@ export function stopDisco() {
   );
 }
 
-function dropDisco(dropped) {
-  clearInterval(dropped.timer);
-  clearTimeout(dropped.stopping);
-  dropped.lfos.forEach((lfo) => lfo.stop());
-  dropped.nodes.forEach((node) => node.disconnect());
-  if (disco === dropped) disco = null;
-}
-
 export function discoBeat() {
   if (!disco || !running()) return null;
   return ((ctx.currentTime - disco.start) * DISCO_BPM) / 60;
+}
+
+export function loadSounds() {
+  if (!loading) {
+    const sets = [
+      [AUDIO_CONFIG.slapSounds, slaps],
+      [AUDIO_CONFIG.rubSounds, rubs],
+      [AUDIO_CONFIG.grabSounds, grabs],
+      [AUDIO_CONFIG.kissSounds, kisses],
+      [AUDIO_CONFIG.glugSounds, glugs],
+      [AUDIO_CONFIG.snapSounds, snaps],
+      [AUDIO_CONFIG.sliceSounds, slices],
+      [AUDIO_CONFIG.patSounds, pats],
+      [AUDIO_CONFIG.skinBodySounds, skinBodies],
+    ];
+    loading = Promise.all([
+      ...sets.map(([urls, buffers]) =>
+        Promise.all(urls.map(decode)).then((decoded) =>
+          buffers.push(...decoded),
+        ),
+      ),
+      decode(AUDIO_CONFIG.burstSound).then((buffer) => {
+        burst = buffer;
+      }),
+      decode(AUDIO_CONFIG.massageBankSound).then((buffer) => {
+        massageBank = buffer;
+        massageMap = mapMassage(buffer);
+      }),
+    ]).catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error("Could not load sounds:", error);
+    });
+  }
+  return loading;
+}
+
+// Mobile Safari can report "running" while its clock stops; only a new context recovers.
+function watchClock() {
+  const live = ctx?.state === "running" && !document.hidden;
+  stalled = live && ctx.currentTime === lastTime;
+  lastTime = live ? ctx.currentTime : -1;
+}
+
+function rebuildContext() {
+  const dancing = disco && !disco.stopping;
+  if (disco) dropDisco(disco);
+  ctx.close().catch(() => {});
+  ctx = null;
+  rub = null;
+  slide = null;
+  choir = null;
+  chant = null;
+  buzzer = null;
+  lastSlap = null;
+  stalled = false;
+  lastTime = -1;
+  context();
+  if (dancing) startDisco();
+}
+
+function unlockAudio() {
+  if (stalled || ctx?.state === "closed") rebuildContext();
+  const c = context();
+  if (c.state !== "running") c.resume().catch(() => {});
+  loadSounds();
+}
+
+const GESTURES = ["pointerdown", "pointerup", "touchend", "click", "keydown"];
+
+// Mobile browsers suspend audio on background or interruption, and a touch pointerdown may not resume it.
+export function keepAudioUnlocked() {
+  GESTURES.forEach((type) =>
+    window.addEventListener(type, unlockAudio, {
+      capture: true,
+      passive: true,
+    }),
+  );
+  setInterval(watchClock, 500);
 }

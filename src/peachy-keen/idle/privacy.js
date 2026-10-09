@@ -74,7 +74,10 @@ export class Privacy {
     this.shown = false;
     this.shopWasOpen = false;
     this.shopReturn = 0;
-    this.toys = new FreeToys(game, () => this.leave());
+    this.toys = new FreeToys(game, () => {
+      this.shopWasOpen = true;
+      this.set(false);
+    });
     /* eslint-disable no-param-reassign */
     room.presence = (id) => this.presence(id);
     tag.pull = () => this.set(true);
@@ -97,11 +100,6 @@ export class Privacy {
 
   set(on) {
     this.game.emit("toy-set", { key: "dnd", value: on });
-  }
-
-  leave() {
-    this.shopWasOpen = true;
-    this.set(false);
   }
 
   start(free) {
@@ -149,6 +147,16 @@ export class Privacy {
       const base = m.userData.privacyBase;
       if (base !== undefined) m.opacity = base; // eslint-disable-line no-param-reassign
     });
+  }
+
+  // Faded materials compile a transparent shader; building those during loading keeps the first fade smooth.
+  async warmFade(warm) {
+    this.away = 0.5;
+    this.applyFade();
+    await warm();
+    this.restoreFade();
+    this.away = 0;
+    this.applyFade();
   }
 
   applyFade() {
