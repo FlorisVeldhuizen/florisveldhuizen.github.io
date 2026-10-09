@@ -9,6 +9,7 @@ import { TrophiesView } from "./views/trophies";
 import { StatsView } from "./views/stats";
 import { OptionsView } from "./views/options";
 import tabMotion from "./tab-motion";
+import splashDrop from "./drop-splash";
 
 const TABS = [
   ["helpers", "Helpers", "hand"],
@@ -387,6 +388,7 @@ export class Panel {
     const name = TABS.find(([key]) => key === id)[2];
     if (name === "seed") growPlant(icon);
     else if (name === "nectar") sloshFlask(icon);
+    else if (name === "juice") splashDrop(icon);
     else tabMotion(name, icon);
     if (name === "trophy") shineTrophy(icon);
   }
