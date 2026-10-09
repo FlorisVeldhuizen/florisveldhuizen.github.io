@@ -11,9 +11,12 @@ export class UI {
     this.oilFill = document.getElementById("oil-fill");
     this.hintSwipe = document.getElementById("hint-swipe");
     this.hintRub = document.getElementById("hint-rub");
+    this.hintMassage = document.getElementById("hint-massage");
     this.hintGrab = document.getElementById("hint-grab");
-    if (window.matchMedia("(pointer: coarse)").matches)
+    if (window.matchMedia("(pointer: coarse)").matches) {
+      this.hintMassage.textContent = "Touch and slide at once to rub it.";
       this.hintGrab.textContent = "Press and hold, then drag to pull it.";
+    }
     this.hintTip = document.getElementById("hint-tip");
     this.cursor = document.getElementById("cursor");
     this.ring = this.cursor.firstElementChild;

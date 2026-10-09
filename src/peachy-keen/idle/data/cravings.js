@@ -3,6 +3,9 @@ export const CRAVE_EVERY = [60, 120];
 export const CRAVE_COMBO = 15;
 export const CRAVE_RUB = 2;
 
+export const rubLearned = (s) => s.stats.rubSeconds >= 5;
+export const bottleEarned = (s) => s.seen.bottle || s.stats.bursts >= 2;
+
 export const CRAVINGS = [
   {
     id: "oil",
@@ -11,7 +14,7 @@ export const CRAVINGS = [
       shy: "Could you… oil me?",
       off: "Some oil, please.",
     },
-    can: (m) => m.dare !== "dry",
+    can: (m, toys, s) => m.dare !== "dry" && bottleEarned(s),
   },
   {
     id: "rub",

@@ -341,7 +341,9 @@ export class IdleGame {
   startCraving() {
     this.timers.crave = between(CRAVE_EVERY);
     const craving = pick(
-      CRAVINGS.filter((option) => option.can(this.model, this.activeToys)),
+      CRAVINGS.filter((option) =>
+        option.can(this.model, this.activeToys, this.state),
+      ),
     );
     this.craving = {
       ...craving,

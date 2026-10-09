@@ -337,7 +337,8 @@ const handOver = async () => {
   }
   const root = document.documentElement;
   root.classList.add("is-handing");
-  if (swapping) interaction.bottle.view.group.visible = true;
+  if (swapping)
+    interaction.bottle.view.group.visible = idle?.bottleEarned() ?? true;
   root.classList.remove("is-switching");
   await wait(STAGE_FADE_MS);
 };
@@ -729,7 +730,7 @@ peach
       interaction.begin(afterOpening ? 0 : 1.6);
       jiggleText ??= new JiggleText();
       if (!swapping) {
-        interaction.bottle.view.group.visible = true;
+        interaction.bottle.view.group.visible = idle?.bottleEarned() ?? true;
         interaction.bottle.screen.x -= 220;
       }
       idle?.begin();

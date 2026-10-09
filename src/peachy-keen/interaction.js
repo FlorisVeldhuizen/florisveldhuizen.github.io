@@ -49,7 +49,11 @@ const TIPS = [
     text: "Grab and shake it fast.",
     when: (i) => i.toolName === "hand",
   },
-  { gesture: "latch", text: "Tap the bottle to carry it without holding." },
+  {
+    gesture: "latch",
+    text: "Tap the bottle to carry it without holding.",
+    when: (i) => i.bottle.view.group.visible,
+  },
   {
     gesture: "strip",
     text: "Pull the waistband down, or up.",
