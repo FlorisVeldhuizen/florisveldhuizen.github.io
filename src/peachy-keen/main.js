@@ -574,6 +574,7 @@ let lastFrameAt = performance.now();
 const frameClip = () => {
   const w = viewWidth();
   const h = viewHeight();
+  if (!started) return null;
   if (sheet.side)
     return clipBox.set(0, 0, Math.min(w, w - sheet.side + CLIP_MARGIN), h);
   if (sheet.top === null) return null;
