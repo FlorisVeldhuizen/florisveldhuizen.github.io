@@ -1,10 +1,18 @@
 import { Color } from "three";
-import { SEEDS, SEED_BY_ID, RIPE, ROTTEN } from "../data/orchard";
+import { SEEDS, SEED_BY_ID, RIPE, RIPE_FOR, ROTTEN } from "../data/orchard";
 import { plantFx, petalShower } from "./plant";
 import { renders, PICKED, blossomColor } from "../renders";
 
 const VARIANTS = 5;
-import { el, setDetail, setText, toggle } from "../dom";
+import {
+  el,
+  floatBeside,
+  inspectOn,
+  setDetail,
+  setText,
+  sidePanel,
+  toggle,
+} from "../dom";
 import { format, formatTime } from "../numbers";
 import { iconSvg } from "../icons";
 import { pitIcon, dropIcon } from "../syrup";
@@ -160,15 +168,30 @@ export class OrchardView {
     this.seeds = el("div", "seeds", root);
     this.seeds.setAttribute("role", "group");
     this.seeds.setAttribute("aria-label", "Seed to plant");
+    this.card = el("p", "shop-detail is-floating is-hidden", root);
+    this.card.setAttribute("aria-live", "polite");
+    const hideCard = (e) => {
+      if (e.pointerType === "mouse" && sidePanel.matches) this.closeCard();
+    };
+    this.seeds.addEventListener("pointerleave", hideCard);
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (sidePanel.matches || e.target.closest(".seed-info")) return;
+        this.closeCard();
+      },
+      true,
+    );
     this.step = el("p", "orchard-step", root);
     this.step.setAttribute("aria-live", "polite");
     this.grid = el("div", "plots", root);
+    this.grid.addEventListener("pointerleave", hideCard);
     this.info = el("p", "shop-detail", root);
     this.info.setAttribute("aria-live", "polite");
     setDetail(this.info, "", [
       canHover.matches
         ? "Hover over a plot or a seed to see the details."
-        : "Tap a seed to see the details.",
+        : "Tap the i on a seed to see its details.",
     ]);
     this.plots = [];
     this.seedButtons = new Map();
@@ -184,16 +207,26 @@ export class OrchardView {
     this.seeds.replaceChildren();
     this.seedButtons.clear();
     SEEDS.filter((seed) => discovered.includes(seed.id)).forEach((seed) => {
-      const b = el("button", "seed", this.seeds);
+      const cell = el("div", "seed-cell", this.seeds);
+      const b = el("button", "seed", cell);
       b.type = "button";
       b.innerHTML = `<i style="background:${seed.color}"></i><span>${seed.name}</span><small></small>`;
       b.addEventListener("click", () => {
         this.selected = seed.id;
-        this.describeSeed(seed);
+        if (sidePanel.matches) this.describeSeed(seed, b);
         this.update();
       });
-      b.addEventListener("pointerenter", () => this.describeSeed(seed));
-      b.addEventListener("focus", () => this.describeSeed(seed));
+      inspectOn(b, () => this.describeSeed(seed, b));
+      const info = el("button", "seed-info", cell, iconSvg("info"));
+      info.type = "button";
+      info.setAttribute("aria-label", `About ${seed.name}`);
+      info.setAttribute("aria-expanded", "false");
+      info.dataset.seed = seed.id;
+      info.addEventListener("click", () => {
+        const open = !this.card.classList.contains("is-hidden");
+        if (open && this.cardSeed === seed.id) this.closeCard();
+        else this.describeSeed(seed, b);
+      });
       b.addEventListener("pointerdown", (e) => this.drag(e, seed, b));
       renders.seedIcon(seed, (url) => {
         const icon = b.querySelector("i");
@@ -264,7 +297,7 @@ export class OrchardView {
         if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 6)
           return;
         this.selected = seed.id;
-        this.describeSeed(seed);
+        this.closeCard();
         this.update();
         ghost = el("div", "seed-ghost", document.body);
         ghost.style.setProperty("--seed", seed.color);
@@ -306,17 +339,35 @@ export class OrchardView {
     window.addEventListener("pointercancel", end);
   }
 
-  describeSeed(seed) {
+  closeCard() {
+    toggle(this.card, "is-hidden", true);
+    this.syncSeedInfo();
+  }
+
+  syncSeedInfo() {
+    const open = !this.card.classList.contains("is-hidden");
+    this.seeds.querySelectorAll(".seed-info").forEach((b) => {
+      b.setAttribute(
+        "aria-expanded",
+        String(open && b.dataset.seed === this.cardSeed),
+      );
+    });
+  }
+
+  describeSeed(seed, button) {
+    this.cardSeed = seed.id;
     const recipe = seed.parents
       ? ` Cross-breeds from ${SEED_BY_ID[seed.parents[0]].name} and ${SEED_BY_ID[seed.parents[1]].name}.`
       : "";
     const rot = seed.fromRot ? " Sprouts on rotten plots." : "";
     const short = seed.pits - this.game.state.pits;
     const need = short > 0 ? ` You need ${morePits(short)}.` : "";
-    setDetail(this.info, seed.name, [
+    setDetail(this.card, seed.name, [
       seed.about,
       `Costs ${pitCount(seed.pits)} to plant. While growing: ${seed.passive.text}. Harvest: ${seed.harvest.text}. Ripens in ${formatTime(seed.grow / this.game.model.growth)}.${recipe}${rot}${need}`,
     ]);
+    floatBeside(this.card, button);
+    this.syncSeedInfo();
   }
 
   buildGrid() {
@@ -364,7 +415,7 @@ export class OrchardView {
     if (!plot) {
       if (!this.orchard.plant(index, this.selected)) {
         const seed = SEED_BY_ID[this.selected];
-        setDetail(this.info, seed.name, [
+        this.plotDetail(index, seed.name, [
           `You need ${morePits(seed.pits - this.game.state.pits)}. Bursts drop pits.`,
         ]);
       }
@@ -373,7 +424,7 @@ export class OrchardView {
       if (info.stage < RIPE && !this.plots[index].confirm) {
         this.arm(index, true);
         this.shake(index);
-        setDetail(this.info, info.seed.name, [
+        this.plotDetail(index, info.seed.name, [
           `It isn't ripe yet. ${press()} again to dig it up.`,
         ]);
         this.update();
@@ -381,8 +432,8 @@ export class OrchardView {
       }
       const reward = this.orchard.harvest(index);
       if (reward) {
-        setDetail(
-          this.info,
+        this.plotDetail(
+          index,
           `Harvested ${info.seed.name.replace(/ tree$/, " peaches")}`,
           [rewardLine(reward)],
         );
@@ -403,11 +454,20 @@ export class OrchardView {
     toggle(p.button, "is-armed", on);
   }
 
+  plotDetail(index, title, lines) {
+    if (!sidePanel.matches) {
+      setDetail(this.info, title, lines);
+      return;
+    }
+    setDetail(this.card, title, lines);
+    floatBeside(this.card, this.plots[index].button);
+  }
+
   describePlot(index) {
     const info = this.orchard.describe(index);
     if (!info) {
       const seed = SEED_BY_ID[this.selected];
-      setDetail(this.info, "Empty plot", [
+      this.plotDetail(index, "Empty plot", [
         `${press()} to plant a ${seed.name} for ${pitCount(seed.pits)}.`,
       ]);
       return;
@@ -420,7 +480,7 @@ export class OrchardView {
     else
       when = `${press()} to clear it. Rotten plots sometimes grow something strange.`;
     const perk = stage < ROTTEN ? `While growing: ${seed.passive.text}.` : "";
-    setDetail(this.info, `${seed.name}, ${name.toLowerCase()}`, [
+    this.plotDetail(index, `${seed.name}, ${name.toLowerCase()}`, [
       `${perk} ${when}`.trim(),
     ]);
   }
@@ -579,6 +639,14 @@ export class OrchardView {
         );
       }
       setText(p.label, plotLabel(info));
+      const ripe = info?.stage === RIPE;
+      p.button.style.setProperty(
+        "--fresh",
+        ripe
+          ? (info.left * this.game.model.growth) / (RIPE_FOR * info.seed.grow)
+          : 1,
+      );
+      toggle(p.button, "is-rotting", ripe && info.left < 60);
       if (info && p.shown?.dataset.key === key)
         p.shown.style.setProperty("--size", plantSize(info));
       p.button.style.setProperty(

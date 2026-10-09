@@ -660,33 +660,6 @@ body.is-storm::after {
   }
 }
 
-.helper-row .row-icon {
-  position: relative;
-}
-
-.hold-ring {
-  position: absolute;
-  inset: -1px;
-  width: 42px;
-  height: 42px;
-  overflow: visible;
-  pointer-events: none;
-  transform: rotate(-90deg);
-}
-
-.hold-ring circle {
-  fill: none;
-  stroke: var(--peach);
-  stroke-width: 2;
-  stroke-dasharray: 129;
-  stroke-dashoffset: 129;
-}
-
-.helper-row.is-holding .hold-ring circle {
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 0.45s linear;
-}
-
 .row-main {
   display: grid;
   gap: 1px;
@@ -866,6 +839,65 @@ body.is-storm::after {
   margin-bottom: 14px;
 }
 
+@media (min-width: 900px), (orientation: landscape) and (min-width: 640px) {
+  .plots + .shop-detail {
+    display: none;
+  }
+}
+
+@media not ((min-width: 900px) or ((orientation: landscape) and (min-width: 640px))) {
+  .tab-orchard {
+    position: relative;
+  }
+
+  .seeds + .shop-detail {
+    position: absolute;
+    right: 0;
+    bottom: auto;
+    left: 0;
+    z-index: 4;
+    margin-top: -8px;
+    background: var(--velvet);
+    box-shadow: 0 14px 34px rgba(12, 1, 6, 0.6);
+    pointer-events: auto;
+  }
+}
+
+.seed-cell {
+  position: relative;
+  display: grid;
+}
+
+.seed-info {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blush-dim);
+}
+
+.seed-info[aria-expanded="true"] {
+  color: var(--peach);
+}
+
+.seed-info .icon {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.5;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .seed-info {
+    display: grid;
+  }
+}
+
 .seed {
   display: grid;
   align-content: center;
@@ -1001,7 +1033,23 @@ body.is-storm::after {
   border: 1px solid var(--harvest);
   border-radius: 9px;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    border-color 0.6s ease;
+  mask: conic-gradient(
+    from 180deg,
+    #000 calc(var(--fresh, 1) * 180deg),
+    transparent 0 calc(360deg - var(--fresh, 1) * 180deg),
+    #000 0
+  );
+}
+
+.plot.is-rotting::before {
+  border-color: #d98a94;
+}
+
+.plot[data-stage="5"].is-rotting .plot-label {
+  color: #d98a94;
 }
 
 .plot[data-stage="5"] {

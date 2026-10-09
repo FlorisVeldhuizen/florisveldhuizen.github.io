@@ -70,35 +70,6 @@ export function inspectOn(button, show) {
   });
 }
 
-const HOLD_MS = 450;
-
-export function onHold(node, fire) {
-  let timer = null;
-  let start = null;
-  const cancel = () => {
-    clearTimeout(timer);
-    timer = null;
-    node.classList.remove("is-holding");
-  };
-  node.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse" || !e.isPrimary) return;
-    start = { x: e.clientX, y: e.clientY };
-    node.classList.add("is-holding");
-    timer = setTimeout(() => {
-      cancel();
-      fire();
-    }, HOLD_MS);
-  });
-  node.addEventListener("pointermove", (e) => {
-    if (timer && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8)
-      cancel();
-  });
-  ["pointerup", "pointercancel", "pointerleave"].forEach((type) =>
-    node.addEventListener(type, cancel),
-  );
-  node.addEventListener("contextmenu", (e) => e.preventDefault());
-}
-
 export function animate(node, frames, options) {
   const last = frames[frames.length - 1];
   return node.animate(reducedMotion.matches ? [last, last] : frames, options);

@@ -6,7 +6,6 @@ import {
   floatBeside,
   clearOnLeave,
   inspectOn,
-  onHold,
   sidePanel,
   toggle,
   keepFocus,
@@ -74,24 +73,6 @@ export class HelpersView {
     this.focused = null;
     this.pinned = false;
     clearOnLeave(this.list, this.detail, () => this.close());
-    document.addEventListener(
-      "pointerdown",
-      () => {
-        this.swallowClick = false;
-      },
-      true,
-    );
-    document.addEventListener(
-      "click",
-      (e) => {
-        if (!this.swallowClick) return;
-        this.swallowClick = false;
-        if (!this.list.contains(e.target)) return;
-        e.stopPropagation();
-        e.preventDefault();
-      },
-      true,
-    );
     document.addEventListener("click", (e) => {
       if (!this.pinned || e.target.closest(".row-info")) return;
       if (!this.detail.contains(e.target)) this.close();
@@ -205,7 +186,7 @@ export class HelpersView {
       b.type = "button";
       b.disabled = !known;
       b.innerHTML = `
-        <span class="row-icon">${iconSvg(known ? helper.id : "lock")}<svg class="hold-ring" viewBox="0 0 42 42" aria-hidden="true"><circle cx="21" cy="21" r="20.5"/></svg></span>
+        <span class="row-icon">${iconSvg(known ? helper.id : "lock")}</span>
         <span class="row-main">
           <span class="row-name">${known ? helper.name : "???"}<span class="row-qty"></span><span class="row-skip" hidden>Butler skips</span></span>
           <span class="row-meta"><span class="row-cost"><span></span>${dropIcon()}</span><span class="row-each"></span></span>
@@ -243,11 +224,6 @@ export class HelpersView {
         inspectOn(b, () => {
           this.focused = helper.id;
           this.showDetail();
-        });
-        onHold(b, () => {
-          this.swallowClick = true;
-          navigator.vibrate?.(10);
-          this.pin(helper.id);
         });
         const info = el("button", "row-info", li, iconSvg("info"));
         info.type = "button";
