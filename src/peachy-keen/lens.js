@@ -196,6 +196,8 @@ export class Lens {
   }
 
   growBlobs(capacity) {
+    // three keeps the first buffer's instance limit until the geometry is disposed.
+    this.blobGeometry.dispose();
     this.blobData = new Float32Array(capacity * 4);
     this.blobAttribute = new InstancedBufferAttribute(this.blobData, 4);
     this.blobGeometry.setAttribute("blob", this.blobAttribute);
