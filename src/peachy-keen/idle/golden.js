@@ -130,6 +130,7 @@ export class GoldenPeach {
     });
     this.dust = Array.from({ length: 12 + SPARKS }, () => {
       const s = new Sprite(additive(twinkle, { color: 0xffe0a0, opacity: 0 }));
+      s.visible = false;
       s.userData = { age: 9, life: 1, size: 0.12, drag: 0, fall: 0 };
       s.userData.v = new Vector3();
       scene.add(s);
@@ -366,6 +367,8 @@ export class GoldenPeach {
       const k = Math.min(1, d.age / d.life);
       // eslint-disable-next-line no-param-reassign
       s.material.opacity = (1 - k) * 0.6;
+      // eslint-disable-next-line no-param-reassign
+      s.visible = k < 1;
       s.scale.setScalar(d.size * (1 - k * 0.5));
       d.v.multiplyScalar(Math.exp(-delta * d.drag));
       d.v.y -= delta * d.fall;
