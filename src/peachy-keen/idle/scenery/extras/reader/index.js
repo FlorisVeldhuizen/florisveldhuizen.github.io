@@ -250,6 +250,8 @@ function reader(ctx) {
   }
 
   function begin(count) {
+    // Card faces need every pose rendered and measured, which a slow phone may not have finished.
+    if (!baked) return;
     const ok = (c, k) => c.state === "rest" && k !== last && k < count;
     if (!upcoming || !ok(upcoming, cards.indexOf(upcoming))) plan(count);
     if (!upcoming || !ok(upcoming, cards.indexOf(upcoming)) || !ctx.live)

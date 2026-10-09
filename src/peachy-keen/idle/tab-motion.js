@@ -47,20 +47,6 @@ const MOTIONS = {
     ]),
     { duration: 780 },
   ],
-  juice: () => [
-    at("50% 85%", [
-      [
-        0,
-        "translateY(-7px) scale(0.9, 1.12)",
-        "cubic-bezier(0.55, 0, 1, 0.45)",
-      ],
-      [0.38, "translateY(0) scale(1.14, 0.84)", "ease-out"],
-      [0.6, "translateY(-1px) scale(0.96, 1.05)"],
-      [0.8, "scale(1.02, 0.98)"],
-      [1, "none"],
-    ]),
-    { duration: 620 },
-  ],
   trophy: () => [
     at("50% 90%", [
       [0, "none", "cubic-bezier(0.2, 0.7, 0.3, 1)"],
