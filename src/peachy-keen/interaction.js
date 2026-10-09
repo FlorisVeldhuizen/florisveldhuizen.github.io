@@ -49,7 +49,11 @@ const TIPS = [
     text: "Grab and shake it fast.",
     when: (i) => i.toolName === "hand",
   },
-  { gesture: "latch", text: "Tap the bottle to carry it without holding." },
+  {
+    gesture: "latch",
+    text: "Tap the bottle to carry it without holding.",
+    when: (i) => i.bottle.view.group.visible,
+  },
   {
     gesture: "strip",
     text: "Pull the waistband down, or up.",
@@ -2002,7 +2006,8 @@ export class Interaction {
     const p = this.pointer;
     const held = performance.now() - p.downAt > CFG.GRAB_HOLD_MS;
     let gripped = held || p.travel > CFG.GRAB_START_PX;
-    if (p.touch) gripped = held;
+    if (p.touch)
+      gripped = performance.now() - p.downAt > CFG.TOUCH_GRAB_HOLD_MS;
     if (p.onWaistband) gripped = p.travel > 28;
     return this.toolName === "hand" && p.armed && p.downOnPeach && gripped;
   }

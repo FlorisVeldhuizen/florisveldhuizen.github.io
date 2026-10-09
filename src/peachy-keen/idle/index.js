@@ -15,6 +15,7 @@ import { Toys } from "./toys";
 import { preparePage } from "./page";
 import { awayMessage } from "./away";
 import { HELPERS } from "./data/helpers";
+import { bottleEarned, rubLearned } from "./data/cravings";
 import { TREE_BY_ID } from "./data/tree";
 import { format } from "./numbers";
 import { playDing, playBuy, playNotes } from "../audio";
@@ -122,6 +123,39 @@ export function createIdle({
       buttons: [{ label: "Thanks, helpers", primary: true }],
     });
   };
+
+  const { bottle, ui } = interaction;
+  const showBottleUi = (shown) => {
+    bottle.el.style.visibility = shown ? "" : "hidden";
+    ui.hintRub.hidden = !shown;
+  };
+  const showBottle = (shown) => {
+    bottle.view.group.visible = shown;
+    showBottleUi(shown);
+  };
+  const showMassageHint = () => {
+    const s = game.state;
+    ui.hintMassage.hidden = !bottleEarned(s) || rubLearned(s);
+    ui.hintMassage.classList.remove("is-learned");
+  };
+  // The second peach brings the bottle, so it never crowds the busy run up to the first split.
+  const revealBottle = () => {
+    const s = game.state;
+    if (bottle.view.group.visible || s.stats.bursts < 1) return;
+    if (interaction.phase !== "live" || interaction.heat < 50) return;
+    s.seen.bottle = true;
+    showBottle(true);
+    bottle.screen.x -= 220;
+    showMassageHint();
+  };
+  const fadeMassageHint = () => {
+    if (ui.hintMassage.hidden || !rubLearned(game.state)) return;
+    ui.hintMassage.classList.add("is-learned");
+  };
+  game.on("replace", () => {
+    showBottle(bottleEarned(game.state));
+    showMassageHint();
+  });
 
   game.on("pop", ({ x, y, value, kind }) => {
     if (!(value > 0)) return;
@@ -324,7 +358,10 @@ export function createIdle({
       syncStyle();
       syncSkin();
       toys.sync();
+      showBottleUi(bottleEarned(game.state));
+      showMassageHint();
     },
+    bottleEarned: () => bottleEarned(game.state),
     begin() {
       started = true;
       panel.slide(true);
@@ -340,6 +377,10 @@ export function createIdle({
         await new Promise(requestAnimationFrame);
     },
     frame(realDelta) {
+      if (started) {
+        revealBottle();
+        fadeMassageHint();
+      }
       layout.update(realDelta);
       squashWithSheet(realDelta);
     },

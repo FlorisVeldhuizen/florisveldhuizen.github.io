@@ -53,21 +53,31 @@ const installed = window.matchMedia(
   "(display-mode: standalone), (display-mode: fullscreen)",
 );
 let viewportHeight = window.innerHeight;
+let viewportWidth = window.innerWidth;
 // Installed iOS reports innerHeight short of the screen; the root box is 100vh there.
 const measureViewport = () => {
   const next = installed.matches
     ? Math.max(window.innerHeight, document.documentElement.offsetHeight)
     : window.innerHeight;
-  if (next === viewportHeight) return false;
+  if (next === viewportHeight && window.innerWidth === viewportWidth)
+    return false;
   viewportHeight = next;
+  viewportWidth = window.innerWidth;
   return true;
 };
-window.addEventListener("resize", measureViewport);
+// iOS fires resize mid-rotation with stale sizes and sends no event once they settle.
+const settleViewport = () =>
+  [100, 400, 1000, 2500].forEach((at) =>
+    setTimeout(() => {
+      if (measureViewport()) window.dispatchEvent(new Event("resize"));
+    }, at),
+  );
+window.addEventListener("resize", (event) => {
+  measureViewport();
+  if (event.isTrusted) settleViewport();
+});
+window.addEventListener("orientationchange", settleViewport);
 measureViewport();
-[100, 400, 1000, 2500].forEach((at) =>
-  setTimeout(() => {
-    if (measureViewport()) window.dispatchEvent(new Event("resize"));
-  }, at),
-);
+settleViewport();
 
 export const viewHeight = () => viewportHeight;
