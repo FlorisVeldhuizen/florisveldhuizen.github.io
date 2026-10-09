@@ -8,6 +8,7 @@ import { RipenView } from "./views/ripen";
 import { TrophiesView } from "./views/trophies";
 import { StatsView } from "./views/stats";
 import { OptionsView } from "./views/options";
+import tabMotion from "./tab-motion";
 
 const TABS = [
   ["helpers", "Helpers", "hand"],
@@ -18,30 +19,6 @@ const TABS = [
   ["stats", "Stats", "juice"],
   ["options", "Options", "blush"],
 ];
-
-const swing = (origin, ...turns) =>
-  [0, ...turns, 0].map((deg) => ({
-    transform: `rotate(${deg}deg)`,
-    transformOrigin: origin,
-  }));
-
-const MOTIONS = {
-  hand: swing("50% 90%", -16, 12, -8, 4),
-  recipe: [
-    { transform: "none" },
-    { transform: "translateY(-5px) scale(0.94, 1.08)" },
-    { transform: "translateY(0) scale(1.1, 0.9)" },
-    { transform: "translateY(-1.5px)" },
-    { transform: "none" },
-  ],
-  blush: [
-    { transform: "none" },
-    { transform: "scale(1.22)" },
-    { transform: "scale(0.96)" },
-    { transform: "scale(1.12)" },
-    { transform: "none" },
-  ],
-};
 
 const GROW = "cubic-bezier(0.33, 0, 0.2, 1)";
 
@@ -58,14 +35,21 @@ function draw(path, duration, delay = 0) {
 }
 
 function unfurl(path, origin, turn, delay) {
-  animate(
-    path,
-    [
-      { transform: `scale(0.2) rotate(${turn}deg)`, transformOrigin: origin },
-      { transform: "none", transformOrigin: origin },
-    ],
-    { duration: 700, delay, easing: GROW, fill: "backwards" },
-  );
+  const frames = [
+    { transform: `scale(0.2) rotate(${turn}deg)`, transformOrigin: origin },
+    {
+      transform: `scale(1.1) rotate(${-turn * 0.12}deg)`,
+      transformOrigin: origin,
+      offset: 0.7,
+    },
+    { transform: "none", transformOrigin: origin },
+  ];
+  animate(path, frames, {
+    duration: 700,
+    delay,
+    easing: GROW,
+    fill: "backwards",
+  });
 }
 
 function strokes(icon) {
@@ -93,16 +77,18 @@ function growPlant(icon) {
 
 const TILTS = [0, 14, -11, 7, -3, 0];
 const SLOSH = [0, -3, 4, -2.5, 1, 0];
+const TILT_OFFSETS = [0, 0.22, 0.47, 0.67, 0.84, 1];
 
 function sloshFlask(icon) {
   const liquid = strokes(icon).at(-1);
   const timing = { duration: 950 };
   animate(
     icon,
-    TILTS.map((deg) => ({
+    TILTS.map((deg, n) => ({
       transform: `rotate(${deg}deg)`,
       transformOrigin: "50% 88%",
       easing: "ease-in-out",
+      offset: TILT_OFFSETS[n],
     })),
     timing,
   );
@@ -112,6 +98,7 @@ function sloshFlask(icon) {
       transform: `rotate(${SLOSH[n] - deg}deg)`,
       transformOrigin: "12px 13px",
       easing: "ease-in-out",
+      offset: TILT_OFFSETS[n],
     })),
     timing,
   );
@@ -398,18 +385,10 @@ export class Panel {
     const icon = this.buttons[id].querySelector(".icon");
     icon.getAnimations({ subtree: true }).forEach((a) => a.cancel());
     const name = TABS.find(([key]) => key === id)[2];
-    const motion = MOTIONS[name];
-    if (motion) {
-      animate(icon, motion, {
-        duration: 560,
-        easing: "cubic-bezier(0.3, 0.7, 0.3, 1)",
-      });
-      return;
-    }
     if (name === "seed") growPlant(icon);
     else if (name === "nectar") sloshFlask(icon);
-    else if (name === "trophy") shineTrophy(icon);
-    else draw(icon.querySelector("path"), 720);
+    else tabMotion(name, icon);
+    if (name === "trophy") shineTrophy(icon);
   }
 
   update(delta) {
