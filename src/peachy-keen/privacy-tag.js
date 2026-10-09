@@ -485,6 +485,26 @@ export class PrivacyTag {
     );
   }
 
+  // Where the tag shows on screen, so candlelight can keep a soft light on it.
+  spot() {
+    if (!this.group.visible) return null;
+    const k = this.scale;
+    const [w, h] = SIZE.map((v) => v * k);
+    let x;
+    let y;
+    if (this.state === "on") {
+      const end = this.points[LINKS].p;
+      const down = this.bottomDir(this.tmp);
+      x = end.x + down.x * this.hangL;
+      y = end.y + down.y * this.hangL;
+    } else {
+      const top = this.tasselPoints[0].p;
+      x = top.x;
+      y = (top.y + this.tasselPoints[TASSEL_LINKS].p.y + 30 * k) / 2;
+    }
+    return { x, y, rx: w * 2.4, ry: h * 1.3, soft: true };
+  }
+
   hang() {
     if (this.state === "on") return;
     const fresh = this.state === "off" || this.state === "hiding";
@@ -497,6 +517,13 @@ export class PrivacyTag {
     if (this.layout) {
       this.length = this.rope().lengths.on;
       this.lengthV = 0;
+      // Tucked, the cord lies folded above the screen; unrolling it folded would fling the tag sideways.
+      this.points.forEach(({ p, old }) => {
+        /* eslint-disable no-param-reassign */
+        p.x = this.anchor.x;
+        old.x = this.anchor.x;
+        /* eslint-enable no-param-reassign */
+      });
     }
   }
 

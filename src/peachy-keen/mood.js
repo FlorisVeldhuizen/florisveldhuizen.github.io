@@ -14,6 +14,16 @@ const VIOLET = new Color(0xd040ff);
 const SUNSET = new Color(0xff6a3a);
 const EMBER = new Color(0xff7a2a);
 const DUSK = new Color(0x24082e);
+// How much of the dark stays at the centre of a plain pool of light.
+const POOL_KEEP = 0.35;
+// An eased falloff in many steps, so a soft light shows no rim.
+const SOFT = Array.from({ length: 9 }, (_, n) => {
+  const t = n / 8;
+  const dark = 0.4 + 0.6 * t * t * (3 - 2 * t);
+  return `rgba(0, 0, 0, ${dark.toFixed(3)}) ${Math.round(t * 100)}%`;
+}).join(", ");
+// Coarse steps, so a gently swaying tag does not restyle the full-screen layer every frame.
+const snap = (v) => Math.round(v / 4) * 4;
 
 export class MoodLight {
   constructor(scene, renderer, { hemi, key, rose, peachRim }) {
@@ -44,6 +54,7 @@ export class MoodLight {
     this.overlay.innerHTML = "<i></i><i></i><i></i><i></i>";
     document.body.appendChild(this.overlay);
     this.shown = -1;
+    this.mask = "";
     this.dimmed = -1;
     this.redim = 0;
   }
@@ -79,7 +90,26 @@ export class MoodLight {
     });
   }
 
-  update(delta, heat) {
+  // Things you reach for, like the tag and the bottle, keep a soft pool of light in the dark vignette.
+  spotlight(spots) {
+    const mask = spots.length
+      ? spots
+          .map(
+            ({ x, y, rx, ry, soft }) =>
+              `radial-gradient(ellipse ${snap(rx)}px ${snap(ry)}px at ${snap(x)}px ${snap(y)}px, ${soft ? SOFT : `rgba(0, 0, 0, ${POOL_KEEP}) 20%, #000 100%`})`,
+          )
+          .join(", ")
+      : "none";
+    if (mask === this.mask) return;
+    this.mask = mask;
+    const { style } = this.overlay;
+    style.maskImage = mask;
+    style.webkitMaskImage = mask;
+    style.maskComposite = "intersect";
+    style.webkitMaskComposite = "source-in";
+  }
+
+  update(delta, heat, spots = []) {
     this.time += delta;
     const settled = Math.abs(this.target - this.amount) < 0.001;
     if (settled && this.amount === 0) return;
@@ -116,6 +146,7 @@ export class MoodLight {
       base.exposure * DIM.exposure,
     );
 
+    this.spotlight(spots);
     const opacity = Math.round(k * 100) / 100;
     if (opacity !== this.shown) {
       this.shown = opacity;
