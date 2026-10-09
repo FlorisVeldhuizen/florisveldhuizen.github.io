@@ -26,7 +26,7 @@ import { UPGRADES, UPGRADE_BY_ID } from "./data/upgrades";
 import { TREE_BY_ID } from "./data/tree";
 import { DARE_BY_ID } from "./data/dares";
 import { TROPHIES } from "./data/trophies";
-import { TOY_BY_ID } from "./data/toys";
+import { TOY_BY_ID, toyCost } from "./data/toys";
 import {
   CRAVINGS,
   CRAVE_SECONDS,
@@ -472,9 +472,10 @@ export class IdleGame {
   buyToy(id) {
     const s = this.state;
     const toy = TOY_BY_ID[id];
-    if (!toy || s.toys.includes(id) || !toy.unlock(s) || toy.cost > s.juice)
+    const cost = toy && toyCost(toy, s);
+    if (!toy || s.toys.includes(id) || !toy.unlock(s) || cost > s.juice)
       return false;
-    s.juice -= toy.cost;
+    s.juice -= cost;
     s.toys.push(id);
     this.refresh();
     this.emit("bought", { kind: "toy", id });

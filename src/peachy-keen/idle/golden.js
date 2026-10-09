@@ -24,6 +24,7 @@ import { playNotes } from "../audio";
 import { reducedMotion, viewHeight } from "../util";
 
 const LIFE = 13;
+const FADE_OUT = 1.5;
 const DEPTH = 2.2;
 const PEACH_RADIUS = 1.7;
 const SIZE = 0.2;
@@ -446,19 +447,20 @@ export class GoldenPeach {
     this.fadeDust(delta);
     if (this.flash >= 0) this.updateFlash(delta);
     if (!this.live) {
-      if (this.game.model.noGolden) return;
+      if (this.game.model.noGolden || this.paused) return;
       this.timer -= delta;
       if (this.timer <= 0) this.spawn();
       return;
     }
     const g = this.live;
+    if (this.paused) g.age = Math.max(g.age, LIFE - FADE_OUT);
     g.age += delta;
     if (g.age >= LIFE) {
       this.despawn();
       return;
     }
     const { x, y } = this.position();
-    const fade = Math.min(1, g.age / 0.6, (LIFE - g.age) / 1.5);
+    const fade = Math.min(1, g.age / 0.6, (LIFE - g.age) / FADE_OUT);
     this.el.style.translate = `${x}px ${y}px`;
     this.ndc.set((x / window.innerWidth) * 2 - 1, -(y / viewHeight()) * 2 + 1);
     this.ray.setFromCamera(this.ndc, this.camera);

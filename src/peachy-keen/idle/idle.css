@@ -257,7 +257,9 @@ body.is-storm::after {
   color: var(--blush-dim);
   font-size: 16px;
   font-style: italic;
-  transition: color 0.2s ease;
+  transition:
+    opacity 0.6s ease,
+    color 0.2s ease;
 }
 
 .tab[hidden] {
@@ -2892,4 +2894,195 @@ body.is-storm::after {
 
 .dust.is-late {
   animation-delay: 1.75s;
+}
+
+.score,
+.hints,
+.toasts {
+  transition: opacity 1s ease 0.7s;
+}
+
+body.is-dnd .score,
+body.is-dnd .hints,
+body.is-dnd .toasts {
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+body.is-dnd .panel:not(.is-open) .tab {
+  opacity: 0.25;
+}
+
+body.is-intro .score,
+body.is-intro .hints,
+body.is-intro .toasts {
+  transition: none;
+}
+
+body.is-dnd.is-shopping .score {
+  opacity: 1;
+}
+
+.free-toys {
+  position: fixed;
+  z-index: 3;
+  cursor: auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+body.is-dnd:not(.is-shopping) .free-toys {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.8s ease 0.4s;
+}
+
+.ft-toggle {
+  min-height: 44px;
+  padding: 10px 8px;
+  border: 0;
+  background: none;
+  color: var(--blush-dim);
+  font-size: 16px;
+  font-style: italic;
+  text-decoration: underline;
+  text-decoration-color: var(--blush-faint);
+  text-underline-offset: 5px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.ft-toggle:hover,
+.free-toys.is-open .ft-toggle {
+  color: var(--blush);
+}
+
+.ft-card {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  display: grid;
+  gap: 6px;
+  width: 272px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--blush-faint);
+  border-radius: 18px;
+  background: rgba(30, 5, 12, 0.9);
+  backdrop-filter: blur(8px);
+  transform-origin: 100% 100%;
+  transition:
+    opacity 0.22s ease,
+    translate 0.28s var(--ease-spring),
+    scale 0.28s var(--ease-spring);
+}
+
+.free-toys:not(.is-open) .ft-card {
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 8px;
+  scale: 0.97;
+}
+
+.ft-pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+
+.ft-pick .segmented {
+  flex-wrap: nowrap;
+}
+
+.ft-label {
+  color: var(--blush-dim);
+  font-size: 14px;
+}
+
+.ft-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--blush-dim);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ft-switch:hover {
+  background: var(--blush-faint);
+  color: var(--blush);
+}
+
+.ft-switch .icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.ft-name {
+  flex: 1;
+}
+
+.ft-state {
+  min-width: 40px;
+  padding: 2px 10px;
+  border: 1px solid var(--blush-faint);
+  border-radius: 999px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.ft-switch[aria-pressed="true"] {
+  color: var(--blush);
+}
+
+.ft-switch[aria-pressed="true"] .ft-state {
+  border-color: var(--blush);
+  background: var(--blush);
+  color: var(--velvet);
+}
+
+.ft-leave {
+  margin-top: 4px;
+  padding: 10px 8px 4px;
+  border: 0;
+  border-top: 1px solid var(--blush-faint);
+  background: none;
+  color: var(--blush-dim);
+  font-size: 14px;
+  font-style: italic;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ft-leave:hover {
+  color: var(--blush);
+}
+
+@media (min-width: 900px), (orientation: landscape) and (min-width: 640px) {
+  .free-toys {
+    right: 96px;
+    bottom: calc(var(--gutter) + 8px);
+  }
+}
+
+@media not ((min-width: 900px) or ((orientation: landscape) and (min-width: 640px))) {
+  .free-toys {
+    right: 22px;
+    bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ft-card {
+    transition: opacity 0.2s ease;
+  }
 }

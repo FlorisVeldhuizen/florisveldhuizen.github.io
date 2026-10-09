@@ -7,7 +7,6 @@ let image = null;
 let size = 0;
 let epoch = 0;
 let target = 0;
-let instant = false;
 let drawing = true;
 let last = 0;
 
@@ -21,7 +20,7 @@ function frame() {
   const delta = Math.min(0.05, (now - last) / 1000);
   last = now;
   // Holds at the bottom until the ripe image can be drawn, so the first part rises instead of popping in.
-  if (image) stepFill(state, target, delta, instant);
+  if (image) stepFill(state, target, delta);
   const time = (now - epoch) / 1000;
   if (drawing && image) {
     drawFill(context, image, size, state.shown, time, state.motion);
@@ -35,7 +34,7 @@ function frame() {
 
 globalThis.onmessage = async ({ data }) => {
   if (data.canvas) {
-    ({ size, epoch, instant } = data);
+    ({ size, epoch } = data);
     const { canvas } = data;
     context = canvas.getContext("2d");
     canvas.width = size;

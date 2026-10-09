@@ -19,7 +19,7 @@ export default class Extras {
     this.clock.time += delta;
     setExtrasSound(!!options.castSound);
     MODULES.forEach((fx) => {
-      const owned = helpers[fx.id] || 0;
+      const owned = (helpers[fx.id] || 0) * this.world.room.presence(fx.id);
       let run = this.runs[fx.id];
       if (!owned) {
         if (run) this.stop(fx.id);

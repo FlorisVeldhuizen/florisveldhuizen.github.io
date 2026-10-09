@@ -13,12 +13,15 @@ export default class Sippers {
 
   update(delta) {
     if (!this.world.game.state.seen.butterflies) return;
+    const away = this.world.room.presence("sippers") < 0.5;
+    if (away && !this.away) this.run?.instance.scatter();
+    this.away = away;
     this.clock.time += delta;
     if (!this.run) {
       const ctx = makeContext("sippers", this.world, this.clock);
       this.run = { ctx, instance: createSippers(ctx) };
     }
-    this.run.instance.update(delta);
+    this.run.instance.update(delta, away);
   }
 
   clear() {

@@ -21,8 +21,10 @@ export class HintDrop {
 
   targets() {
     const heights = this.lines.map((line) => line.offsetHeight);
-    const learned = this.lines.map((line) =>
-      line.classList.contains("is-learned"),
+    // In free play the hints are hidden, so the bottle rests as if they were all learned.
+    const hidden = document.body.classList.contains("is-dnd");
+    const learned = this.lines.map(
+      (line) => hidden || line.classList.contains("is-learned"),
     );
     const shifts = this.lines.map((_, i) =>
       heights.reduce((sum, h, j) => (j > i && learned[j] ? sum + h : sum), 0),
