@@ -309,21 +309,6 @@ button:focus-visible {
   display: none;
 }
 
-.settings-lab {
-  padding-top: 12px;
-  border-top: 1px solid var(--blush-faint);
-}
-
-.settings-lab > .settings-row {
-  margin-top: 12px;
-}
-
-.settings-lab summary {
-  color: var(--peach);
-  font-style: italic;
-  cursor: pointer;
-}
-
 .settings-row {
   display: flex;
   align-items: center;
@@ -805,10 +790,6 @@ button:focus-visible {
     gap: 6px;
     padding: 10px 16px;
     font-size: 15px;
-  }
-
-  .settings-lab > .settings-row {
-    margin-top: 6px;
   }
 
   .hints {

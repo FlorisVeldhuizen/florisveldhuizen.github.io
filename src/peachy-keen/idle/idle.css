@@ -2844,12 +2844,6 @@ body.is-storm::after {
   margin-top: 4px;
 }
 
-.settings .is-locked {
-  opacity: 0.35;
-  cursor: not-allowed;
-  text-decoration: line-through;
-}
-
 .intro {
   padding: var(--edge-top) calc(var(--panel-side, 0px) + var(--edge-right))
     calc(
@@ -3044,11 +3038,6 @@ body.is-storm::after {
   .track-ink {
     transition: none;
   }
-}
-
-.settings-row[hidden],
-.settings-lab[hidden] {
-  display: none;
 }
 
 .plot.is-armed .plot-ring {
