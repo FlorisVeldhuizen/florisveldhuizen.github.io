@@ -309,21 +309,6 @@ button:focus-visible {
   display: none;
 }
 
-.settings-lab {
-  padding-top: 12px;
-  border-top: 1px solid var(--blush-faint);
-}
-
-.settings-lab > .settings-row {
-  margin-top: 12px;
-}
-
-.settings-lab summary {
-  color: var(--peach);
-  font-style: italic;
-  cursor: pointer;
-}
-
 .settings-row {
   display: flex;
   align-items: center;
@@ -808,10 +793,6 @@ button:focus-visible {
     font-size: 15px;
   }
 
-  .settings-lab > .settings-row {
-    margin-top: 6px;
-  }
-
   .hints {
     font-size: 14px;
   }
@@ -1031,6 +1012,12 @@ button:focus-visible {
   border-width: 2px;
   border-color: #ff5fa8;
   border-radius: 999px;
+}
+
+.cursor[data-tool="coins"] span {
+  border-width: 2px;
+  border-color: #ffcf5a;
+  background-color: rgba(255, 207, 90, 0.18);
 }
 
 .cursor[data-buzzing="true"] span {

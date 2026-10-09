@@ -13,6 +13,8 @@ const snaps = [];
 const slices = [];
 const pats = [];
 const skinBodies = [];
+const coinSkins = [];
+const coinClinks = [];
 const lastPlayed = new Map();
 let burst = null;
 let massageBank = null;
@@ -58,7 +60,7 @@ async function decode(url) {
   return context().decodeAudioData(await response.arrayBuffer());
 }
 
-function noiseBuffer() {
+export function noiseBuffer() {
   if (!noise) {
     const c = context();
     noise = c.createBuffer(1, c.sampleRate, c.sampleRate);
@@ -735,6 +737,24 @@ export function playPat(weight, pan, oil, { gain = 1, flam = true } = {}) {
     ...PAT,
     volume: PAT.volume * gain,
     flam,
+  });
+}
+
+export function playCoinSkin(volume, pan, cutoff = 9000, delay = 0) {
+  if (!running() || !coinSkins.length) return;
+  patLayer(ctx.currentTime + delay, pickPat(coinSkins, Math.random(), 99), {
+    volume: volume * vary(0.2),
+    cutoff,
+    pan,
+  });
+}
+
+export function playCoinClink(volume, pan) {
+  if (!running() || !coinClinks.length) return;
+  patLayer(ctx.currentTime, pickPat(coinClinks, Math.random(), 99), {
+    volume: volume * vary(0.2),
+    cutoff: 14000,
+    pan,
   });
 }
 
@@ -1844,6 +1864,8 @@ export function loadSounds() {
       [AUDIO_CONFIG.sliceSounds, slices],
       [AUDIO_CONFIG.patSounds, pats],
       [AUDIO_CONFIG.skinBodySounds, skinBodies],
+      [AUDIO_CONFIG.coinSkinSounds, coinSkins],
+      [AUDIO_CONFIG.coinClinkSounds, coinClinks],
     ];
     loading = Promise.all([
       ...sets.map(([urls, buffers]) =>

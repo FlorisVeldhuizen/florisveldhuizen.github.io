@@ -571,7 +571,7 @@ export class Interaction {
   }
 
   tap() {
-    if (this.phase !== "live") return;
+    if (this.phase !== "live" || this.toolName === "coins") return;
     const now = performance.now();
     const { x, y } = this.pointer;
     const hit = this.raycastAt(x, y);
@@ -593,13 +593,15 @@ export class Interaction {
     this.smack(hit, 0, 0, 0.9);
   }
 
-  smack(hit, vx, vy, strength, toolName = this.toolName) {
+  smack(hit, vx, vy, strength, toolName = this.toolName, from = null) {
     const tool = TOOLS[toolName];
+    const at = from ?? this.pointer;
     const now = performance.now();
     const tapped = vx === 0 && vy === 0;
-    const swipe = tapped
+    let swipe = tapped
       ? this.tempA.set(0, 0, -1)
       : this.tempA.set(vx, -vy, 0).normalize();
+    if (from) swipe = this.tempA.copy(from.dir);
     const normal = this.tempB
       .copy(hit.face.normal)
       .transformDirection(this.peach.mesh.matrixWorld);
@@ -662,7 +664,7 @@ export class Interaction {
 
     if (toolName === "lips") {
       playKiss();
-    } else {
+    } else if (toolName !== "coins") {
       playSlap(
         Math.min(1, 0.4 + strength * 0.35),
         this.heat / 100,
@@ -670,14 +672,15 @@ export class Interaction {
         this.firmness.pitch * tool.pitch,
       );
     }
-    this.ui.onSmack(this.smacks, this.combo, this.pointer.x, this.pointer.y);
+    this.ui.onSmack(this.smacks, from?.quiet ? 0 : this.combo, at.x, at.y);
     if (this.combo >= 5) this.talk.say("combo", 0.5);
     else if (toolName === "lips") this.talk.say("kiss", 0.4);
+    else if (toolName === "coins") this.talk.say("coins", 0.25);
     else this.talk.say("smack", 0.3);
     this.emit("smack", {
       strength,
-      x: this.pointer.x,
-      y: this.pointer.y,
+      x: at.x,
+      y: at.y,
       combo: this.combo,
       total: this.smacks,
       tool: toolName,
@@ -1913,6 +1916,7 @@ export class Interaction {
       ? CFG.FULL_SWIPE_SPEED / CFG.TOUCH_SWIPE_BOOST
       : CFG.FULL_SWIPE_SPEED;
     const swiping =
+      this.toolName !== "coins" &&
       p.armed &&
       !(p.pressed && p.grabbed) &&
       motion.speed > CFG.MIN_SWIPE_SPEED;
