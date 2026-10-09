@@ -9,10 +9,16 @@ const RIPPLE_DELAY = 0.045;
 const KICK_PER_PX = 170 / 44;
 
 export default class IntroTitle {
-  constructor(element) {
+  constructor(element, selector = ".intro-letter") {
     this.element = element;
-    // The letters are written in the page, so the title looks the same before and after this script runs.
-    const spans = [...element.querySelectorAll(".intro-letter")];
+    this.selector = selector;
+    this.queue = [];
+    this.bind();
+  }
+
+  // The title letters are written in the page, so it looks the same before and after this script runs.
+  bind() {
+    const spans = [...this.element.querySelectorAll(this.selector)];
     this.letters = spans.map((span, i) => {
       const ch = span.classList.contains("is-space") ? " " : span.textContent;
       const letter = {
@@ -26,7 +32,7 @@ export default class IntroTitle {
       span.addEventListener("pointerdown", () => this.ripple(i));
       return letter;
     });
-    this.queue = [];
+    this.queue.length = 0;
   }
 
   kick() {

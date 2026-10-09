@@ -36,6 +36,7 @@ const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
 const introStatus = document.getElementById("intro-status");
+const statusJiggle = new IntroTitle(introStatus, ".status-letter");
 const freeOpen = freePlayOpen();
 if (freeOpen) openFreePlay();
 const readyText = () =>
@@ -54,6 +55,7 @@ const statusLetters = (text) =>
 
 function writeStatus(text) {
   introStatus.replaceChildren(...statusLetters(text));
+  statusJiggle.bind();
 }
 
 function setStatus(text) {
@@ -170,7 +172,14 @@ const interaction = new Interaction({
 });
 interaction.bottle.view.group.visible = false;
 const naughty = new Naughty(interaction, talk);
-const wild = new Wild({ scene, camera, interaction, talk, backdrop });
+const wild = new Wild({
+  scene,
+  camera,
+  renderer,
+  interaction,
+  talk,
+  backdrop,
+});
 const shock = new Shock(renderer, interaction);
 interaction.on("charge", () => quality.hold(4));
 const skinRings = new SkinRings(scene, interaction);
@@ -463,8 +472,10 @@ intro.addEventListener("pointerleave", () => {
   intro.classList.remove("is-over");
 });
 intro.addEventListener("pointerdown", (e) => {
-  if (!startGame || started || !interaction.raycastAt(e.clientX, e.clientY))
-    return;
+  const hit =
+    startGame && !started && interaction.raycastAt(e.clientX, e.clientY);
+  if (!hit) return;
+  interaction.pat(hit, 0.9);
   interaction.squashVelocity.x -= 1.4;
   interaction.squashAxis.set(0, 1);
 });
@@ -609,6 +620,7 @@ renderer.setAnimationLoop(() => {
   if (!started || intro.isConnected) {
     showRipeness(realDelta);
     introTitle.update(realDelta);
+    statusJiggle.update(realDelta);
   }
   shadowHold = castersInPlay()
     ? SHADOW_HOLD

@@ -1,23 +1,8 @@
 import { TOYS } from "./data/toys";
 
-function toyFor(button) {
-  const key = button.dataset.setting;
-  const value = button.dataset.value ?? true;
-  return TOYS.find((t) => t.setting === key && t.values.includes(value));
-}
-
 export class Toys {
   constructor(game, settings) {
     Object.assign(this, { game, settings });
-    this.buttons = settings.buttons.filter(toyFor);
-    this.buttons.forEach((b) => {
-      // eslint-disable-next-line no-param-reassign
-      b.closest(".settings-row").hidden = true;
-    });
-    settings.panel.querySelectorAll(".settings-lab").forEach((lab) => {
-      // eslint-disable-next-line no-param-reassign
-      lab.hidden = !lab.querySelector(".settings-row:not([hidden])");
-    });
     const change = settings.onChange;
     settings.onChange = (key, value) => {
       change(key, value);
@@ -60,15 +45,6 @@ export class Toys {
     TOYS.forEach((toy) => {
       if (!this.owned(toy) && toy.values.includes(settings[toy.setting]))
         this.apply(toy.setting, toy.off);
-    });
-    this.buttons.forEach((button) => {
-      const toy = toyFor(button);
-      const locked = !this.owned(toy);
-      // eslint-disable-next-line no-param-reassign
-      button.disabled = locked;
-      button.classList.toggle("is-locked", locked);
-      // eslint-disable-next-line no-param-reassign
-      button.title = locked ? `Buy “${toy.name}” in the shop to unlock` : "";
     });
     const active = TOYS.filter(
       (toy) => this.owned(toy) && toy.values.includes(settings[toy.setting]),

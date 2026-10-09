@@ -309,21 +309,6 @@ button:focus-visible {
   display: none;
 }
 
-.settings-lab {
-  padding-top: 12px;
-  border-top: 1px solid var(--blush-faint);
-}
-
-.settings-lab > .settings-row {
-  margin-top: 12px;
-}
-
-.settings-lab summary {
-  color: var(--peach);
-  font-style: italic;
-  cursor: pointer;
-}
-
 .settings-row {
   display: flex;
   align-items: center;
@@ -617,6 +602,7 @@ button:focus-visible {
 /* While it loads the status line carries a slow lift wave, a CSS animation so it keeps moving when the page is busy. */
 .status-letter {
   display: inline-block;
+  transform-origin: 50% 88%;
 }
 
 .status-letter.is-space {
@@ -805,10 +791,6 @@ button:focus-visible {
     gap: 6px;
     padding: 10px 16px;
     font-size: 15px;
-  }
-
-  .settings-lab > .settings-row {
-    margin-top: 6px;
   }
 
   .hints {
@@ -1030,6 +1012,12 @@ button:focus-visible {
   border-width: 2px;
   border-color: #ff5fa8;
   border-radius: 999px;
+}
+
+.cursor[data-tool="coins"] span {
+  border-width: 2px;
+  border-color: #ffcf5a;
+  background-color: rgba(255, 207, 90, 0.18);
 }
 
 .cursor[data-buzzing="true"] span {

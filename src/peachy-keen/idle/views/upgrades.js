@@ -1,6 +1,7 @@
 import { UPGRADE_BY_ID } from "../data/upgrades";
 import { TOYS, TOY_BY_ID, PICKERS, toyCost } from "../data/toys";
 import { dropIcon } from "../syrup";
+import toolTrack from "../tool-track";
 
 const PICKED = PICKERS.map((p) => p.key);
 const TRAY_KEY = "peachy-keen-toy-tray";
@@ -52,20 +53,10 @@ export class UpgradesView {
       this.tray,
       "Toys are yours for good, even after you ripen. Tap a toy you own to switch it on or off.",
     );
-    this.pickers = PICKERS.map((picker) => {
-      const row = el("div", "tool-row", this.tray);
-      el("span", "tool-label", row, picker.label);
-      const group = el("span", "segmented", row);
-      group.setAttribute("role", "group");
-      group.setAttribute("aria-label", picker.label);
-      const buttons = picker.options.map(([id, label]) => {
-        const b = el("button", "", group);
-        b.type = "button";
-        b.addEventListener("click", () => this.pick(picker, id));
-        return { id, label, button: b, toy: TOY_BY_ID[id] };
-      });
-      return { ...picker, row, buttons };
-    });
+    this.pickers = PICKERS.map((picker) => ({
+      picker,
+      track: toolTrack(this.tray, picker, (id) => this.pick(picker, id)),
+    }));
     this.toyList = el("ol", "rows", this.tray);
     this.toyRows = new Map();
     this.toySignature = "";
@@ -147,23 +138,12 @@ export class UpgradesView {
 
   updatePickers() {
     const { game } = this;
-    const s = game.state;
-    this.pickers.forEach((picker) => {
-      const active = picker.buttons.find((t) => game.activeToys.includes(t.id));
-      let owns = false;
-      picker.buttons.forEach(({ id, label, button, toy }) => {
-        const owned = !toy || s.toys.includes(id);
-        if (toy && owned) owns = true;
-        // eslint-disable-next-line no-param-reassign
-        button.hidden = !owned;
-        setText(button, label);
-        button.setAttribute(
-          "aria-pressed",
-          String(active ? active.id === id : id === picker.off),
-        );
-      });
-      // eslint-disable-next-line no-param-reassign
-      picker.row.hidden = !owns;
+    const owned = (id) => !TOY_BY_ID[id] || game.state.toys.includes(id);
+    this.pickers.forEach(({ picker, track }) => {
+      const active = picker.options.find(([id]) =>
+        game.activeToys.includes(id),
+      );
+      track.update(active ? active[0] : picker.off, owned);
     });
   }
 

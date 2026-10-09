@@ -127,3 +127,56 @@ export function nudge(node) {
     { duration: 280, easing: "ease-out" },
   );
 }
+
+export function slideOn(track, pick, preview = () => {}) {
+  let drag = null;
+  let lit = -1;
+  const light = (k) => {
+    if (k === lit) return;
+    lit = k;
+    if (k >= 0) {
+      navigator.vibrate?.(4);
+      preview(k);
+    }
+  };
+  let slidAt = -1e9;
+  const n = () => Number(track.style.getPropertyValue("--n")) || 1;
+  track.addEventListener("pointerdown", (e) => {
+    if (e.isPrimary) drag = { x: e.clientX, id: e.pointerId, moved: false };
+  });
+  track.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    if (!drag.moved) {
+      if (Math.abs(e.clientX - drag.x) < 6) return;
+      drag.moved = true;
+      track.setPointerCapture(drag.id);
+      track.classList.add("is-sliding");
+    }
+    const r = track.getBoundingClientRect();
+    const at = ((e.clientX - r.left) / r.width) * n() - 0.5;
+    const i = Math.min(n() - 1, Math.max(0, at));
+    track.style.setProperty("--i", i);
+    light(Math.round(i));
+  });
+  const end = () => {
+    if (!drag) return;
+    const { moved } = drag;
+    drag = null;
+    if (!moved) return;
+    slidAt = performance.now();
+    track.classList.remove("is-sliding");
+    const k = Math.round(Number(track.style.getPropertyValue("--i")));
+    track.style.setProperty("--i", k);
+    light(-1);
+    pick(k);
+  };
+  track.addEventListener("pointerup", end);
+  track.addEventListener("pointercancel", end);
+  track.addEventListener(
+    "click",
+    (e) => {
+      if (performance.now() - slidAt < 300) e.stopPropagation();
+    },
+    true,
+  );
+}
