@@ -1663,9 +1663,10 @@ body.is-storm::after {
 
 @media (prefers-reduced-motion: reduce) {
   .plot *,
-  .node,
   .node::after,
-  .sky-star,
+  .node-glow::before,
+  .node-glow::after,
+  .sky-twinkle,
   body.is-frenzy::after,
   body.is-satisfied::after,
   body.is-storm::after {
@@ -1783,7 +1784,12 @@ body.is-storm::after {
   opacity: 0.45;
 }
 
-.sky-star.is-twinkle {
+.sky-twinkle {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff2e8;
+  opacity: 0.45;
+  pointer-events: none;
   animation: twinkle-star 3.6s ease-in-out infinite;
   animation-delay: var(--delay, 0s);
 }
@@ -1916,7 +1922,38 @@ body.is-storm::after {
 .node[data-state="ready"] {
   border-color: var(--gold);
   color: var(--gold);
+}
+
+/* Two fixed glows fade into each other, so the pulse needs no repaint. */
+.node-glow {
+  display: none;
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.node[data-state="ready"] .node-glow {
+  display: block;
+}
+
+.node-glow::before,
+.node-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  opacity: 0;
   animation: ready-star 1.8s ease-in-out infinite alternate;
+}
+
+.node-glow::before {
+  box-shadow: 0 0 6px rgba(255, 210, 122, 0.3);
+  animation-direction: alternate-reverse;
+}
+
+.node-glow::after {
+  box-shadow: 0 0 16px rgba(255, 210, 122, 0.7);
 }
 
 .node[data-state="ready"] .node-cost {
@@ -1983,10 +2020,10 @@ body.is-storm::after {
 
 @keyframes ready-star {
   from {
-    box-shadow: 0 0 6px rgba(255, 210, 122, 0.3);
+    opacity: 0;
   }
   to {
-    box-shadow: 0 0 16px rgba(255, 210, 122, 0.7);
+    opacity: 1;
   }
 }
 

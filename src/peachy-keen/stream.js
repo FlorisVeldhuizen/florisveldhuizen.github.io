@@ -1,4 +1,4 @@
-import { clamp, ease, reducedMotion, viewHeight } from "./util";
+import { clamp, ease, reducedMotion, viewHeight, viewWidth } from "./util";
 
 const GRAVITY = 2400;
 const EMIT_RATE = 120;
@@ -466,7 +466,7 @@ export default class OilStream {
       d.y += d.vy * delta;
       d.z += d.vz * delta;
       const onScreen =
-        d.x > 0 && d.x < window.innerWidth && d.y > 0 && d.y < viewHeight();
+        d.x > 0 && d.x < viewWidth() && d.y > 0 && d.y < viewHeight();
       if (d.z >= 1) {
         if (onScreen) this.onLens?.(d.x, d.y, d.r * NEAR_SCALE);
         return false;

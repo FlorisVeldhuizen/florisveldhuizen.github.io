@@ -26,7 +26,7 @@ import {
   INTERACTION_CONFIG as CFG,
 } from "./config";
 import { Bottle } from "./bottle";
-import { clamp, reducedMotion, viewHeight } from "./util";
+import { clamp, reducedMotion, viewHeight, viewWidth } from "./util";
 import SurfaceMarker, { MARKERS, surfaceNormal } from "./marker";
 
 const DROP_STEP_PX = 12;
@@ -161,7 +161,7 @@ export class Interaction {
     };
 
     this.pointer = {
-      x: window.innerWidth / 2,
+      x: viewWidth() / 2,
       y: viewHeight() / 2,
       samples: [],
       present: false,
@@ -336,8 +336,8 @@ export class Interaction {
 
   // eslint-disable-next-line class-methods-use-this
   requestShake() {
-    if (typeof DeviceMotionEvent?.requestPermission === "function")
-      DeviceMotionEvent.requestPermission().catch(() => {});
+    if (typeof window.DeviceMotionEvent?.requestPermission === "function")
+      window.DeviceMotionEvent.requestPermission().catch(() => {});
   }
 
   jolt(x, y) {
@@ -481,7 +481,7 @@ export class Interaction {
     if (!a || a === b || now - b.t > CFG.SAMPLE_WINDOW_MS)
       return { vx: 0, vy: 0, speed: 0 };
     const dt = Math.max(CFG.SAMPLE_MIN_MS, b.t - a.t) / 1000;
-    const unit = Math.min(window.innerWidth, viewHeight());
+    const unit = Math.min(viewWidth(), viewHeight());
     const vx = (b.x - a.x) / dt / unit;
     const vy = (b.y - a.y) / dt / unit;
     return { vx, vy, speed: Math.hypot(vx, vy) };
@@ -498,12 +498,12 @@ export class Interaction {
     for (let i = first + 1; i < s.length; i += 1)
       path += Math.hypot(s[i].x - s[i - 1].x, s[i].y - s[i - 1].y);
     const dt = Math.max(CFG.SAMPLE_MIN_MS, b.t - s[first].t) / 1000;
-    return path / dt / Math.min(window.innerWidth, viewHeight());
+    return path / dt / Math.min(viewWidth(), viewHeight());
   }
 
   raycastAt(x, y) {
     if (!this.peach.mesh) return null;
-    this.ndc.set((x / window.innerWidth) * 2 - 1, -(y / viewHeight()) * 2 + 1);
+    this.ndc.set((x / viewWidth()) * 2 - 1, -(y / viewHeight()) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, this.camera);
     return this.raycaster.intersectObject(this.peach.mesh, false)[0] || null;
   }
@@ -723,7 +723,7 @@ export class Interaction {
       world,
     );
     this.ndc.set(
-      (this.pointer.x / window.innerWidth) * 2 - 1,
+      (this.pointer.x / viewWidth()) * 2 - 1,
       -(this.pointer.y / viewHeight()) * 2 + 1,
     );
     this.raycaster.setFromCamera(this.ndc, this.camera);
@@ -1381,7 +1381,7 @@ export class Interaction {
   toScreen(world) {
     this.screen.copy(world).project(this.camera);
     return {
-      x: (this.screen.x + 1) * 0.5 * window.innerWidth,
+      x: (this.screen.x + 1) * 0.5 * viewWidth(),
       y: (1 - this.screen.y) * 0.5 * viewHeight(),
     };
   }
@@ -1546,6 +1546,8 @@ export class Interaction {
       h.holder.rotation.set(0, 0, 0);
       h.holder.scale.setScalar(1);
       h.holder.visible = true;
+      // The fabric discards every pixel without lingerie, so it is not drawn then.
+      h.mesh.userData.fabric.visible = this.halfLingerie > 0;
       h.normal = normal.clone();
       h.launch = normal
         .clone()
@@ -1648,6 +1650,11 @@ export class Interaction {
     this.peach.fadeHalfLingerie(
       this.halfLingerie * (1 - fade * fade * (3 - 2 * fade)),
     );
+    if (fade === 1)
+      this.halves.forEach((h) => {
+        // eslint-disable-next-line no-param-reassign
+        h.mesh.userData.fabric.visible = false;
+      });
     if (!this.snapped && t >= SLICE_HOLD) this.snapHalves();
     if (!this.snapped) {
       const k = t / SLICE_HOLD;
@@ -2222,7 +2229,7 @@ export class Interaction {
     const still = reducedMotion.matches;
     const p = this.pointer;
     const steady = still || !p.present || this.holdStill;
-    const tx = steady ? 0 : (p.x / window.innerWidth - 0.5) * 0.5;
+    const tx = steady ? 0 : (p.x / viewWidth() - 0.5) * 0.5;
     const ty = steady ? 0 : (p.y / viewHeight() - 0.5) * -0.3;
     const ease = 1 - Math.exp(-delta * 3);
     this.parallax.x += (tx - this.parallax.x) * ease;
@@ -2320,7 +2327,7 @@ export class Interaction {
     setRub(
       this.carrying ? 0 : this.rubbing,
       this.oil,
-      clamp((this.pointer.x / window.innerWidth) * 2 - 1, -1, 1) * 0.5,
+      clamp((this.pointer.x / viewWidth()) * 2 - 1, -1, 1) * 0.5,
     );
 
     this.juice.update(delta);

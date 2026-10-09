@@ -14,7 +14,7 @@ import {
   Color,
   BackSide,
 } from "three";
-import { viewHeight } from "./util";
+import { viewHeight, viewWidth } from "./util";
 
 const FRAME_HEIGHT = 6.4;
 const FRAME_WIDTH = 5.2;
@@ -27,7 +27,7 @@ export const RING = {
 };
 
 function fitCamera(camera) {
-  const aspect = window.innerWidth / viewHeight();
+  const aspect = viewWidth() / viewHeight();
   const halfFov = (camera.fov * Math.PI) / 360;
   const needHeight = Math.max(FRAME_HEIGHT, FRAME_WIDTH / aspect);
   camera.aspect = aspect;
@@ -68,17 +68,33 @@ function createRingLightEnvironment() {
   return env;
 }
 
+// iOS can hand back a context that is already lost, so simpler settings are tried before giving up.
+const RENDERER_TRIES = [
+  { antialias: true, powerPreference: "high-performance" },
+  { antialias: true },
+  { antialias: false },
+];
+
+function createRenderer() {
+  let failure = null;
+  for (let n = 0; n < RENDERER_TRIES.length; n += 1) {
+    try {
+      return new WebGLRenderer(RENDERER_TRIES[n]);
+    } catch (error) {
+      failure = error;
+    }
+  }
+  throw failure;
+}
+
 export function initScene() {
   const scene = new Scene();
   const camera = new PerspectiveCamera(34, 1, 0.1, 100);
   fitCamera(camera);
 
-  const renderer = new WebGLRenderer({
-    antialias: true,
-    powerPreference: "high-performance",
-  });
+  const renderer = createRenderer();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, viewHeight());
+  renderer.setSize(viewWidth(), viewHeight());
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.5;
   renderer.localClippingEnabled = true;
@@ -133,7 +149,7 @@ export function setupResizeHandler(camera, renderer, onResize) {
     requestAnimationFrame(() => {
       pending = false;
       fitCamera(camera);
-      renderer.setSize(window.innerWidth, viewHeight());
+      renderer.setSize(viewWidth(), viewHeight());
       onResize?.();
     });
   });
@@ -145,12 +161,14 @@ export class QualityGovernor {
     this.mode = "auto";
     this.max = Math.min(window.devicePixelRatio, 2);
     this.ratio = this.max;
+    this.shown = this.max;
     this.windowTime = 0;
     this.windowFrames = 0;
     this.goodWindows = 0;
     this.badWindows = 0;
     this.fps = 60;
     this.refresh = 60;
+    this.holdTime = 0;
   }
 
   setMode(mode) {
@@ -159,12 +177,27 @@ export class QualityGovernor {
   }
 
   apply(ratio) {
-    if (ratio === this.ratio) return;
     this.ratio = ratio;
-    this.renderer.setPixelRatio(ratio);
+    const shown = Math.min(ratio, this.cap ?? ratio);
+    if (shown === this.shown) return;
+    this.shown = shown;
+    this.renderer.setPixelRatio(shown);
+  }
+
+  setCap(cap) {
+    if (cap === this.cap) return;
+    this.cap = cap;
+    this.apply(this.ratio);
+  }
+
+  // A burst is short, so its slow frames should not change the resolution.
+  hold(seconds) {
+    this.holdTime = seconds;
+    this.badWindows = 0;
   }
 
   update(delta) {
+    this.holdTime -= delta;
     this.windowTime += delta;
     this.windowFrames += 1;
     if (this.windowTime < 1) return;
@@ -172,7 +205,7 @@ export class QualityGovernor {
     this.fps = this.windowFrames / this.windowTime;
     this.windowTime = 0;
     this.windowFrames = 0;
-    if (this.mode !== "auto") return;
+    if (this.mode !== "auto" || this.holdTime > 0) return;
 
     this.refresh = Math.max(this.refresh, this.fps);
     this.badWindows = this.fps < this.refresh * 0.85 ? this.badWindows + 1 : 0;

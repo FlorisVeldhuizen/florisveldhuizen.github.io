@@ -1660,6 +1660,8 @@ export class Room {
       ray.material.opacity =
         choir * (0.14 + 0.08 * Math.sin(t * 0.7 + n * 1.7));
       // eslint-disable-next-line no-param-reassign
+      ray.visible = choir > 0;
+      // eslint-disable-next-line no-param-reassign
       ray.rotation.z =
         (n - 1.5) * 0.12 +
         (Math.sin(t * 0.2 + n) * 0.04 + this.wind.breeze.x * 0.04) * still;
@@ -1818,6 +1820,7 @@ export class Room {
     this.flashAge += delta;
     const f = this.flashAge / 0.45;
     this.flash.material.opacity = f < 1 ? (1 - f) * 0.9 : 0;
+    this.flash.visible = f < 1;
     this.flash.scale.setScalar(0.2 + Math.min(1, f) * 0.9);
 
     const hole = this.hole.mesh;

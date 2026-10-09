@@ -2097,6 +2097,7 @@ export class Peach {
     fabric.receiveShadow = true;
     fabric.renderOrder = order + 3;
     half.add(fabric);
+    half.userData.fabric = fabric;
     return half;
   }
 

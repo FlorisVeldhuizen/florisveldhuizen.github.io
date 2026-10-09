@@ -47,16 +47,30 @@ function thread(n) {
   return `<path class="thread" data-id="${n.id}" pathLength="1" d="M${x1.toFixed(3)} ${y1.toFixed(3)}Q${cx.toFixed(3)} ${cy.toFixed(3)} ${x2.toFixed(3)} ${y2.toFixed(3)}"/>`;
 }
 
+// Twinkling stars are HTML, so their fade does not repaint the whole sky.
 function sky() {
   let seed = 7;
   const next = () => {
     seed = (seed * 16807) % 2147483647;
     return seed / 2147483647;
   };
-  return Array.from({ length: STARS }, (_, n) => {
+  const still = [];
+  const twinkling = [];
+  for (let n = 0; n < STARS; n += 1) {
     const r = 0.012 + next() * 0.02;
-    return `<circle class="sky-star${n % 5 ? "" : " is-twinkle"}" cx="${(next() * COLS).toFixed(2)}" cy="${(next() * HEIGHT).toFixed(2)}" r="${r.toFixed(3)}" style="--delay:${(-next() * 4).toFixed(2)}s"/>`;
-  }).join("");
+    const cx = next() * COLS;
+    const cy = next() * HEIGHT;
+    const delay = (-next() * 4).toFixed(2);
+    if (n % 5)
+      still.push(
+        `<circle class="sky-star" cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(3)}"/>`,
+      );
+    else
+      twinkling.push(
+        `<i class="sky-twinkle" style="left:${(((cx - r) / COLS) * 100).toFixed(3)}%;top:${(((cy - r) / HEIGHT) * 100).toFixed(3)}%;width:${(((2 * r) / COLS) * 100).toFixed(3)}%;height:${(((2 * r) / HEIGHT) * 100).toFixed(3)}%;--delay:${delay}s"></i>`,
+      );
+  }
+  return { still: still.join(""), twinkling: twinkling.join("") };
 }
 
 export class RipenView {
@@ -79,7 +93,8 @@ export class RipenView {
     const threads = TREE.filter((n) => n.parent)
       .map(thread)
       .join("");
-    this.tree.innerHTML = `<svg class="tree-sky" viewBox="0 0 ${COLS} ${HEIGHT}" aria-hidden="true">${sky()}${threads}</svg>`;
+    const stars = sky();
+    this.tree.innerHTML = `${stars.twinkling}<svg class="tree-sky" viewBox="0 0 ${COLS} ${HEIGHT}" aria-hidden="true">${stars.still}${threads}</svg>`;
     this.branches = new Map(
       [...this.tree.querySelectorAll(".thread")].map((b) => [b.dataset.id, b]),
     );
@@ -90,7 +105,7 @@ export class RipenView {
         "button",
         `node${node.parent ? "" : " is-root"}${MAJOR.has(node.id) ? " is-major" : ""}`,
         this.tree,
-        `${iconSvg(node.icon)}<span class="node-cost" aria-hidden="true">${node.cost}</span>`,
+        `<span class="node-glow" aria-hidden="true"></span>${iconSvg(node.icon)}<span class="node-cost" aria-hidden="true">${node.cost}</span>`,
       );
       b.type = "button";
       const [x, y] = PLACE[node.id];

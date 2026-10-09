@@ -9,7 +9,7 @@ import {
   Vector2,
 } from "three";
 import { RING_GLSL } from "./rings";
-import { clamp, reducedMotion, viewHeight } from "./util";
+import { clamp, reducedMotion, viewHeight, viewWidth } from "./util";
 
 const RING_TIME = 0.9;
 const RING_END = 1.6;
@@ -100,10 +100,7 @@ export class Shock {
     }
     const u = material.uniforms;
     const screen = at || this.i.toScreen(this.i.group.position);
-    u.uCenter.value.set(
-      screen.x / window.innerWidth,
-      1 - screen.y / viewHeight(),
-    );
+    u.uCenter.value.set(screen.x / viewWidth(), 1 - screen.y / viewHeight());
     this.ring = 0;
     this.power = power;
     this.flash = Math.max(this.flash, 0.55 * power);
@@ -130,7 +127,7 @@ export class Shock {
     if (i.phase === "charging" && this.ring >= RING_END) {
       const at = i.toScreen(i.group.position);
       material.uniforms.uCenter.value.set(
-        at.x / window.innerWidth,
+        at.x / viewWidth(),
         1 - at.y / viewHeight(),
       );
     }
@@ -166,7 +163,7 @@ export class Shock {
     if (!this.active) return;
     const u = material.uniforms;
     u.tFrame.value = this.capture();
-    u.uAspect.value = window.innerWidth / viewHeight();
+    u.uAspect.value = viewWidth() / viewHeight();
     u.uRing.value = this.ring * 1.2;
     u.uRingPower.value =
       this.ring < RING_END ? this.power * (1 - this.ring / RING_END) : 0;

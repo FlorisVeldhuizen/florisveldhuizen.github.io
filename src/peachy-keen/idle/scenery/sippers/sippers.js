@@ -1,6 +1,6 @@
 /* eslint-disable no-param-reassign, no-continue */
 import { Euler, Group, Matrix4, Quaternion, Vector3 } from "three";
-import { viewHeight } from "../../../util";
+import { viewHeight, viewWidth } from "../../../util";
 import { skinPose, skinSpot } from "../skin-jiggle";
 import { makeShared } from "./parts";
 import Sparks from "./fx";
@@ -68,7 +68,7 @@ export function createSippers(ctx) {
       camera.position.distanceTo(at));
   const screenOf = (v, out) => {
     proj.copy(v).project(camera);
-    out.sx = (proj.x + 1) * 0.5 * window.innerWidth;
+    out.sx = (proj.x + 1) * 0.5 * viewWidth();
     out.sy = (1 - proj.y) * 0.5 * viewHeight();
     out.front = proj.z < 1;
   };
@@ -87,7 +87,7 @@ export function createSippers(ctx) {
       ctr.z + rand(0.2, 1.6),
     );
   };
-  const panOf = (w) => ((w.sx / window.innerWidth) * 2 - 1) * 0.8;
+  const panOf = (w) => ((w.sx / viewWidth()) * 2 - 1) * 0.8;
   const quietTouch = (hit, t) => {
     quiet = true;
     ctx.touch(hit, { pop: false, ...t });

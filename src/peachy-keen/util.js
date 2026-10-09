@@ -53,13 +53,16 @@ const installed = window.matchMedia(
   "(display-mode: standalone), (display-mode: fullscreen)",
 );
 let viewportHeight = window.innerHeight;
+let viewportWidth = window.innerWidth;
 // Installed iOS reports innerHeight short of the screen; the root box is 100vh there.
 const measureViewport = () => {
   const next = installed.matches
     ? Math.max(window.innerHeight, document.documentElement.offsetHeight)
     : window.innerHeight;
-  if (next === viewportHeight) return false;
+  const width = window.innerWidth;
+  if (next === viewportHeight && width === viewportWidth) return false;
   viewportHeight = next;
+  viewportWidth = width;
   return true;
 };
 window.addEventListener("resize", measureViewport);
@@ -71,3 +74,10 @@ measureViewport();
 );
 
 export const viewHeight = () => viewportHeight;
+// Reading innerWidth forces a layout, so frame code reads this copy.
+export const viewWidth = () => viewportWidth;
+
+export const sheet = { top: null, side: 0, moved: 0 };
+
+// Light combinations whose shaders are built: 1 = mood lights, 2 = disco lights, summed.
+export const warmedLights = new Set();

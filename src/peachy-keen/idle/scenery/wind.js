@@ -1,5 +1,5 @@
 import { Vector3 } from "three";
-import { viewHeight } from "../../util";
+import { viewHeight, viewWidth } from "../../util";
 
 const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 const WAKE_RADIUS = 0.8;
@@ -74,13 +74,13 @@ export class Wind {
     const w = this.wake;
     w.on = pointer.present && motion.speed > 0;
     if (!w.on) return;
-    const unit = Math.min(window.innerWidth, viewHeight());
+    const unit = Math.min(viewWidth(), viewHeight());
     w.vx = motion.vx * unit;
     w.vy = motion.vy * unit;
     w.origin.copy(this.camera.position);
     w.dir
       .set(
-        (pointer.x / window.innerWidth) * 2 - 1,
+        (pointer.x / viewWidth()) * 2 - 1,
         -(pointer.y / viewHeight()) * 2 + 1,
         0.5,
       )

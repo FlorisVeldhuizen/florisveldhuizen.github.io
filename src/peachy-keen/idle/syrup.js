@@ -24,6 +24,11 @@ const FALL_GRAVITY = 980;
 const MAX_STRETCH = 1.6;
 const MELT_RATE = 14;
 
+// The icons sit under SVG filters, so a write is skipped when nothing changed.
+function setChanged(node, name, value) {
+  if (node.getAttribute(name) !== value) node.setAttribute(name, value);
+}
+
 const DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <linearGradient id="syrup-drop-fill" x1="0.2" y1="0" x2="0.7" y2="1">
@@ -229,7 +234,8 @@ export class SyrupDrop {
     this.flash = Math.max(0, this.flash - dt * 8);
     this.shine.forEach((node, n) => {
       const base = n ? 0.3 : 0.38;
-      node.setAttribute(
+      setChanged(
+        node,
         "opacity",
         (base + (0.9 - base) * this.flash).toFixed(2),
       );
@@ -237,7 +243,8 @@ export class SyrupDrop {
     this.wobble.step(dt);
     this.tilt.step(dt);
     this.hop.step(dt);
-    this.body.setAttribute(
+    setChanged(
+      this.body,
       "transform",
       `translate(0 ${this.hop.x.toFixed(2)}) ${wobbleTransform(this.wobble, this.tilt, this.pulse.x)}`,
     );
@@ -260,7 +267,7 @@ export function pitWobble(svg) {
     step(dt) {
       wobble.step(dt);
       tilt.step(dt);
-      group.setAttribute("transform", wobbleTransform(wobble, tilt));
+      setChanged(group, "transform", wobbleTransform(wobble, tilt));
     },
   };
 }

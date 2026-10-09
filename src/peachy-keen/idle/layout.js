@@ -1,4 +1,4 @@
-import { Spring, clamp, viewHeight } from "../util";
+import { Spring, clamp, sheet, viewHeight, viewWidth } from "../util";
 import { sidePanel } from "./dom";
 
 const FRAME_HEIGHT = 6.4;
@@ -20,6 +20,18 @@ export class Layout {
     this.cssKey = "";
     this.growth = 0;
     this.measure();
+    this.stale = false;
+    this.wasSliding = false;
+    // Reading the panel rect forces a layout, so it is read only after something moved it.
+    const mark = () => {
+      this.stale = true;
+    };
+    const watch = new ResizeObserver(mark);
+    [panel.root, this.rate, this.rate.parentElement].forEach((node) =>
+      watch.observe(node),
+    );
+    window.addEventListener("resize", mark);
+    sidePanel.addEventListener("change", mark);
     this.shown = Array.from(
       { length: 3 },
       () => new Spring(0, SETTLE_FREQUENCY, SETTLE_DAMPING),
@@ -30,8 +42,10 @@ export class Layout {
   measure() {
     const rect = this.panel.root.getBoundingClientRect();
     const wide = sidePanel.matches;
-    this.side = wide ? Math.max(0, window.innerWidth - rect.left) : 0;
+    this.side = wide ? Math.max(0, viewWidth() - rect.left) : 0;
     this.bottom = wide ? 0 : Math.max(0, viewHeight() - rect.top);
+    sheet.top = this.bottom ? rect.top : null;
+    sheet.side = this.side;
     const h = viewHeight();
     const opened = clamp((this.bottom - h * TOP_FROM) / (h * TOP_RAMP), 0, 1);
     this.top = opened * this.rate.getBoundingClientRect().bottom;
@@ -56,15 +70,20 @@ export class Layout {
     return {
       x: 0,
       y: this.top,
-      w: window.innerWidth - this.side,
+      w: viewWidth() - this.side,
       h: viewHeight() - this.bottom - this.top,
     };
   }
 
   update(delta) {
-    this.measure();
+    const { sliding } = this.panel;
+    if (this.stale || sliding || this.wasSliding) {
+      this.stale = false;
+      this.measure();
+    }
+    this.wasSliding = sliding;
     const bottom = this.frameBottom();
-    const w = window.innerWidth;
+    const w = viewWidth();
     const h = viewHeight();
     const stageW = Math.max(1, w - this.side);
     const stageH = Math.max(1, h - bottom * 0.85 - this.top);
@@ -116,6 +135,7 @@ export class Layout {
       root.setProperty("--panel-bottom", `${this.bottom}px`);
       const [closed] = this.panel.sheetStops();
       root.setProperty("--sheet-shown", clamp(this.bottom / closed, 0, 1));
+      sheet.moved += 1;
     }
   }
 }

@@ -45,6 +45,15 @@ export class Hud {
     });
     this.pitIcon = this.pits.querySelector(".pit-icon");
     this.pitWobble = pitWobble(this.pitIcon);
+    // Fliers home in every frame, and reading the rect forces a layout, so it is kept until the score moves.
+    this.pitBox = null;
+    const moved = () => {
+      this.pitBox = null;
+    };
+    const watch = new ResizeObserver(moved);
+    watch.observe(this.pits);
+    watch.observe(this.pits.parentElement);
+    window.addEventListener("resize", moved);
     this.buffs = document.getElementById("buffs");
     this.dare = document.getElementById("dare");
     this.buffRows = new Map();
@@ -184,8 +193,14 @@ export class Hud {
   }
 
   pitTarget() {
-    const box = this.pitIcon.getBoundingClientRect();
-    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    if (!this.pitBox) {
+      const box = this.pitIcon.getBoundingClientRect();
+      this.pitBox = {
+        x: box.left + box.width / 2,
+        y: box.top + box.height / 2,
+      };
+    }
+    return this.pitBox;
   }
 
   stepFliers(dt) {

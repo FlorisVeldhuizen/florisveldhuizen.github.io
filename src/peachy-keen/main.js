@@ -1,4 +1,4 @@
-import { Group, Clock, Color, Vector3 } from "three";
+import { Group, Clock, Color, Vector3, Vector4 } from "three";
 import { initScene, setupResizeHandler, QualityGovernor } from "./scene";
 import { createBackdrop } from "./backdrop";
 import { Peach } from "./peach";
@@ -14,7 +14,13 @@ import { Wild } from "./wild";
 import { Shock } from "./shock";
 import { SkinRings } from "./rings";
 import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
-import { reducedMotion } from "./util";
+import {
+  reducedMotion,
+  warmedLights,
+  sheet,
+  viewHeight,
+  viewWidth,
+} from "./util";
 import IntroTitle from "./intro-title";
 import JiggleText from "./jiggle-text";
 import slideToggle from "./slide-toggle";
@@ -213,6 +219,7 @@ interaction.bottle.view.group.visible = false;
 const naughty = new Naughty(interaction, talk);
 const wild = new Wild({ scene, camera, interaction, talk, backdrop });
 const shock = new Shock(renderer, interaction);
+interaction.on("charge", () => quality.hold(4));
 const skinRings = new SkinRings(scene, interaction);
 settings.applyAll();
 let idle = null;
@@ -257,7 +264,7 @@ if (fillCanvas.transferControlToOffscreen) {
   );
   fillWorker.onmessage = ({ data }) => Object.assign(fill, data);
   window.addEventListener("resize", () =>
-    fillWorker.postMessage({ size: fillSize() }),
+    fillWorker?.postMessage({ size: fillSize() }),
   );
 } else {
   fillContext = fillCanvas.getContext("2d");
@@ -398,6 +405,8 @@ function drawEverything() {
     renderer.render(scene, camera);
   });
   renderer.render(lens.overlay, lens.overlayCamera);
+  lens.blobGeometry.instanceCount = 1;
+  renderer.render(lens.blobScene, lens.overlayCamera);
   renderer.render(shock.scene, shock.camera);
   renderer.setScissorTest(false);
   camera.layers.disable(JUICE_LAYER);
@@ -413,15 +422,30 @@ function drawEverything() {
 }
 
 // Every lit pixel pays for each visible light, so lights that are off stay out of the shaders.
-const extraLights = [mood.candle, mood.halo, ...wild.disco.lights];
-const showExtraLights = (shown) =>
-  extraLights.forEach((light) => {
-    // eslint-disable-next-line no-param-reassign
-    light.visible = shown;
+const lightGroups = [[mood.candle, mood.halo], wild.disco.lights];
+const lightIndex = (shown) => (shown[0] ? 1 : 0) + (shown[1] ? 2 : 0);
+// Each light combination is its own shader variant; unwarmed ones fall back to all lights on.
+const ALL_LIGHTS = [true, true];
+let warmExtra = [];
+const showLights = (shown) =>
+  lightGroups.forEach((members, n) =>
+    members.forEach((light) => {
+      // eslint-disable-next-line no-param-reassign
+      light.visible = shown[n];
+    }),
+  );
+const lightsShown = [false, false];
+const showLitGroups = () => {
+  lightGroups.forEach((members, n) => {
+    lightsShown[n] = members.some((light) => light.intensity > 0);
   });
+  showLights(
+    warmedLights.has(lightIndex(lightsShown)) ? lightsShown : ALL_LIGHTS,
+  );
+};
 
-async function warmLights(lit) {
-  showExtraLights(lit);
+async function warmLights(shown) {
+  showLights(shown);
   renderer.shadowMap.enabled = true;
   const shadowed = renderer.compileAsync(scene, camera);
   renderer.shadowMap.enabled = false;
@@ -429,17 +453,23 @@ async function warmLights(lit) {
     shadowed,
     renderer.compileAsync(scene, camera),
     renderer.compileAsync(lens.overlay, lens.overlayCamera),
+    renderer.compileAsync(lens.blobScene, lens.overlayCamera),
     renderer.compileAsync(shock.scene, shock.camera),
   ]);
   // The render loop switches unlit lights off while the compile runs.
-  showExtraLights(lit);
+  showLights(shown);
   // ANGLE on Metal builds a shader on its first draw, not at compile, so draw every variant into one pixel.
   drawEverything();
+  warmedLights.add(lightIndex(shown));
 }
 
-async function warm() {
-  await warmLights(true);
-  await warmLights(false);
+async function warm(extra = warmExtra) {
+  warmExtra = extra;
+  warmedLights.clear();
+  const states = [ALL_LIGHTS, [false, false], ...extra];
+  for (let n = 0; n < states.length; n += 1)
+    // eslint-disable-next-line no-await-in-loop
+    await warmLights(states[n]);
 }
 
 let warming = false;
@@ -473,7 +503,7 @@ async function prepareIdle() {
   });
   naughty.set("achievements", false);
   idle.prepare();
-  await warm();
+  await warm(idle.lightStates());
   idle.ready();
   setStatus(status);
 }
@@ -719,6 +749,8 @@ peach
       showHud();
       setTimeout(() => {
         intro.remove();
+        fillWorker?.terminate();
+        fillWorker = null;
         document.documentElement.classList.remove(
           "is-opening",
           "is-handing",
@@ -760,8 +792,48 @@ const castersInPlay = () =>
   interaction.halves?.some((h) => h.holder.visible);
 
 const clock = new Clock();
+// With the shop sheet up only the visible part is drawn; the margin keeps edge refraction sampling real pixels.
+const CLIP_MARGIN = 32;
+// A full-height sheet leaves a thin strip of the scene, so it can draw at a lower resolution.
+const FULL_SHEET_RESOLUTION = 0.6;
+const clipBox = new Vector4();
+// With the shop open and nothing being touched, the scene draws every other frame; any touch restores full rate at once.
+const CALM_AFTER = 1;
+let calmFor = 0;
+let skipFrame = false;
+let lastFrameAt = performance.now();
+const frameClip = () => {
+  const w = viewWidth();
+  const h = viewHeight();
+  if (sheet.side)
+    return clipBox.set(0, 0, Math.min(w, w - sheet.side + CLIP_MARGIN), h);
+  if (sheet.top === null) return null;
+  const shown = Math.min(h, sheet.top + CLIP_MARGIN);
+  return clipBox.set(0, h - shown, w, shown);
+};
 renderer.setAnimationLoop(() => {
   if (warming) return;
+  const shop = idle?.shop() ?? 0;
+  quality.setCap(shop > 1 ? quality.max * FULL_SHEET_RESOLUTION : undefined);
+  const now = performance.now();
+  const gap = now - lastFrameAt;
+  lastFrameAt = now;
+  const busy =
+    interaction.pointer.pressed ||
+    interaction.carrying ||
+    interaction.grab ||
+    interaction.slicing ||
+    interaction.phase !== "live" ||
+    interaction.bottle.stream.active ||
+    wild.disco.on ||
+    shock.active;
+  calmFor = busy ? 0 : calmFor + gap / 1000;
+  if (shop && calmFor > CALM_AFTER) {
+    // Half rate reads as slow frames, so the resolution governor waits it out.
+    quality.hold(1);
+    skipFrame = !skipFrame;
+    if (skipFrame) return;
+  } else skipFrame = false;
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
   jiggleText?.update(realDelta);
   if (!started || intro.isConnected) {
@@ -785,7 +857,7 @@ renderer.setAnimationLoop(() => {
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);
   mood.update(realDelta, interaction.heat / 100);
-  showExtraLights(extraLights.some((light) => light.intensity > 0));
+  showLitGroups();
   peach.updateRing(camera);
   quality.update(realDelta);
   settings.showFps(quality.fps);
@@ -796,11 +868,13 @@ renderer.setAnimationLoop(() => {
   lens.update(delta);
   skinRings.update(delta);
   shock.update(realDelta);
-  backdrop.render();
+  const clip = shop ? frameClip() : null;
+  backdrop.render(clip);
   if (!renderer.domElement.classList.contains("is-drawn"))
     requestAnimationFrame(() => renderer.domElement.classList.add("is-drawn"));
-  lens.render([juice, droplets]);
+  lens.render([juice, droplets], clip);
   shock.render();
+  if (clip) renderer.setScissorTest(false);
 });
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {

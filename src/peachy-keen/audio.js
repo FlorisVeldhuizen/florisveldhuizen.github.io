@@ -1233,6 +1233,7 @@ export function setBuzz(amount, contact = 0) {
 export const DISCO_BPM = 100;
 const STEP = 60 / DISCO_BPM / 4;
 const SWING = 0.18;
+const DISCO_LOOKAHEAD = 0.3;
 export const DISCO_FADE = 2.8;
 const DISCO_LEVEL = 0.42;
 const MUFFLE_OPEN = 20000;
@@ -1619,8 +1620,16 @@ function discoStep(index, at) {
 }
 
 function scheduleDisco() {
+  if (disco.next >= disco.until) {
+    clearInterval(disco.timer);
+    return;
+  }
   const now = ctx.currentTime;
-  while (disco.start + disco.next * STEP < now + 0.12) {
+  // Notes due inside a main-thread stall are skipped, so the lookahead outlasts a long frame.
+  while (
+    disco.next < disco.until &&
+    disco.start + disco.next * STEP < now + DISCO_LOOKAHEAD
+  ) {
     const beatAt = disco.start + disco.next * STEP;
     const at = beatAt + (disco.next % 2 ? SWING * STEP : 0);
     if (beatAt >= now - 0.01) discoStep(disco.next, Math.max(at, now));
@@ -1628,13 +1637,17 @@ function scheduleDisco() {
   }
 }
 
+let impulse = null;
+
 function reverb() {
-  const length = Math.floor(ctx.sampleRate * 2.6);
-  const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
-  for (let c = 0; c < 2; c += 1) {
-    const data = impulse.getChannelData(c);
-    for (let i = 0; i < length; i += 1)
-      data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3.4;
+  if (!impulse) {
+    const length = Math.floor(ctx.sampleRate * 2.6);
+    impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+    for (let c = 0; c < 2; c += 1) {
+      const data = impulse.getChannelData(c);
+      for (let i = 0; i < length; i += 1)
+        data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3.4;
+    }
   }
   const convolver = ctx.createConvolver();
   convolver.buffer = impulse;
@@ -1689,6 +1702,104 @@ function freeze(param, now) {
   return param;
 }
 
+const LOOP_STEPS = 128;
+const LEAD_IN_STEPS = 32;
+let discoLoop = null;
+
+// The whole 8-bar song is rendered once, so playing it costs one buffer source instead of ~70 voices.
+function renderDiscoLoop() {
+  if (discoLoop) return discoLoop;
+  const live = ctx;
+  const rate = live.sampleRate;
+  const leadIn = LEAD_IN_STEPS * STEP;
+  const loopLength = Math.round(LOOP_STEPS * STEP * rate);
+  const offline = new OfflineAudioContext(
+    2,
+    Math.ceil(leadIn * rate) + loopLength,
+    rate,
+  );
+  const first = LOOP_STEPS - LEAD_IN_STEPS;
+  let shadow = null;
+  const within = (fn) => {
+    const saved = disco;
+    ctx = offline;
+    disco = shadow;
+    try {
+      fn();
+    } finally {
+      shadow = disco;
+      ctx = live;
+      disco = saved;
+    }
+  };
+  within(() => {
+    const bus = ctx.createGain();
+    bus.connect(ctx.destination);
+    const verb = reverb();
+    const wet = ctx.createGain();
+    wet.gain.value = 0.55;
+    verb.connect(wet).connect(bus);
+    const lfos = [];
+    const nodes = [];
+    disco = {
+      bus,
+      verb,
+      chorus: ensemble(bus, lfos, nodes),
+      echo: makeEcho(bus, nodes),
+      lfos,
+      nodes,
+      routes: new Map(),
+    };
+  });
+  const scheduleBar = (bar) =>
+    within(() => {
+      for (let step = 0; step < 16; step += 1) {
+        const index = first + bar * 16 + step;
+        const at = (bar * 16 + step + (step % 2 ? SWING : 0)) * STEP;
+        discoStep(index, at);
+      }
+    });
+  const bars = (LEAD_IN_STEPS + LOOP_STEPS) / 16;
+  scheduleBar(0);
+  // Each bar is built one bar ahead, so no single task creates every node.
+  for (let bar = 1; bar < bars; bar += 1)
+    offline.suspend((bar - 1) * 16 * STEP).then(() => {
+      scheduleBar(bar);
+      offline.resume();
+    });
+  discoLoop = offline.startRendering().then((rendered) => {
+    const loop = live.createBuffer(2, loopLength, rate);
+    const skip = Math.ceil(leadIn * rate);
+    for (let c = 0; c < 2; c += 1)
+      loop.copyToChannel(
+        rendered.getChannelData(c).subarray(skip, skip + loopLength),
+        c,
+      );
+    discoLoop = loop;
+    return loop;
+  });
+  return discoLoop;
+}
+
+function playLoop(d, buffer, step) {
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  source.connect(d.bus);
+  source.start(d.start + step * STEP, (step % LOOP_STEPS) * STEP);
+  Object.assign(d, { source, until: step });
+  d.nodes.push(source);
+}
+
+const nextBar = (step) => Math.ceil((step + 4) / 16) * 16;
+
+function loopWhenReady(playing) {
+  renderDiscoLoop().then((buffer) => {
+    if (disco !== playing || playing.stopping || playing.source) return;
+    playLoop(playing, buffer, nextBar(playing.next));
+  });
+}
+
 export function startDisco() {
   if (disco) {
     if (!disco.stopping) return;
@@ -1734,9 +1845,15 @@ export function startDisco() {
     lfos,
     nodes,
     routes: new Map(),
+    until: Infinity,
   };
+  if (discoLoop instanceof AudioBuffer) {
+    playLoop(disco, discoLoop, 0);
+    return;
+  }
   disco.timer = setInterval(scheduleDisco, 25);
   scheduleDisco();
+  loopWhenReady(disco);
 }
 
 export function stopDisco() {
@@ -1756,6 +1873,7 @@ export function stopDisco() {
 
 function dropDisco(dropped) {
   clearInterval(dropped.timer);
+  dropped.source?.stop();
   clearTimeout(dropped.stopping);
   dropped.lfos.forEach((lfo) => lfo.stop());
   dropped.nodes.forEach((node) => node.disconnect());

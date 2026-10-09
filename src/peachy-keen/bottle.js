@@ -4,7 +4,15 @@ import { BottleModel } from "./bottle3d";
 import OilStream from "./stream";
 import OilShadow from "./oilshadow";
 import { HintDrop } from "./hintdrop";
-import { Spring, clamp, ease, reducedMotion, viewHeight } from "./util";
+import {
+  Spring,
+  clamp,
+  ease,
+  reducedMotion,
+  sheet,
+  viewHeight,
+  viewWidth,
+} from "./util";
 
 const PEACH_HEIGHT = 3.2;
 const HEIGHT_TO_PEACH = 0.28;
@@ -21,15 +29,6 @@ const NORMAL_LEAN = 0.75;
 const AXIS = new Vector3(0, 1, 0);
 const FLING_SPEED = 2.8;
 const FLING_COOLDOWN = 1.2;
-
-function sheetTop() {
-  const panel = document.querySelector(".panel");
-  const sheet = getComputedStyle(document.documentElement).getPropertyValue(
-    "--panel-bottom",
-  );
-  if (!panel || !parseFloat(sheet)) return viewHeight();
-  return panel.getBoundingClientRect().top;
-}
 
 // A smooth minimum, so the sheet picks the bottle up gradually instead of with a hard edge.
 function softMin(a, b, k) {
@@ -73,7 +72,7 @@ class ModelView {
     this.group.updateMatrixWorld();
     const point = this.model.spoutWorld(this.point).project(this.camera);
     return {
-      x: (point.x + 1) * 0.5 * window.innerWidth,
+      x: (point.x + 1) * 0.5 * viewWidth(),
       y: (1 - point.y) * 0.5 * viewHeight(),
     };
   }
@@ -130,7 +129,7 @@ class ModelView {
   }
 
   toWorld(x, y, target) {
-    this.ndc.set((x / window.innerWidth) * 2 - 1, -(y / viewHeight()) * 2 + 1);
+    this.ndc.set((x / viewWidth()) * 2 - 1, -(y / viewHeight()) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, this.camera);
     return this.raycaster.ray.intersectPlane(this.plane, target);
   }
@@ -230,10 +229,18 @@ export class Bottle {
     });
     this.hints = document.querySelector(".hints");
     this.hintDrop = new HintDrop(this.hints);
+    // Layout reads force a layout, so they are redone only after the hints or the sheet moved.
+    this.placed = null;
+    new ResizeObserver(() => {
+      this.placed = null;
+    }).observe(this.hints);
     this.updateHome();
     this.screen.x = this.homeX;
     this.screen.y = this.homeY;
-    window.addEventListener("resize", () => this.updateHome());
+    window.addEventListener("resize", () => {
+      this.placed = null;
+      this.updateHome();
+    });
   }
 
   followSize(delta) {
@@ -256,12 +263,21 @@ export class Bottle {
     if (delta === undefined) this.hintDrop.settle();
     else this.hintDrop.update(delta);
     const drop = this.hintDrop.bottleAt;
-    const shown = this.hints.offsetHeight - drop;
-    const line = Math.min(...this.hintDrop.lines.map((l) => l.offsetHeight));
+    if (this.placed?.moved !== sheet.moved)
+      this.placed = {
+        moved: sheet.moved,
+        hintsHeight: this.hints.offsetHeight,
+        hintsTop: this.hints.offsetTop,
+        left: this.el.offsetLeft,
+      };
+    const { hintsHeight, hintsTop, left } = this.placed;
+    const shown = hintsHeight - drop;
+    const line = Math.min(...this.hintDrop.heights);
     const gap = HINT_GAP_PX * clamp(shown / line, 0, 1);
-    const rest = this.hints.offsetTop + drop - gap;
+    const rest = hintsTop + drop - gap;
     // The shop sheet pushes the bottle up when it rises past it, and lets it back down as it falls.
-    const bottom = softMin(rest, sheetTop() - this.el.offsetLeft, CATCH_PX);
+    const sheetTop = sheet.top ?? viewHeight();
+    const bottom = softMin(rest, sheetTop - left, CATCH_PX);
     const homeY = bottom - height / 2;
     this.homeShift = this.homeY === undefined ? 0 : homeY - this.homeY;
     if (homeY === this.homeY && height === this.heightPx) return;
@@ -273,7 +289,7 @@ export class Bottle {
       width: `${width}px`,
       height: `${height}px`,
     });
-    this.homeX = this.el.offsetLeft + width / 2;
+    this.homeX = left + width / 2;
   }
 
   size() {
@@ -351,7 +367,7 @@ export class Bottle {
     this.flingWait = FLING_COOLDOWN;
     this.fill = Math.max(0.3, this.fill - amount * 0.03);
     this.sloshVelocity += 4;
-    const unit = Math.min(window.innerWidth, viewHeight());
+    const unit = Math.min(viewWidth(), viewHeight());
     const spout = this.view.spoutScreen();
     this.stream.fling(spout, peak.vx * unit, peak.vy * unit, amount);
     peak.speed = 0;

@@ -7,6 +7,9 @@ const a = new Vector3();
 const b = new Vector3();
 const c = new Vector3();
 const CHUNK = 64;
+const GROUP = 16;
+let entries = new Float64Array(64);
+let entryChunks = new Int32Array(64);
 const BITS = 10;
 const chunkBoxes = new WeakMap();
 
@@ -73,7 +76,18 @@ export function boxesFor(geometry) {
     }
     boxes.set(box, n * 6);
   }
-  found = { boxes, order };
+  const groups = new Float32Array(Math.ceil(chunks / GROUP) * 6);
+  for (let g = 0; g < groups.length / 6; g += 1) {
+    const box = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+    const end = Math.min(chunks, (g + 1) * GROUP);
+    for (let n = g * GROUP; n < end; n += 1)
+      for (let axis = 0; axis < 3; axis += 1) {
+        box[axis] = Math.min(box[axis], boxes[n * 6 + axis]);
+        box[axis + 3] = Math.max(box[axis + 3], boxes[n * 6 + axis + 3]);
+      }
+    groups.set(box, g * 6);
+  }
+  found = { boxes, groups, order };
   chunkBoxes.set(geometry, found);
   return found;
 }
@@ -83,6 +97,7 @@ export function raycastNearest(raycaster, intersects) {
   if (!geometry.boundingSphere) geometry.computeBoundingSphere();
   sphere.copy(geometry.boundingSphere).applyMatrix4(matrixWorld);
   if (!raycaster.ray.intersectsSphere(sphere)) return;
+  if (sphere.distanceToPoint(raycaster.ray.origin) > raycaster.far) return;
   localRay.copy(raycaster.ray).applyMatrix4(inverse.copy(matrixWorld).invert());
 
   const p = geometry.attributes.position.array;
@@ -90,27 +105,55 @@ export function raycastNearest(raycaster, intersects) {
   const plant = geometry.attributes.plant?.array;
   const { x: ox, y: oy, z: oz } = localRay.origin;
   const { x: dx, y: dy, z: dz } = localRay.direction;
-  const { boxes, order } = boxesFor(geometry);
+  const { boxes, groups, order } = boxesFor(geometry);
   const ix = 1 / dx;
   const iy = 1 / dy;
   const iz = 1 / dz;
-  let nearest = Infinity;
-  let face = -1;
-  for (let n = 0; n < boxes.length / 6; n += 1) {
-    const o = n * 6;
-    const x1 = (boxes[o] - ox) * ix;
-    const x2 = (boxes[o + 3] - ox) * ix;
-    const y1 = (boxes[o + 1] - oy) * iy;
-    const y2 = (boxes[o + 4] - oy) * iy;
-    const z1 = (boxes[o + 2] - oz) * iz;
-    const z2 = (boxes[o + 5] - oz) * iz;
+  const entry = (b, o) => {
+    const x1 = (b[o] - ox) * ix;
+    const x2 = (b[o + 3] - ox) * ix;
+    const y1 = (b[o + 1] - oy) * iy;
+    const y2 = (b[o + 4] - oy) * iy;
+    const z1 = (b[o + 2] - oz) * iz;
+    const z2 = (b[o + 5] - oz) * iz;
     const enter = Math.max(
       Math.min(x1, x2),
       Math.min(y1, y2),
       Math.min(z1, z2),
     );
     const exit = Math.min(Math.max(x1, x2), Math.max(y1, y2), Math.max(z1, z2));
-    if (exit < 0 || enter > exit || enter > nearest) continue;
+    return exit < 0 || enter > exit ? Infinity : enter;
+  };
+  // Crossed chunks are tested nearest first, so the search stops once no later chunk can hold a closer hit.
+  const chunks = boxes.length / 6;
+  if (entries.length < chunks) {
+    entries = new Float64Array(chunks);
+    entryChunks = new Int32Array(chunks);
+  }
+  let crossed = 0;
+  for (let g = 0; g < groups.length / 6; g += 1) {
+    if (entry(groups, g * 6) !== Infinity) {
+      const last = Math.min(chunks, (g + 1) * GROUP);
+      for (let n = g * GROUP; n < last; n += 1) {
+        const enter = entry(boxes, n * 6);
+        if (enter !== Infinity) {
+          let k = crossed;
+          while (k > 0 && entries[k - 1] > enter) {
+            entries[k] = entries[k - 1];
+            entryChunks[k] = entryChunks[k - 1];
+            k -= 1;
+          }
+          entries[k] = enter;
+          entryChunks[k] = n;
+          crossed += 1;
+        }
+      }
+    }
+  }
+  let nearest = Infinity;
+  let face = -1;
+  for (let slot = 0; slot < crossed && entries[slot] <= nearest; slot += 1) {
+    const n = entryChunks[slot];
     const end = Math.min(order.length, (n + 1) * CHUNK);
     for (let f = n * CHUNK; f < end; f += 1) {
       const t = order[f];

@@ -10,7 +10,7 @@ import {
   createBackgroundMaterial,
   createBackdropBlitMaterial,
 } from "./shaders";
-import { viewHeight } from "./util";
+import { viewHeight, viewWidth } from "./util";
 
 const SMOKE_SCALE = 0.5;
 
@@ -40,7 +40,7 @@ export function createBackdrop(scene, renderer) {
       blit.uniforms.time.value = value;
     },
     resize() {
-      material.uniforms.resolution.value.set(window.innerWidth, viewHeight());
+      material.uniforms.resolution.value.set(viewWidth(), viewHeight());
     },
     update(delta, heat) {
       material.uniforms.time.value += delta * speed;
@@ -48,10 +48,18 @@ export function createBackdrop(scene, renderer) {
       const h = material.uniforms.heat;
       h.value += (heat - h.value) * Math.min(1, delta * 2);
     },
-    render() {
+    render(clip = null) {
       renderer.getDrawingBufferSize(size).multiplyScalar(SMOKE_SCALE).ceil();
       const resized = target.width !== size.x || target.height !== size.y;
       if (resized) target.setSize(size.x, size.y);
+      // The smoke target covers the screen, so only the part left visible is shaded.
+      target.scissorTest = Boolean(clip);
+      if (clip) {
+        const k = size.x / viewWidth();
+        target.scissor
+          .set(clip.x * k, clip.y * k, clip.z * k, clip.w * k)
+          .ceil();
+      }
       frame += 1;
       // The smoke drifts slowly enough to redraw at half rate; disco beams need every frame.
       const still = material.uniforms.disco.value < 0.001;
@@ -71,7 +79,7 @@ export function createBackdrop(scene, renderer) {
     setLens(x, y, power) {
       blit.uniforms.lensAt.value.set(x, y);
       blit.uniforms.lensPower.value = power;
-      blit.uniforms.aspect.value = window.innerWidth / viewHeight();
+      blit.uniforms.aspect.value = viewWidth() / viewHeight();
     },
     setMotion(enabled) {
       speed = enabled ? 1 : 0.15;

@@ -1,18 +1,25 @@
 import {
   Box2,
   CanvasTexture,
+  Color,
+  CustomBlending,
   FramebufferTexture,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
   LinearFilter,
   Mesh,
+  OneFactor,
   OrthographicCamera,
   PlaneGeometry,
   Scene,
   ShaderMaterial,
   Vector2,
   Vector3,
+  Vector4,
+  WebGLRenderTarget,
 } from "three";
 import { JUICE_LAYER, juiceMaterial, dropletPositionAt } from "./juice";
-import { viewHeight } from "./util";
+import { viewHeight, viewWidth } from "./util";
 
 const LIFE = 4.2;
 const OIL_LIFE = 6;
@@ -21,9 +28,11 @@ const SURFACE = 0.2;
 const FALLOFF = [0.5, 0.444, 0.311, 0.172, 0.075, 0];
 const project = new Vector3();
 const corner = new Vector2();
+const clearColor = new Color();
+const area = new Vector4();
 const SPRITE_SIZE = 256;
 
-function drawBlobSprite(channel) {
+function drawBlobSprite() {
   const sprite = document.createElement("canvas");
   sprite.width = SPRITE_SIZE;
   sprite.height = SPRITE_SIZE;
@@ -31,14 +40,41 @@ function drawBlobSprite(channel) {
   const half = SPRITE_SIZE / 2;
   const g = ctx.createRadialGradient(half, half, 0, half, half, half);
   FALLOFF.forEach((v, i) => {
-    const c = [0, 0, 0];
-    c[channel] = Math.round(v * 255);
-    g.addColorStop(i / (FALLOFF.length - 1), `rgb(${c})`);
+    g.addColorStop(i / (FALLOFF.length - 1), `rgb(${Math.round(v * 255)},0,0)`);
   });
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
   return sprite;
 }
+
+// Blobs add up in a render target on the GPU: juice in red, oil in green.
+const BlobShader = {
+  uniforms: {
+    tSprite: { value: null },
+    uSize: { value: new Vector2(1, 1) },
+  },
+  vertexShader: `
+    attribute vec4 blob;
+    uniform vec2 uSize;
+    varying vec2 vUv;
+    varying float vOil;
+    void main() {
+      vUv = uv;
+      vOil = blob.w;
+      vec2 at = blob.xy + vec2(position.x, -position.y) * blob.z;
+      gl_Position = vec4(at.x / uSize.x * 2.0 - 1.0, 1.0 - at.y / uSize.y * 2.0, 0.0, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tSprite;
+    varying vec2 vUv;
+    varying float vOil;
+    void main() {
+      float v = texture2D(tSprite, vUv).r;
+      gl_FragColor = vec4(v * (1.0 - vOil), v * vOil, 0.0, 1.0);
+    }
+  `,
+};
 
 const LensShader = {
   uniforms: {
@@ -100,10 +136,33 @@ export class Lens {
     this.enabled = true;
     this.onHit = null;
     this.drops = [];
-    this.canvas = document.createElement("canvas");
-    this.ctx = this.canvas.getContext("2d");
-    this.sprite = drawBlobSprite(0);
-    this.oilSprite = drawBlobSprite(1);
+    this.width = CANVAS_WIDTH;
+    this.height = CANVAS_WIDTH;
+    this.target = new WebGLRenderTarget(1, 1, { depthBuffer: false });
+    const square = new PlaneGeometry(2, 2);
+    this.blobGeometry = new InstancedBufferGeometry();
+    this.blobGeometry.index = square.index;
+    this.blobGeometry.setAttribute("position", square.attributes.position);
+    this.blobGeometry.setAttribute("uv", square.attributes.uv);
+    this.growBlobs(256);
+    this.blobMaterial = new ShaderMaterial({
+      uniforms: BlobShader.uniforms,
+      vertexShader: BlobShader.vertexShader,
+      fragmentShader: BlobShader.fragmentShader,
+      blending: CustomBlending,
+      blendSrc: OneFactor,
+      blendDst: OneFactor,
+      depthTest: false,
+      depthWrite: false,
+    });
+    this.blobMaterial.uniforms.tSprite.value = new CanvasTexture(
+      drawBlobSprite(),
+    );
+    this.blobScene = new Scene();
+    const blobs = new Mesh(this.blobGeometry, this.blobMaterial);
+    blobs.frustumCulled = false;
+    this.blobScene.add(blobs);
+    this.blobCount = 0;
 
     this.material = new ShaderMaterial({
       uniforms: LensShader.uniforms,
@@ -125,17 +184,21 @@ export class Lens {
   }
 
   resize() {
-    const w = window.innerWidth;
-    const h = viewHeight();
-    this.canvas.width = CANVAS_WIDTH;
-    this.canvas.height = Math.round((CANVAS_WIDTH * h) / w);
+    this.width = CANVAS_WIDTH;
+    this.height = Math.round((CANVAS_WIDTH * viewHeight()) / viewWidth());
     this.material.uniforms.uTexel.value.set(
-      1.5 / this.canvas.width,
-      1.5 / this.canvas.height,
+      1.5 / this.width,
+      1.5 / this.height,
     );
-    this.texture?.dispose();
-    this.texture = new CanvasTexture(this.canvas);
-    this.material.uniforms.tDrops.value = this.texture;
+    this.blobMaterial.uniforms.uSize.value.set(this.width, this.height);
+    this.target.setSize(this.width, this.height);
+    this.material.uniforms.tDrops.value = this.target.texture;
+  }
+
+  growBlobs(capacity) {
+    this.blobData = new Float32Array(capacity * 4);
+    this.blobAttribute = new InstancedBufferAttribute(this.blobData, 4);
+    this.blobGeometry.setAttribute("blob", this.blobAttribute);
   }
 
   addDrop(x, y, r, delay = 0, oil = false) {
@@ -156,7 +219,7 @@ export class Lens {
 
   oilSplat(x, y, r) {
     if (!this.enabled) return;
-    const scale = this.canvas.width / window.innerWidth;
+    const scale = this.width / viewWidth();
     const size = r * scale;
     this.addDrop(x * scale, y * scale, size, 0, true);
     const count = Math.floor(Math.random() * 3);
@@ -176,8 +239,8 @@ export class Lens {
   splat(worldPosition, worldVelocity, size = 1) {
     if (!this.enabled) return;
     project.copy(worldPosition).project(this.camera);
-    const x = (project.x * 0.5 + 0.5) * this.canvas.width;
-    const y = (0.5 - project.y * 0.5) * this.canvas.height;
+    const x = (project.x * 0.5 + 0.5) * this.width;
+    const y = (0.5 - project.y * 0.5) * this.height;
     const r = Math.min(90, (5 + Math.random() ** 1.8 * 34) * size);
     this.addDrop(x, y, r);
     this.onHit?.();
@@ -205,10 +268,8 @@ export class Lens {
       const delay = 0.18 + Math.random() * 0.27;
       dropletPositionAt(drop, delay, project).project(this.camera);
       this.addDrop(
-        (project.x * 0.5 + 0.5) * this.canvas.width +
-          (Math.random() - 0.5) * 30,
-        (0.5 - project.y * 0.5) * this.canvas.height +
-          (Math.random() - 0.5) * 30,
+        (project.x * 0.5 + 0.5) * this.width + (Math.random() - 0.5) * 30,
+        (0.5 - project.y * 0.5) * this.height + (Math.random() - 0.5) * 30,
         1.5 + Math.random() ** 2 * 9 * amount,
         delay,
       );
@@ -217,11 +278,7 @@ export class Lens {
 
   update(delta) {
     if (this.drops.length === 0) return;
-    const { ctx, canvas } = this;
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = "lighter";
+    this.blobCount = 0;
     this.reach.makeEmpty();
 
     this.drops = this.drops.filter((d) => d.age < d.life);
@@ -249,19 +306,45 @@ export class Lens {
 
       const evaporate = Math.min(1, (d.life - d.age) / 1.4);
       const grow = Math.min(1, 0.35 + d.age * 14);
-      const sprite = d.oil ? this.oilSprite : this.sprite;
-      d.trail.forEach((t) => this.blob(sprite, t.x, t.y, t.r * evaporate));
-      this.blob(sprite, d.x, d.y, d.r * grow * evaporate);
+      const oil = d.oil ? 1 : 0;
+      d.trail.forEach((t) => this.blob(oil, t.x, t.y, t.r * evaporate));
+      this.blob(oil, d.x, d.y, d.r * grow * evaporate);
     });
-    this.texture.needsUpdate = true;
+    this.blobsDirty = true;
   }
 
-  blob(sprite, x, y, r) {
+  blob(oil, x, y, r) {
     if (r < 0.6) return;
     const reach = r * 1.8;
-    this.ctx.drawImage(sprite, x - reach, y - reach, reach * 2, reach * 2);
+    if (this.blobCount * 4 >= this.blobData.length) {
+      const old = this.blobData;
+      this.growBlobs(this.blobCount * 2);
+      this.blobData.set(old);
+    }
+    const at = this.blobCount * 4;
+    this.blobData[at] = x;
+    this.blobData[at + 1] = y;
+    this.blobData[at + 2] = reach;
+    this.blobData[at + 3] = oil;
+    this.blobCount += 1;
     this.reach.expandByPoint(corner.set(x - reach, y - reach));
     this.reach.expandByPoint(corner.set(x + reach, y + reach));
+  }
+
+  drawBlobs() {
+    const r = this.renderer;
+    this.blobsDirty = false;
+    this.blobGeometry.instanceCount = this.blobCount;
+    this.blobAttribute.needsUpdate = true;
+    const previous = r.getRenderTarget();
+    r.getClearColor(clearColor);
+    const clearAlpha = r.getClearAlpha();
+    r.setRenderTarget(this.target);
+    r.setClearColor(0x000000, 1);
+    r.clear();
+    r.render(this.blobScene, this.overlayCamera);
+    r.setRenderTarget(previous);
+    r.setClearColor(clearColor, clearAlpha);
   }
 
   captureFrame() {
@@ -281,7 +364,12 @@ export class Lens {
     return this.frame;
   }
 
-  render(liquids) {
+  render(liquids, clip = null) {
+    if (this.blobsDirty) this.drawBlobs();
+    if (clip) {
+      this.renderer.setScissor(clip);
+      this.renderer.setScissorTest(true);
+    }
     this.renderer.render(this.scene, this.camera);
     const { autoClear } = this.renderer;
     this.renderer.autoClear = false;
@@ -297,17 +385,29 @@ export class Lens {
     if (this.drops.length > 0 && !this.reach.isEmpty()) {
       // Reuse the juice copy to skip a second full-frame copy; drops then miss flying juice.
       if (!juicy) this.captureFrame();
-      const scale = window.innerWidth / this.canvas.width;
+      const scale = viewWidth() / this.width;
       const { min, max } = this.reach;
-      this.renderer.setScissor(
+      area.set(
         min.x * scale - 2,
         viewHeight() - max.y * scale - 2,
         (max.x - min.x) * scale + 4,
         (max.y - min.y) * scale + 4,
       );
-      this.renderer.setScissorTest(true);
-      this.renderer.render(this.overlay, this.overlayCamera);
-      this.renderer.setScissorTest(false);
+      if (clip) {
+        const x = Math.max(area.x, clip.x);
+        const y = Math.max(area.y, clip.y);
+        area.z = Math.min(area.x + area.z, clip.x + clip.z) - x;
+        area.w = Math.min(area.y + area.w, clip.y + clip.w) - y;
+        area.x = x;
+        area.y = y;
+      }
+      if (area.z > 0 && area.w > 0) {
+        this.renderer.setScissor(area);
+        this.renderer.setScissorTest(true);
+        this.renderer.render(this.overlay, this.overlayCamera);
+      }
+      if (clip) this.renderer.setScissor(clip);
+      else this.renderer.setScissorTest(false);
     }
     this.renderer.autoClear = autoClear;
   }

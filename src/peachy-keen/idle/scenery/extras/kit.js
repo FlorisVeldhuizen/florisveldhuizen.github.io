@@ -13,7 +13,7 @@ import {
   playBloop,
   playPat,
 } from "../../../audio";
-import { reducedMotion } from "../../../util";
+import { reducedMotion, warmedLights } from "../../../util";
 
 const UP = new Vector3(0, 1, 0.3).normalize();
 
@@ -202,17 +202,11 @@ export function makeContext(id, world, clock) {
       if (warming === 0) shownBeforeWarm = group.visible;
       warming += 1;
       group.visible = false;
-      const extra = [
-        world.mood.candle,
-        world.mood.halo,
-        ...world.wild.disco.lights,
-      ];
-      const variants = [
-        [false, false],
-        [true, false],
-        [false, true],
-        [true, true],
-      ];
+      const moodLights = [world.mood.candle, world.mood.halo];
+      const extra = [...moodLights, ...world.wild.disco.lights];
+      const variants = [false, true].flatMap((shadows) =>
+        [...warmedLights].map((lit) => [shadows, lit]),
+      );
       for (let v = 0; v < variants.length; v += 1) {
         const [shadows, lit] = variants[v];
         // eslint-disable-next-line no-await-in-loop
@@ -231,7 +225,7 @@ export function makeContext(id, world, clock) {
         renderer.shadowMap.enabled = shadows;
         extra.forEach((l) => {
           // eslint-disable-next-line no-param-reassign
-          l.visible = lit;
+          l.visible = moodLights.includes(l) ? lit % 2 === 1 : lit >= 2;
         });
         group.traverse(({ material }) => {
           [].concat(material ?? []).forEach((m) => {

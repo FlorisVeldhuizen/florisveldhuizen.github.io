@@ -21,7 +21,7 @@ import { softTexture, twinkleTexture } from "./scenery/shapes";
 import { ringMaterial, showRing } from "../rings";
 import { format } from "./numbers";
 import { playNotes } from "../audio";
-import { reducedMotion, viewHeight } from "../util";
+import { reducedMotion, viewHeight, viewWidth } from "../util";
 
 const LIFE = 13;
 const DEPTH = 2.2;
@@ -460,7 +460,7 @@ export class GoldenPeach {
     const { x, y } = this.position();
     const fade = Math.min(1, g.age / 0.6, (LIFE - g.age) / 1.5);
     this.el.style.translate = `${x}px ${y}px`;
-    this.ndc.set((x / window.innerWidth) * 2 - 1, -(y / viewHeight()) * 2 + 1);
+    this.ndc.set((x / viewWidth()) * 2 - 1, -(y / viewHeight()) * 2 + 1);
     this.ray.setFromCamera(this.ndc, this.camera);
     if (!this.ray.ray.intersectPlane(this.plane, this.at)) return;
     const h = this.holder;

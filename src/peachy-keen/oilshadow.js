@@ -9,7 +9,7 @@ import {
   Vector2,
   Vector3,
 } from "three";
-import { clamp, viewHeight } from "./util";
+import { clamp, viewHeight, viewWidth } from "./util";
 
 const MAX_POINTS = 400;
 const SIDES = 6;
@@ -65,7 +65,7 @@ export default class OilShadow {
     const span = bottom.y - top.y || 1;
     const z = top.z + (bottom.z - top.z) * clamp((y - top.y) / span, 0, 1);
     this.plane.constant = -z;
-    this.ndc.set((x / window.innerWidth) * 2 - 1, -(y / viewHeight()) * 2 + 1);
+    this.ndc.set((x / viewWidth()) * 2 - 1, -(y / viewHeight()) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, this.camera);
     return this.raycaster.ray.intersectPlane(this.plane, target);
   }

@@ -247,13 +247,18 @@ export class Panel {
       ? { opacity: 0 }
       : { translate: sidePanel.matches ? "100% 0" : "0 100%" };
     const frames = shown ? [out, {}] : [{}, out];
-    return this.root.animate(frames, {
-      duration: shown ? 650 : 450,
-      easing: shown
-        ? "cubic-bezier(0.2, 0.8, 0.2, 1)"
-        : "cubic-bezier(0.4, 0, 0.2, 1)",
-      fill: shown ? "backwards" : "forwards",
-    }).finished;
+    this.sliding = true;
+    return this.root
+      .animate(frames, {
+        duration: shown ? 650 : 450,
+        easing: shown
+          ? "cubic-bezier(0.2, 0.8, 0.2, 1)"
+          : "cubic-bezier(0.4, 0, 0.2, 1)",
+        fill: shown ? "backwards" : "forwards",
+      })
+      .finished.finally(() => {
+        this.sliding = false;
+      });
   }
 
   sheetStops() {

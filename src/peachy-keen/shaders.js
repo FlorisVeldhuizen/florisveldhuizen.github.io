@@ -1,5 +1,5 @@
 import { ShaderMaterial, Vector2 } from "three";
-import { viewHeight } from "./util";
+import { viewHeight, viewWidth } from "./util";
 
 const VERTEX_SHADER = `
     varying vec2 vUv;
@@ -18,7 +18,7 @@ export function createBackgroundMaterial() {
       kick: { value: 0 },
       beat: { value: 0 },
       ballAt: { value: new Vector2(0, 0.43) },
-      resolution: { value: new Vector2(window.innerWidth, viewHeight()) },
+      resolution: { value: new Vector2(viewWidth(), viewHeight()) },
     },
     vertexShader: VERTEX_SHADER,
     fragmentShader: `

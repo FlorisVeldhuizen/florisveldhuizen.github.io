@@ -17,10 +17,16 @@ export class HintDrop {
     this.lineMotions = this.lines.map(() => ({ from: 0, to: 0, start: 0 }));
     this.bottle = { from: 0, to: 0, start: 0 };
     this.bottleAt = 0;
+    // Reading offsetHeight forces a layout, so line heights are kept up to date by an observer.
+    this.heights = this.lines.map((line) => line.offsetHeight);
+    const watch = new ResizeObserver(() => {
+      this.heights = this.lines.map((line) => line.offsetHeight);
+    });
+    this.lines.forEach((line) => watch.observe(line));
   }
 
   targets() {
-    const heights = this.lines.map((line) => line.offsetHeight);
+    const { heights } = this;
     const learned = this.lines.map((line) =>
       line.classList.contains("is-learned"),
     );
