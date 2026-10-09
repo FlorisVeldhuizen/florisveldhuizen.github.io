@@ -8,8 +8,8 @@
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
-  "background_color": "#362c3f",
-  "theme_color": "#362c3f",
+  "background_color": "#3b0f1e",
+  "theme_color": "#3b0f1e",
   "categories": ["games"],
   "icons": [
     { "src": "/peachy-keen/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

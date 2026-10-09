@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#362c3f" />
+    <meta name="theme-color" content="#3b0f1e" />
     <meta name="description" content="A peach to smack, pull and oil up." />
     <title>Jiggle Peach</title>
     <link
@@ -295,6 +295,31 @@
       <div id="intro-shape" class="intro-shape" aria-hidden="true">
         <canvas id="intro-fill"></canvas>
       </div>
+      <script>
+        // iOS draws the launch image at screen size, which can differ from the page; start the still there.
+        (() => {
+          const standalone =
+            navigator.standalone ||
+            matchMedia("(display-mode: standalone), (display-mode: fullscreen)")
+              .matches;
+          if (!standalone) return;
+          const shape = document.getElementById("intro-shape");
+          const long = Math.max(screen.width, screen.height);
+          const short = Math.min(screen.width, screen.height);
+          const portrait = innerHeight >= innerWidth;
+          const w = portrait ? short : long;
+          const h = portrait ? long : short;
+          shape.style.top = `${h / 2}px`;
+          shape.style.width = `${Math.min(h, w * 1.2308)}px`;
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              shape.classList.add("is-settling");
+              shape.style.top = "";
+              shape.style.width = "";
+            }),
+          );
+        })();
+      </script>
       <h1 id="intro-title" class="intro-title" aria-label="Jiggle Peach">
         <span class="intro-letter" aria-hidden="true">J</span
         ><span class="intro-letter" aria-hidden="true">i</span
