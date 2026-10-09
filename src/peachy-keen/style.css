@@ -617,6 +617,7 @@ button:focus-visible {
 /* While it loads the status line carries a slow lift wave, a CSS animation so it keeps moving when the page is busy. */
 .status-letter {
   display: inline-block;
+  transform-origin: 50% 88%;
 }
 
 .status-letter.is-space {

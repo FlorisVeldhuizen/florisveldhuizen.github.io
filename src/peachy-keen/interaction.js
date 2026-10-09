@@ -387,6 +387,27 @@ export class Interaction {
     this.spin.z += (Math.random() - 0.5) * 0.5 * size;
   }
 
+  pat(hit, strength) {
+    const tool = TOOLS.hand;
+    const normal = this.tempB
+      .copy(hit.face.normal)
+      .transformDirection(this.peach.mesh.matrixWorld);
+    const push = this.tempA
+      .set(0, 0, -0.75)
+      .addScaledVector(normal, -0.65)
+      .normalize();
+    this.peach.addJiggle(
+      hit.point,
+      push,
+      (0.06 + strength ** 1.4 * 0.08) * tool.force,
+      tool.reach,
+    );
+    const lever = hit.point.clone().sub(this.group.position);
+    this.spin.add(
+      lever.cross(this.tempA.set(0, 0, -1)).multiplyScalar(0.5 * strength),
+    );
+  }
+
   timeScale(realDelta) {
     if (this.freeze > 0) {
       this.freeze -= realDelta;
