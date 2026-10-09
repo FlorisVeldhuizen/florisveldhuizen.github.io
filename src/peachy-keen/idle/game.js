@@ -123,8 +123,7 @@ export class IdleGame {
       this.pendingBurst = null;
     });
     i.on("release", ({ knead, length }) => {
-      const s = this.state;
-      s.stats.grabs += 1;
+      this.count("grabs");
       this.satisfy("grab");
       const value =
         this.handValue(1, 0) * (1 + knead * 4 + length * 3) * this.model.grab;
@@ -132,24 +131,35 @@ export class IdleGame {
       this.popAtPeach(value, "grab");
     });
     i.on("wedgie", ({ amount }) => {
-      this.state.stats.wedgies += 1;
+      this.count("wedgies");
       this.satisfy("wedgie");
       const value = this.handValue(1, 0) * 10 * amount * this.model.wedgie;
       this.gain(value, "hand");
       this.popAtPeach(value, "wedgie");
     });
     i.on("stripped", () => {
-      this.state.stats.strips += 1;
+      this.count("strips");
       const value = this.handValue(1, 0) * 25 * this.model.strip;
       this.gain(value, "hand");
       this.popAtPeach(value, "strip");
     });
     i.on("twerk", ({ beat }) => {
-      if (beat === 1) this.state.stats.twerks += 1;
+      if (beat === 1) this.count("twerks");
       const value = this.rate * 0.25 * this.model.twerk;
       this.gain(value, "twerk");
       this.popAtPeach(value, "twerk");
     });
+  }
+
+  count(key, amount = 1) {
+    this.state.stats[key] += amount;
+    this.state.runStats[key] += amount;
+  }
+
+  best(key, value) {
+    const { stats, runStats } = this.state;
+    stats[key] = Math.max(stats[key], value);
+    runStats[key] = Math.max(runStats[key], value);
   }
 
   handValue(strength, combo) {
@@ -157,17 +167,15 @@ export class IdleGame {
   }
 
   onSmack(strength, combo, x, y) {
-    const s = this.state;
     const m = this.model;
     let value = this.handValue(strength, combo);
     const crit = value > 0 && Math.random() < m.crit;
     if (crit) {
       value *= m.critPower;
-      s.stats.crits += 1;
+      this.count("crits");
     }
-    s.stats.smacks += 1;
-    s.runSmacks += 1;
-    s.stats.bestCombo = Math.max(s.stats.bestCombo, combo);
+    this.count("smacks");
+    this.best("bestCombo", combo);
     if (combo >= CRAVE_COMBO) this.satisfy("combo");
     this.gain(value, "hand");
     this.emit("pop", { x, y, value, kind: crit ? "crit" : "smack" });
@@ -185,8 +193,7 @@ export class IdleGame {
       burstPayout(m, s, this.live) * this.i.burstPower * (edged ? m.edged : 1);
     const lucky = Math.random() < m.luckyPit;
     const pits = m.pits * (lucky ? 3 : 1);
-    s.stats.bursts += 1;
-    s.runBursts += 1;
+    this.count("bursts");
     s.pits += pits;
     s.pitsTotal += pits;
     if (edged) s.seen.edged = true;
@@ -250,17 +257,17 @@ export class IdleGame {
     this.gain(income - sipped, "helpers");
 
     if (i.rubbing > 0 && live) {
-      s.stats.rubSeconds += dt;
+      this.count("rubSeconds", dt);
       this.gain(this.handValue(1, 0) * i.rubbing * 1.5 * m.rub * dt, "hand");
     }
     if (m.buzz && this.buzzer?.dented && live) {
-      s.stats.rubSeconds += dt;
+      this.count("rubSeconds", dt);
       const power = 1 + 3 * this.buzzer.level;
       this.gain(this.handValue(1, 0) * power * m.rub * dt, "hand");
     }
     const pouring = i.carrying && i.rubbing > 0;
     if (pouring && !this.pouring) {
-      s.stats.pours += 1;
+      this.count("pours");
       this.satisfy("oil");
     }
     this.pouring = pouring;
@@ -279,7 +286,7 @@ export class IdleGame {
     s.stats.played += dt;
     s.runTime += dt;
     s.stats.bestRate = Math.max(s.stats.bestRate, this.rate);
-    s.stats.hottest = Math.max(s.stats.hottest, i.heat);
+    this.best("hottest", i.heat);
     if (i.oil > 0.95) s.seen.fullyOiled = true;
 
     if (s.buffs.length && s.buffs.some((b) => b.until <= now)) {
@@ -623,7 +630,7 @@ export class IdleGame {
     const s = this.state;
     const m = this.model;
     const now = Date.now();
-    s.stats.goldens += 1;
+    this.count("goldens");
     if (buffActive(s, "frenzy", now)) s.seen.doubleDip = true;
     const owned = HELPERS.filter((h) => (s.helpers[h.id] || 0) > 0);
     const table = [
