@@ -124,6 +124,13 @@ const LINES = {
       "Where did you get that?",
       "Bzzzz. Yes.",
     ],
+    coins: [
+      "Is that for me?",
+      "Keep the change coming.",
+      "Ka-ching.",
+      "Make it rain, daddy.",
+      "Tip your peach.",
+    ],
     disco: [
       "Watch me move.",
       "Is this song about me?",
@@ -272,6 +279,12 @@ const LINES = {
       "It tickles… a lot…",
       "My whole pit is shaking…",
       "Too much— no, stay.",
+    ],
+    coins: [
+      "You don't have to pay me…",
+      "Oh! That's cold!",
+      "Is this… a tip?",
+      "I'll save it. Promise.",
     ],
     disco: [
       "I don't dance… usually.",

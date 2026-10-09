@@ -170,7 +170,14 @@ const interaction = new Interaction({
 });
 interaction.bottle.view.group.visible = false;
 const naughty = new Naughty(interaction, talk);
-const wild = new Wild({ scene, camera, interaction, talk, backdrop });
+const wild = new Wild({
+  scene,
+  camera,
+  renderer,
+  interaction,
+  talk,
+  backdrop,
+});
 const shock = new Shock(renderer, interaction);
 interaction.on("charge", () => quality.hold(4));
 const skinRings = new SkinRings(scene, interaction);
