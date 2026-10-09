@@ -37,11 +37,16 @@ const TIPS = [
       touch
         ? "Slide a finger over the peach to rub it."
         : "Move slowly over the peach to rub it.",
+    when: (i, touch) => !touch || i.toolName === "hand",
   },
-  { gesture: "clap", text: "Tap twice quickly to clap." },
+  {
+    gesture: "clap",
+    text: "Tap twice quickly to clap.",
+    when: (i) => i.toolName !== "coins",
+  },
   {
     gesture: "knead",
-    text: "Grab and hold still to knead.",
+    text: "Grab, hold still, then let go for a big squish.",
     when: (i) => i.toolName === "hand",
   },
   {
@@ -57,7 +62,7 @@ const TIPS = [
   {
     gesture: "strip",
     text: "Pull the waistband down, or up.",
-    when: (i) => i.garment.worn,
+    when: (i) => i.canStrip(),
   },
   {
     gesture: "buzzmode",
