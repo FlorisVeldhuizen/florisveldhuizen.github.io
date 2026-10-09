@@ -1200,6 +1200,9 @@ export function setBuzz(amount, contact = 0) {
 
 export const DISCO_BPM = 100;
 const STEP = 60 / DISCO_BPM / 4;
+const LOOP_STEPS = 128;
+// Disco LFOs run whole cycles per loop, so the pre-rendered loop wraps in phase.
+const LOOP_SECONDS = LOOP_STEPS * STEP;
 const SWING = 0.18;
 const DISCO_LOOKAHEAD = 0.3;
 export const DISCO_FADE = 2.8;
@@ -1381,7 +1384,7 @@ function rhodes(at, frequency, length, velocity, pan) {
     modulator.connect(depth).connect(carrier.frequency);
     carrier.connect(out);
   });
-  route(out, { verb: 0.3, chorus: 0.4, pan, sway: 3.4 });
+  route(out, { verb: 0.3, chorus: 0.4, pan, sway: 65 / LOOP_SECONDS });
 }
 
 function strings(at, notes, length, volume) {
@@ -1624,14 +1627,14 @@ function reverb() {
 function ensemble(out, lfos, nodes) {
   const input = ctx.createGain();
   [
-    [0.012, 0.47, -0.7],
-    [0.017, 0.61, 0.7],
-    [0.022, 0.29, 0],
-  ].forEach(([base, rate, pan]) => {
+    [0.012, 9, -0.7],
+    [0.017, 12, 0.7],
+    [0.022, 6, 0],
+  ].forEach(([base, cycles, pan]) => {
     const delay = ctx.createDelay(0.05);
     delay.delayTime.value = base;
     const lfo = ctx.createOscillator();
-    lfo.frequency.value = rate;
+    lfo.frequency.value = cycles / LOOP_SECONDS;
     const depth = ctx.createGain();
     depth.gain.value = 0.0035;
     lfo.connect(depth).connect(delay.delayTime);
@@ -1669,9 +1672,16 @@ function freeze(param, now) {
   return param;
 }
 
-const LOOP_STEPS = 128;
 const LEAD_IN_STEPS = 32;
 let discoLoop = null;
+
+function seeded(seed) {
+  let state = seed;
+  return () => {
+    state = (state * 16807) % 2147483647;
+    return (state - 1) / 2147483646;
+  };
+}
 
 // The whole 8-bar song is rendered once, so playing it costs one buffer source instead of ~70 voices.
 function renderDiscoLoop() {
@@ -1686,6 +1696,10 @@ function renderDiscoLoop() {
     rate,
   );
   const first = LOOP_STEPS - LEAD_IN_STEPS;
+  const seeds = Array.from(
+    { length: LOOP_STEPS },
+    () => 1 + Math.floor(Math.random() * 2147483646),
+  );
   let shadow = null;
   const within = (fn) => {
     const saved = disco;
@@ -1723,7 +1737,14 @@ function renderDiscoLoop() {
       for (let step = 0; step < 16; step += 1) {
         const index = first + bar * 16 + step;
         const at = (bar * 16 + step + (step % 2 ? SWING : 0)) * STEP;
-        discoStep(index, at);
+        // Lead-in bars get the same random notes as the loop's end, so the tails across the wrap match.
+        const { random } = Math;
+        Math.random = seeded(seeds[index % LOOP_STEPS]);
+        try {
+          discoStep(index, at);
+        } finally {
+          Math.random = random;
+        }
       }
     });
   const bars = (LEAD_IN_STEPS + LOOP_STEPS) / 16;
