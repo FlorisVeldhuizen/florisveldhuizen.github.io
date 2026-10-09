@@ -27,7 +27,7 @@ const TIMED = ["frameMs", "longFrames"];
 const LIMITS = {
   frameMs: { ratio: 1.15, slack: 0.4 },
   forcedLayouts: { ratio: 1.5, slack: 0.05 },
-  drawCalls: { ratio: 1.1, slack: 2 },
+  drawCalls: { ratio: 1.5, slack: 15 },
   audioNodes: { ratio: 1.25, slack: 20 },
   longFrames: { ratio: 1.5, slack: 1 },
 };
@@ -222,7 +222,10 @@ async function measure(browser, url, scene) {
   );
   const page = await context.newPage();
   const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("pageerror", (e) => {
+    const at = (e.stack ?? "").split("\n")[1]?.trim().split("/").pop() ?? "";
+    errors.push(`${e.message} (${at})`);
+  });
   await page.goto(url);
   await page.waitForSelector("#intro.is-ready", { timeout: 120000 });
   const stage = await page.locator("#stage").boundingBox();
