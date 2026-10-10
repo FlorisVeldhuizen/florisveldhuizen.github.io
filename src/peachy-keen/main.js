@@ -27,7 +27,8 @@ import { PrivacyTag, freePlayOpen, openFreePlay, cordX } from "./privacy-tag";
 import IntroTitle from "./intro-title";
 import JiggleText from "./jiggle-text";
 import slideToggle from "./slide-toggle";
-import { stepFill, drawFill } from "./fill-wave";
+import Gulp from "./fill-wave";
+import IntroGlow from "./intro-glow";
 
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["idle", "free"];
@@ -249,22 +250,69 @@ const loadedShare = () =>
     (sum, k) => sum + LOAD_SHARE[k] * loaded[k],
     0,
   );
-const fill = { shown: 0, motion: 0, velocity: 0, at: 0 };
+const fill = {
+  shown: 0,
+  velocity: 0,
+  at: 0,
+  modes: new Array(8).fill(0),
+  span: [-0.6, 0.6],
+  stretches: 0,
+  squashes: 0,
+  kick: 0,
+  full: false,
+};
 const ripeCentre = new Vector3();
 let stillGone = false;
 let onRipe = null;
 const RIPE_RENDER = "/peachy-keen/intro-peach-ripe.webp";
+const GREY_RENDER = "/peachy-keen/intro-peach.webp";
 // The still and the live peach share one wave clock, so the wave carries on across the handover.
 const waveEpoch = performance.timeOrigin + performance.now();
 const waveTime = () =>
   (performance.timeOrigin + performance.now() - waveEpoch) / 1000;
+const calm = reducedMotion.matches ? 0.3 : 1;
+const LEAF_FILL_MS = 550;
+const RIPE_CLEAR_MS = 600;
 
+const introShape = document.getElementById("intro-shape");
 const fillCanvas = document.getElementById("intro-fill");
 const fillSize = () =>
   Math.round(fillCanvas.clientWidth * Math.min(2, devicePixelRatio));
+// Loaded as images, they share the preloads and the CSS background; the worker sits outside the service worker's scope.
+const loadStill = (url) =>
+  new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () =>
+      window.createImageBitmap
+        ? createImageBitmap(image).then(resolve, () => resolve(null))
+        : resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = url;
+  });
+const stillImages = Promise.all([
+  loadStill(RIPE_RENDER),
+  loadStill(GREY_RENDER),
+]);
+const makeCanvas = (w, h) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  return canvas;
+};
 let fillWorker = null;
 let fillContext = null;
-const ripeRender = new Image();
+let mainGulp = null;
+// Without a worker the page runs the same gulps itself; with no images it still fills, unseen.
+const startMainGulp = async (draw) => {
+  mainGulp = new Gulp({ makeCanvas, calm });
+  if (!draw) {
+    mainGulp.setImages(null, null);
+    return;
+  }
+  const [ripe, grey] = await stillImages;
+  mainGulp.setImages(ripe, grey);
+  if (mainGulp.grey) introShape.classList.add("is-filling");
+};
 if (fillCanvas.transferControlToOffscreen) {
   fillWorker = new Worker(new URL("./fill-worker.js", import.meta.url), {
     type: "module",
@@ -275,26 +323,43 @@ if (fillCanvas.transferControlToOffscreen) {
       canvas,
       size: fillSize(),
       epoch: waveEpoch,
+      calm,
     },
     [canvas],
   );
-  // The worker sits outside the service worker's scope, so the page fetches the image for it.
-  fetch(RIPE_RENDER)
-    .then((res) => res.blob())
-    .then(
-      (image) => fillWorker?.postMessage({ image }),
-      () => fillWorker?.postMessage({ noImage: true }),
-    );
-  fillWorker.onmessage = ({ data }) => Object.assign(fill, data);
+  stillImages.then((images) =>
+    fillWorker?.postMessage({ images }, images.filter(Boolean)),
+  );
+  fillWorker.onmessage = ({ data }) => {
+    if (data.painted) introShape.classList.add("is-filling");
+    else Object.assign(fill, data);
+  };
   fillWorker.onerror = () => {
     fillWorker = null;
+    startMainGulp(false);
   };
   window.addEventListener("resize", () =>
     fillWorker?.postMessage({ size: fillSize() }),
   );
 } else {
   fillContext = fillCanvas.getContext("2d");
-  ripeRender.src = RIPE_RENDER;
+  startMainGulp(true);
+}
+
+// Each gulp's stretch and squash reach the live peach once it is on screen.
+let seenStretches = 0;
+let seenSquashes = 0;
+function passGulps() {
+  const live = group.visible;
+  if (fill.stretches > seenStretches) {
+    seenStretches = fill.stretches;
+    if (live) interaction.squashVelocity.x -= fill.kick * 0.3;
+  }
+  if (fill.squashes > seenSquashes) {
+    seenSquashes = fill.squashes;
+    if (live) interaction.squashVelocity.x += fill.kick;
+  }
+  if (live) interaction.squashAxis.set(0, 1);
 }
 
 let lastTarget = 0;
@@ -306,18 +371,21 @@ function showRipeness(delta) {
   }
   const time = waveTime();
   if (fillWorker) fillWorker.postMessage({ target });
-  else {
-    // A missing ripe image or a failed worker still lets the level rise, so loading can finish.
-    if (ripeRender.complete || !fillContext) stepFill(fill, target, delta);
+  else if (mainGulp) {
+    mainGulp.step(delta, target);
     const size = fillSize();
-    if (!stillGone && fillContext && ripeRender.naturalWidth && size) {
+    if (!stillGone && fillContext && size) {
       if (fillCanvas.width !== size) {
         fillCanvas.width = size;
         fillCanvas.height = size;
       }
-      drawFill(fillContext, ripeRender, size, fill.shown, time, fill.motion);
+      mainGulp.draw(fillContext, size, time);
     }
+    Object.assign(fill, mainGulp.snapshot(), {
+      at: performance.timeOrigin + performance.now(),
+    });
   }
+  passGulps();
   // Messages arrive unevenly, so the level carries on along its last speed in between.
   const ahead = fillWorker
     ? Math.min(
@@ -328,15 +396,17 @@ function showRipeness(delta) {
         ),
       )
     : 0;
-  peach.uniforms.uRipe.value = Math.min(1, fill.shown + fill.velocity * ahead);
-  peach.uniforms.uRipeMotion.value = fill.motion;
-  peach.uniforms.uRipeTime.value = time;
+  const { uniforms } = peach;
+  uniforms.uRipe.value = Math.min(1, fill.shown + fill.velocity * ahead);
+  uniforms.uRipeModes.value = fill.modes;
+  uniforms.uRipeSpan.value.set(fill.span[0], fill.span[1]);
+  uniforms.uRipeTime.value = time;
   if (peach.mesh) {
-    const bounds = peach.uniforms.uBounds.value;
+    const bounds = uniforms.uBounds.value;
     peach.mesh.updateMatrixWorld();
     ripeCentre.set(bounds.x, bounds.y, bounds.z);
     peach.mesh.localToWorld(ripeCentre).applyMatrix4(camera.matrixWorldInverse);
-    peach.uniforms.uRipeFrame.value.set(
+    uniforms.uRipeFrame.value.set(
       -ripeCentre.z,
       bounds.w * peach.worldScale(),
       ripeCentre.y,
@@ -344,6 +414,40 @@ function showRipeness(delta) {
   }
   if (fill.shown >= 1) onRipe?.();
 }
+
+const aura = new IntroGlow(scene, camera, viewHeight);
+aura.load();
+let fullAt = null;
+let ripeAt = null;
+let leafKicked = false;
+// Runs every frame, so the leaf and the aura finish even after the tap.
+function finishRipening() {
+  const now = performance.now();
+  if (fill.full && fullAt === null) {
+    fullAt = now;
+    aura.place(
+      introShape.getBoundingClientRect(),
+      group,
+      peach.uniforms.uBounds.value.w * peach.worldScale(),
+    );
+  }
+  if (fill.shown >= 1 && ripeAt === null) ripeAt = now;
+  const { uniforms } = peach;
+  if (ripeAt !== null)
+    uniforms.uRipe.value =
+      1 + 0.15 * Math.min(1, (now - ripeAt) / RIPE_CLEAR_MS);
+  const leaf = fullAt === null ? 0 : Math.min(1, (now - fullAt) / LEAF_FILL_MS);
+  uniforms.uLeafRipe.value = leaf * leaf * (3 - 2 * leaf);
+  if (leaf >= 1 && !leafKicked) {
+    leafKicked = true;
+    peach.kickLeaf(2.2 * calm);
+  }
+  aura.update(
+    fullAt === null ? -1 : (now - fullAt - LEAF_FILL_MS) / 1000,
+    group,
+  );
+}
+peach.uniforms.uLeafRipe.value = 0;
 
 function sayForAMoment(text) {
   setStatus(text);
@@ -593,6 +697,7 @@ peach
       interaction.holdStill = false;
       stillGone = true;
       fillWorker?.postMessage({ stop: true });
+      introShape.classList.remove("is-filling");
     }, SHAPE_FADE_MS);
     const ripe = new Promise((resolve) => {
       onRipe = resolve;
@@ -716,8 +821,9 @@ function frame() {
   } else skipFrame = false;
   const realDelta = Math.min(clock.getDelta(), 1 / 20);
   jiggleText?.update(realDelta);
+  if (!started || intro.isConnected) showRipeness(realDelta);
+  finishRipening();
   if (!started || intro.isConnected) {
-    showRipeness(realDelta);
     introTitle.update(realDelta);
     statusJiggle.update(realDelta);
   }
