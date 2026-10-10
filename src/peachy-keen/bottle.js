@@ -412,11 +412,11 @@ export class Bottle {
   }
 
   update(delta) {
+    this.updateHome(delta);
     if (this.carried) return;
     if (this.stream.active) this.stream.update(null, 0, undefined, 0, delta);
     this.oilShadow.update(this.stream);
     this.time += delta;
-    this.updateHome(delta);
     this.screen.y += this.homeShift;
     const v = this.velocity;
     v.x += ((this.homeX - this.screen.x) * 170 - v.x * 20) * delta;
