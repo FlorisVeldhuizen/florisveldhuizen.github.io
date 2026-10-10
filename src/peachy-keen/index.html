@@ -298,12 +298,21 @@
       <script>
         // iOS draws the launch image at screen size, which can differ from the page; start the still there.
         (() => {
+          const shape = document.getElementById("intro-shape");
+          const show = () => shape.classList.add("is-shown");
           const standalone =
             navigator.standalone ||
             matchMedia("(display-mode: standalone), (display-mode: fullscreen)")
               .matches;
-          if (!standalone) return;
-          const shape = document.getElementById("intro-shape");
+          // In a browser the still fades in once it has loaded; the launch image already shows it in the app.
+          if (!standalone) {
+            const still = new Image();
+            still.onload = show;
+            still.onerror = show;
+            still.src = "/peachy-keen/intro-peach.webp";
+            return;
+          }
+          show();
           const long = Math.max(screen.width, screen.height);
           const short = Math.min(screen.width, screen.height);
           const portrait = innerHeight >= innerWidth;

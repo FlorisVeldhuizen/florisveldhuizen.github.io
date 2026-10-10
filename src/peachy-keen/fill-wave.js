@@ -158,6 +158,11 @@ export default class Gulp {
     this.stretches = 0;
     this.squashes = 0;
     this.full = false;
+    this.holdUntil = 0;
+  }
+
+  holdGulps(seconds) {
+    this.holdUntil = this.clock + seconds;
   }
 
   // Without the ripe image the level still rises over a plain span, so loading can finish.
@@ -276,7 +281,11 @@ export default class Gulp {
       this.pendingJump += this.real + sip - this.loaded;
       this.loaded = this.real + sip;
     }
-    if (this.pendingJump > 0.0005 && this.clock - this.lastGulp >= GULP_GAP) {
+    if (
+      this.pendingJump > 0.0005 &&
+      this.clock - this.lastGulp >= GULP_GAP &&
+      this.clock >= this.holdUntil
+    ) {
       const jump = this.pendingJump;
       const kick = (0.3 * Math.min(1, jump / 0.04) + jump * 1.1) * this.calm;
       this.squashVel -= kick * 0.3;
@@ -345,6 +354,8 @@ export default class Gulp {
       stretches: this.stretches,
       squashes: this.squashes,
       kick: this.squashKick,
+      squash: this.squash,
+      squashVel: this.squashVel,
       full: this.full,
     };
   }

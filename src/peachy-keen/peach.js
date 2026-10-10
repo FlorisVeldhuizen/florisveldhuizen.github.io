@@ -3062,6 +3062,7 @@ export class Peach {
     ).cross(new Vector3(0, 1, 0));
     if (lift.lengthSq() < 1e-6) return;
     this.leaf.bendVel.addScaledVector(lift.normalize(), strength);
+    this.leaf.free = 1;
   }
 
   updateLeaf(delta) {
@@ -3136,7 +3137,10 @@ export class Peach {
     torque.clampLength(0, LEAF.MAX_TORQUE);
     const k = (2 * Math.PI * LEAF.HZ) ** 2;
     // Held still, the leaf settles fast so the intro still can take over without a second leaf.
-    const c = 2 * LEAF.DAMPING * Math.sqrt(k) * (1 + (1 - this.breeze) * 6);
+    // A kick frees the leaf for a moment even while the peach is held still.
+    L.free = Math.max(0, (L.free ?? 0) - dt / 1.5);
+    const loose = Math.max(this.breeze, L.free);
+    const c = 2 * LEAF.DAMPING * Math.sqrt(k) * (1 + (1 - loose) * 6);
     L.bendVel
       .addScaledVector(torque, dt)
       .addScaledVector(L.bend, -k * dt)

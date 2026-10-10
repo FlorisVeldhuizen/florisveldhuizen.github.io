@@ -267,6 +267,8 @@ const fill = {
   stretches: 0,
   squashes: 0,
   kick: 0,
+  squash: 0,
+  squashVel: 0,
   full: false,
 };
 const ripeCentre = new Vector3();
@@ -280,6 +282,7 @@ const waveTime = () =>
   (performance.timeOrigin + performance.now() - waveEpoch) / 1000;
 const calm = reducedMotion.matches ? 0.3 : 1;
 const LEAF_FILL_MS = 550;
+const HANDOVER_QUIET = 0.8;
 const RIPE_CLEAR_MS = 600;
 
 const introShape = document.getElementById("intro-shape");
@@ -433,6 +436,8 @@ function finishRipening() {
   const now = performance.now();
   if (fill.full && fullAt === null) {
     fullAt = now;
+    // The peach holds the still's pose through loading and starts to sway once it is full.
+    interaction.holdStill = false;
     aura.place(
       introShape.getBoundingClientRect(),
       group,
@@ -709,11 +714,16 @@ peach
     idleReady = prepareIdle();
     await idleReady;
     setLoaded("prepare", 1);
+    // The live peach picks up the still's squash, and gulps pause while the two cross over.
+    interaction.squash.x = fill.squash;
+    interaction.squashVelocity.x = fill.squashVel;
+    interaction.squashAxis.set(0, 1);
+    fillWorker?.postMessage({ quiet: HANDOVER_QUIET });
+    mainGulp?.holdGulps(HANDOVER_QUIET);
     group.visible = true;
     intro.classList.add("has-shape");
     sayWords(LOADING_WORDS.ripen);
     setTimeout(() => {
-      interaction.holdStill = false;
       stillGone = true;
       fillWorker?.postMessage({ stop: true });
       introShape.classList.remove("is-filling");

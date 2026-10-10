@@ -55,5 +55,6 @@ globalThis.onmessage = ({ data }) => {
     context.canvas.width = size;
     context.canvas.height = size;
   }
+  if (data.quiet) gulp.holdGulps(data.quiet);
   if (data.stop) drawing = false;
 };
