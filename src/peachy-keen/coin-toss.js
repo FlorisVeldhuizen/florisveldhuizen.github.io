@@ -15,6 +15,7 @@ import {
   noiseBuffer,
   playCoinClink,
   playCoinSkin,
+  playCoinWhoosh,
   playPat,
 } from "./audio";
 import {
@@ -61,9 +62,15 @@ const SWIPE_PX = 30;
 const SWIPE_SPEED = 700;
 const TAP_PX = 14;
 const RAIN_GAP = 0.085;
+const WHOOSH = 0.25;
+const RAIN_WHOOSH = 0.25;
 const LIFE = 4;
 const Y = new Vector3(0, 1, 0);
 const Z = new Vector3(0, 0, 1);
+
+function panAt(x) {
+  return clamp((x / window.innerWidth) * 2 - 1, -1, 1) * 0.5;
+}
 
 function launch(c, rain) {
   Object.assign(c, { on: true, rain, age: 0, hits: 0, stick: 0, glow: 0 });
@@ -195,7 +202,7 @@ export class CoinToss {
     this.aimN.set(-c.vel.y, c.vel.x, 0).normalize();
     this.edgeOut(c, c.vel, (vx > 0 ? -1 : 1) * (18 + Math.random() * 8));
     launch(c, false);
-    this.audio.tink();
+    this.whoosh(c, x, FLIGHT);
   }
 
   take() {
@@ -256,7 +263,7 @@ export class CoinToss {
       : this.aimN;
     this.edgeOut(c, lead, side * (16 + Math.random() * 8));
     launch(c, false);
-    this.audio.tink();
+    this.whoosh(c, x, t);
   }
 
   onPeach(x, y, centre) {
@@ -330,6 +337,7 @@ export class CoinToss {
       c.spin.applyQuaternion(this.q);
     }
     launch(c, true);
+    if (Math.random() < RAIN_WHOOSH) this.whoosh(c, hx, t, 0.6);
   }
 
   edgeOn(c, t, roll) {
@@ -471,8 +479,13 @@ export class CoinToss {
       this.spark(h.point, n, 0.1 + Math.random() * 0.14, 1.2 + 1.8 * k);
   }
 
+  whoosh(c, toX, flight, gain = 1) {
+    const from = panAt(this.i.toScreen(c.pos).x) * 1.4;
+    playCoinWhoosh(WHOOSH * gain, from, panAt(toX), flight);
+  }
+
   hitSound(first, k, x) {
-    const pan = clamp((x / window.innerWidth) * 2 - 1, -1, 1) * 0.5;
+    const pan = panAt(x);
     const loud = (first ? 1 : 0.5) * (0.7 + 0.3 * k);
     const spread = (amount) => 1 + (Math.random() * 2 - 1) * amount;
     playCoinSkin(

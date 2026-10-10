@@ -15,6 +15,7 @@ const pats = [];
 const skinBodies = [];
 const coinSkins = [];
 const coinClinks = [];
+const coinWhooshes = [];
 const lastPlayed = new Map();
 let burst = null;
 let massageBank = null;
@@ -756,6 +757,24 @@ export function playCoinClink(volume, pan) {
     cutoff: 14000,
     pan,
   });
+}
+
+export function playCoinWhoosh(volume, fromPan, toPan, flight) {
+  if (!running() || !coinWhooshes.length) return;
+  const now = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = pickPat(coinWhooshes, Math.random(), 99);
+  src.playbackRate.value = vary(0.033);
+  const gain = ctx.createGain();
+  gain.gain.value = volume * vary(0.2);
+  const soften = ctx.createBiquadFilter();
+  soften.type = "lowpass";
+  soften.frequency.value = 9000;
+  const panner = ctx.createStereoPanner();
+  panner.pan.setValueAtTime(fromPan, now);
+  panner.pan.linearRampToValueAtTime(toPan, now + flight);
+  src.connect(soften).connect(gain).connect(panner).connect(master);
+  src.start(now);
 }
 
 export function playWobble(
@@ -1890,6 +1909,7 @@ export function loadSounds() {
       [AUDIO_CONFIG.skinBodySounds, skinBodies],
       [AUDIO_CONFIG.coinSkinSounds, coinSkins],
       [AUDIO_CONFIG.coinClinkSounds, coinClinks],
+      [AUDIO_CONFIG.coinWhooshSounds, coinWhooshes],
     ];
     loading = Promise.all([
       ...sets.map(([urls, buffers]) =>

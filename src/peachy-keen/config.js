@@ -275,6 +275,13 @@ export const AUDIO_CONFIG = {
       import: "default",
     }),
   ),
+  coinWhooshSounds: inNumberOrder(
+    import.meta.glob("./assets/coinwhoosh*.m4a", {
+      eager: true,
+      query: "?url",
+      import: "default",
+    }),
+  ),
   massageBankSound,
   pitchVariationMin: 0.88,
   pitchVariationMax: 1.12,
