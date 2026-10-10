@@ -1065,22 +1065,43 @@ function drawPrint(shape) {
   return new CanvasTexture(canvas);
 }
 
-function generateFuzzNormalMap() {
-  const size = 1024;
+function fuzzNoise(size) {
   const bytes = new Uint8Array(size * size * 4);
   // getRandomValues fills at most 65536 bytes per call.
   for (let i = 0; i < bytes.length; i += 65536) {
     crypto.getRandomValues(bytes.subarray(i, i + 65536));
   }
-  const height = new Float32Array(size * size);
-  for (let i = 0; i < height.length; i += 1) {
+  const noise = new Float32Array(size * size);
+  for (let i = 0; i < noise.length; i += 1) {
     const b = i * 4;
-    height[i] =
+    noise[i] =
       (0.3 / 255) *
       (bytes[b] +
         0.5 * bytes[b + 1] +
         0.25 * bytes[b + 2] +
         0.125 * bytes[b + 3]);
+  }
+  return noise;
+}
+
+function generateFuzzNormalMap() {
+  const size = 1024;
+  const half = size / 2;
+  const height = fuzzNoise(size);
+  const bumps = fuzzNoise(half);
+  const bump = (x, y) => bumps[(y % half) * half + (x % half)];
+  for (let y = 0; y < size; y += 1) {
+    const y0 = Math.floor(y / 2);
+    const ty = (y % 2) / 2;
+    for (let x = 0; x < size; x += 1) {
+      const x0 = Math.floor(x / 2);
+      const tx = (x % 2) / 2;
+      const top = bump(x0, y0) + (bump(x0 + 1, y0) - bump(x0, y0)) * tx;
+      const bottom =
+        bump(x0, y0 + 1) + (bump(x0 + 1, y0 + 1) - bump(x0, y0 + 1)) * tx;
+      height[y * size + x] =
+        height[y * size + x] * 0.6 + (top + (bottom - top) * ty) * 1.4;
+    }
   }
   const canvas = document.createElement("canvas");
   canvas.width = size;
