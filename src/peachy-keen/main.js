@@ -147,6 +147,8 @@ if (import.meta.env.DEV) window.pkTag = privacyTag;
 const mood = new MoodLight(scene, renderer, lights);
 
 const settings = new Settings();
+// From page open, so a touch while loading already starts iOS audio before the first smack.
+keepAudioUnlocked();
 
 const interaction = new Interaction({
   scene,
@@ -548,7 +550,6 @@ peach
     await settled;
     juice.clear();
     loadSounds();
-    keepAudioUnlocked();
 
     const start = async () => {
       if (started) return;
