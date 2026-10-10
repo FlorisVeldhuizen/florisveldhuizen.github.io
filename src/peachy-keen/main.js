@@ -580,6 +580,7 @@ const clipBox = new Vector4();
 // With the shop open and nothing being touched, the scene draws every other frame; any touch restores full rate at once.
 const CALM_AFTER = 1;
 let calmFor = 0;
+let calmShop = 0;
 let skipFrame = false;
 let lastFrameAt = performance.now();
 const frameClip = () => {
@@ -607,7 +608,9 @@ renderer.setAnimationLoop(() => {
     interaction.phase !== "live" ||
     interaction.bottle.stream.active ||
     wild.disco.on ||
-    shock.active;
+    shock.active ||
+    shop !== calmShop;
+  calmShop = shop;
   calmFor = busy ? 0 : calmFor + gap / 1000;
   if (shop && calmFor > CALM_AFTER) {
     // Half rate reads as slow frames, so the resolution governor waits it out.

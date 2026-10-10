@@ -2886,8 +2886,7 @@ body.is-storm::after {
   /* Rises with the sheet as it slides in, from the spot the hints hold in Classic. */
   .hints {
     bottom: calc(
-      var(--gutter) + env(safe-area-inset-bottom) + var(--sheet-shown, 0) *
-        (120px - var(--gutter))
+      var(--gutter) + env(safe-area-inset-bottom) + var(--sheet-shown, 0) * 76px
     );
     transition: opacity 0.15s ease 0.1s;
   }
@@ -2977,11 +2976,22 @@ body.is-storm::after {
 
   .toasts {
     bottom: calc(
-      min(var(--panel-bottom, 0px), var(--view-h) * 0.6, 600px) + 48px
+      min(var(--panel-bottom, 0px), var(--view-h) * 0.6, 600px) + var(--gutter)
     );
   }
 
-  .is-shopping .meters.is-visible {
+  .meters {
+    max-height: 64px;
+    overflow: clip;
+    transition:
+      opacity 0.5s ease,
+      max-height 0.5s ease,
+      margin-top 0.5s ease;
+  }
+
+  .is-shopping .meters {
+    max-height: 0;
+    margin-top: 0;
     opacity: 0;
   }
 }
