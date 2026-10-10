@@ -2234,6 +2234,7 @@ body.is-storm::after {
 }
 
 .trophy {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 1;
@@ -2253,6 +2254,18 @@ body.is-storm::after {
   border-color: rgba(212, 162, 76, 0.7);
   background: rgba(212, 162, 76, 0.12);
   color: var(--gold);
+}
+
+.trophy.is-new::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 6px rgba(255, 210, 122, 0.7);
 }
 
 .stats {

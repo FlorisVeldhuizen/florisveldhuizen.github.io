@@ -53,6 +53,7 @@ export function freshState() {
     nectar: 0,
     nectarTotal: 0,
     achievements: [],
+    trophiesRead: [],
     tree: [],
     toys: [],
     privacy: { crowd: 0, price: 0 },
@@ -115,6 +116,7 @@ export function decode(text) {
   if (state.version < 2 && state.toys.includes("talk")) state.toys.push("shy");
   if (state.options.helperStyle === "props") state.options.helperStyle = "room";
   if (state.version < 3) rescaleNectar(state);
+  if (!("trophiesRead" in saved)) state.trophiesRead = [...state.achievements];
   state.options.sell = false;
   state.version = VERSION;
   return state;
