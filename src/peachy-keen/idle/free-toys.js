@@ -56,6 +56,7 @@ export default class FreeToys {
     const owns = (id) => s.toys.includes(id);
     this.card.replaceChildren();
     this.controls = [];
+    el("p", "ft-empty", this.card, "No toys yet. Find them in the shop.");
     PICKERS.forEach((picker) => {
       const track = toolTrack(this.card, picker, (id) => {
         const toy = TOY_BY_ID[id];
@@ -117,19 +118,23 @@ export default class FreeToys {
       this.build();
     }
     const owned = (id) => !TOY_BY_ID[id] || game.state.toys.includes(id);
+    let empty = true;
     this.controls.forEach(({ button, picker, track, toy, state }) => {
       if (track) {
         const active = picker.options.find(([option]) =>
           game.activeToys.includes(option),
         );
         track.update(active ? active[0] : picker.off, owned);
+        if (!track.row.hidden) empty = false;
         return;
       }
+      empty = false;
       const on = game.activeToys.includes(toy.id);
       setText(state, on ? "On" : "Off");
       const pressed = String(on);
       if (button.getAttribute("aria-pressed") !== pressed)
         button.setAttribute("aria-pressed", pressed);
     });
+    this.card.classList.toggle("is-empty", empty);
   }
 }

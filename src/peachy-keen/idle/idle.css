@@ -3391,6 +3391,23 @@ body.is-dnd:not(.is-shopping) .free-toys {
   border-top: 1px solid var(--blush-faint);
 }
 
+.ft-empty {
+  display: none;
+  margin: 6px 0 2px;
+  color: var(--blush-dim);
+  font-size: 13px;
+  text-align: center;
+}
+
+.ft-card.is-empty .ft-empty {
+  display: block;
+}
+
+.ft-card.is-empty .ft-foot {
+  margin-top: 0;
+  border-top: 0;
+}
+
 .ft-leave {
   min-height: 32px;
   padding: 4px 8px;
