@@ -42,6 +42,9 @@ export class TrophiesView {
       b.addEventListener("pointerenter", show);
       b.addEventListener("focus", show);
       b.addEventListener("click", show);
+      b.addEventListener("animationend", (e) => {
+        if (e.animationName === "trophy-soak") b.classList.remove("is-seen");
+      });
       return { t, b };
     });
     this.shown = -1;
@@ -53,6 +56,7 @@ export class TrophiesView {
     if (got && !trophiesRead.includes(t.id)) {
       trophiesRead.push(t.id);
       toggle(anchor, "is-new", false);
+      anchor.classList.add("is-seen");
     }
     setDetail(this.detail, got ? t.name : "Locked", [t.about]);
     floatBeside(this.detail, anchor);

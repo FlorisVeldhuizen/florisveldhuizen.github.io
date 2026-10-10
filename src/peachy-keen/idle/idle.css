@@ -2267,6 +2267,45 @@ body.is-storm::after {
   background: var(--gold);
 }
 
+.trophy.is-seen::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+  pointer-events: none;
+  animation: dot-breath 0.34s forwards;
+}
+
+.trophy.is-seen {
+  animation: trophy-soak 0.6s 0.2s ease-out;
+}
+
+@keyframes dot-breath {
+  0% {
+    scale: 1;
+    animation-timing-function: cubic-bezier(0.2, 0, 0.4, 1);
+  }
+  35% {
+    scale: 1.15;
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.6);
+  }
+  100% {
+    opacity: 0;
+    scale: 0;
+  }
+}
+
+@keyframes trophy-soak {
+  30% {
+    border-color: rgba(255, 210, 122, 0.85);
+    background-color: rgba(212, 162, 76, 0.16);
+  }
+}
+
 .stats {
   display: grid;
   grid-template-columns: 1fr auto;
