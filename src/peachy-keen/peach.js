@@ -916,6 +916,8 @@ const HOLE_FUZZ = `
 const FRAGMENT_COLOR = `
   ${SKIN_SAMPLE}
   ${CUT_RULE}
+  float bark = step(0.5, vPlant) * (1.0 - leaf);
+  leaf = max(leaf, bark);
   #ifdef SKIN_FADE
     float fadeFacing = clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0);
     float fadeAt = mix(skinFbm(vRestPosition / uBounds.w * 5.0), 1.0 - fadeFacing, 0.55);
@@ -2038,7 +2040,7 @@ export class Peach {
         )
         .replace(
           "#include <normal_fragment_maps>",
-          `vec3 oilBase = normal;\n#include <normal_fragment_maps>\n${HOLE_FUZZ}\nif (uSkinPattern.x > 0.5 && uSkinPattern.x < 1.5) {\n  float facing = clamp(dot(oilBase, normalize(vViewPosition)), 0.0, 1.0);\n  diffuseColor.rgb = mix(diffuseColor.rgb, uSkinDeep, smoothstep(0.05, 1.0, facing) * uSkinPattern.y * (1.0 - leaf));\n}\nif (uSkinPattern.x > 1.5) {\n  vec3 honeyNormal = oilBump(-vViewPosition, oilBase, skinHoneyHeight * uOilDepth * 0.6, faceDirection);\n  normal = normalize(mix(normal, honeyNormal, skinHoney));\n}\nif (oilSpot > 0.0) {\n  vec3 oilNormal = oilBump(-vViewPosition, oilBase, oilHeight * uOilDepth, faceDirection);\n  normal = normalize(mix(normal, oilNormal, oilSpot));\n}`,
+          `vec3 oilBase = normal;\n#include <normal_fragment_maps>\n${HOLE_FUZZ}\nnormal = normalize(mix(normal, oilBase, bark * 0.85));\nif (uSkinPattern.x > 0.5 && uSkinPattern.x < 1.5) {\n  float facing = clamp(dot(oilBase, normalize(vViewPosition)), 0.0, 1.0);\n  diffuseColor.rgb = mix(diffuseColor.rgb, uSkinDeep, smoothstep(0.05, 1.0, facing) * uSkinPattern.y * (1.0 - leaf));\n}\nif (uSkinPattern.x > 1.5) {\n  vec3 honeyNormal = oilBump(-vViewPosition, oilBase, skinHoneyHeight * uOilDepth * 0.6, faceDirection);\n  normal = normalize(mix(normal, honeyNormal, skinHoney));\n}\nif (oilSpot > 0.0) {\n  vec3 oilNormal = oilBump(-vViewPosition, oilBase, oilHeight * uOilDepth, faceDirection);\n  normal = normalize(mix(normal, oilNormal, oilSpot));\n}`,
         )
         .replace(
           "#include <opaque_fragment>",
