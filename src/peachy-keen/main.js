@@ -871,6 +871,7 @@ function frame() {
   peach.breeze = interaction.swayAmount;
   peach.update(delta, interaction.heat / 100);
   backdrop.update(delta, interaction.heat / 100);
+  ui.cursor.classList.toggle("is-tag", privacyTag.hovered);
   const spots = [privacyTag.spot()];
   if (interaction.bottle.view.group.visible) {
     const { x, y, size } = interaction.bottle.homeBox();

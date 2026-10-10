@@ -1103,3 +1103,13 @@ button:focus-visible {
     animation: none;
   }
 }
+
+.cursor.is-tag span {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-width: 1.5px;
+  border-color: var(--peach);
+  border-radius: 50%;
+  background-color: rgba(255, 168, 119, 0.3);
+}

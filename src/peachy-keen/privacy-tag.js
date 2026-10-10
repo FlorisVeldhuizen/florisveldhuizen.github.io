@@ -1,6 +1,7 @@
 import {
   CanvasTexture,
   CatmullRomCurve3,
+  Color,
   ConeGeometry,
   CylinderGeometry,
   ExtrudeGeometry,
@@ -37,8 +38,6 @@ const SETTLE = [60, 9];
 const REEL_CALM = 250;
 const MIN_HANG = 0.35;
 const REEL_DRAG = 0.045;
-const TAIL_KEEP = 0.9;
-const TAIL_WIND = 90;
 const TUCKED_SWAY = 0.12;
 const CATCH = 70;
 const GIVE = 180;
@@ -50,7 +49,21 @@ const IDLE_SWAY = 80;
 const MAX_FLING = 2500;
 const IDLE_FLICK = 400;
 const IDLE_TUG = 24;
-const HOVER_PEEK = 18;
+const HOVER_PEEK = 26;
+const HOVER_HOLD = 10;
+const HOVER_REST = 1.2;
+const DIP = 280;
+const NOD = { time: 1.2, freq: 0.9, decay: 3.2, lean: 0.2 };
+const TAIL = {
+  spring: 55,
+  damp: 7.5,
+  push: 0.0002,
+  max: 0.45,
+  wind: 0.08,
+  smooth: 18,
+  curl: 0.012,
+};
+const WARM_RATE = 10;
 const ELASTIC = 0.2;
 const TAUT = 0.985;
 const TIGHTEN = 0.12;
@@ -82,6 +95,9 @@ const MAX_ROLL = 1.5;
 const KNOT_GAP = 3;
 const TASSEL_LINKS = 3;
 const RED = 0xc0252f;
+const RED_WARM = 0xec5a52;
+const GOLD = 0xe3b452;
+const GOLD_WARM = 0xf7d27a;
 const MINCHO =
   '"Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif';
 const LABEL = "起こさないで";
@@ -226,7 +242,7 @@ export class PrivacyTag {
     // The cord is drawn as a smooth curve through the physics points, so bends show no corners.
     this.curve = new CatmullRomCurve3(this.ropeWorld, false, "centripetal");
     const gold = new MeshStandardMaterial({
-      color: 0xe3b452,
+      color: GOLD,
       roughness: 0.4,
       metalness: 0.6,
     });
@@ -238,6 +254,12 @@ export class PrivacyTag {
       knot: new Mesh(new SphereGeometry(1, 12, 8), this.red),
       band: new Mesh(new CylinderGeometry(1, 1, 1, 12), gold),
       fringe: new Mesh(new ConeGeometry(1, 1, 14, 1, true), this.red),
+    };
+    this.colors = {
+      red: new Color(RED),
+      redWarm: new Color(RED_WARM),
+      gold: new Color(GOLD),
+      goldWarm: new Color(GOLD_WARM),
     };
     this.tasselParts = [
       ...this.tassel.cords,
@@ -292,6 +314,10 @@ export class PrivacyTag {
     this.gust = 0;
     this.finger = null;
     this.peek = false;
+    this.wasHovered = false;
+    this.warmth = 0;
+    this.nod = { t: Infinity, at: -Infinity, dir: 1 };
+    this.tail = null;
     this.stretch = 0;
     this.touching = new Set();
     this.onBoard = false;
@@ -471,6 +497,8 @@ export class PrivacyTag {
     });
     const end = this.points[LINKS].p;
     this.ends.forEach((e) => e.copy(end));
+    this.tail = null;
+    this.nod.t = Infinity;
     this.tasselPoints = Array.from({ length: TASSEL_LINKS + 1 }, () => ({
       p: end.clone(),
       old: end.clone(),
@@ -510,6 +538,10 @@ export class PrivacyTag {
       y = (top.y + this.tasselPoints[TASSEL_LINKS].p.y + 30 * k) / 2;
     }
     return { x, y, rx: w * 2.4, ry: h * 1.3, soft: true };
+  }
+
+  get hovered() {
+    return this.state === "idle" && this.peek;
   }
 
   hang() {
@@ -556,7 +588,9 @@ export class PrivacyTag {
     if (this.state !== "idle" && this.state !== "on") return false;
     if (this.state === "idle") {
       // Tucked up only the cord and tail show, so they get a generous grab area.
-      const reach = IDLE_GRAB * this.scale;
+      // The grab area grows with the hover drop, so the pointer cannot lose the tag and bounce it.
+      const reach =
+        (IDLE_GRAB + (this.peek ? HOVER_PEEK + HOVER_HOLD : 0)) * this.scale;
       return (
         this.knotDistance(e) < reach ||
         this.points
@@ -822,43 +856,54 @@ export class PrivacyTag {
     this.stepTassel(dt, end, still);
   }
 
+  // One stiff tail on a damped spring, so tag motion cannot flap it to the side or leave it stuck there.
   stepTassel(dt, end, still) {
     const pts = this.tasselPoints;
     const { link } = this.tassel;
     const bottom = this.bottomDir(this.bottom)
       .multiplyScalar(this.arm)
       .add(end);
-    pts[0].p.copy(bottom);
-    pts[0].old.copy(bottom);
-    const g = GRAVITY * dt * dt;
-    for (let n = 1; n < pts.length; n += 1) {
-      const { p, old } = pts[n];
-      const vx = (p.x - old.x) * TAIL_KEEP;
-      const vy = (p.y - old.y) * TAIL_KEEP;
-      const vz = (p.z - old.z) * 0.85;
-      old.copy(p);
-      p.x += vx + this.gust * TAIL_WIND * still * dt * dt;
-      p.y += vy + g;
-      p.z += vz - p.z * 0.02;
+    if (!this.tail) this.tail = { angle: 0, spin: 0, x: bottom.x, vx: 0 };
+    const t = this.tail;
+    const vx =
+      t.vx + ((bottom.x - t.x) / dt - t.vx) * Math.min(1, dt * TAIL.smooth);
+    const ax = (vx - t.vx) / dt;
+    t.x = bottom.x;
+    t.vx = vx;
+    let goal = this.gust * TAIL.wind * still;
+    const { nod } = this;
+    if (nod.t < NOD.time) {
+      nod.t += dt;
+      const u = Math.min(1, nod.t / NOD.time);
+      goal +=
+        Math.sin(Math.PI * 2 * NOD.freq * u) *
+        Math.exp(-NOD.decay * u) *
+        Math.min(1, u * 6) *
+        NOD.lean *
+        nod.dir;
     }
-    for (let k = 0; k < 6; k += 1)
-      for (let n = 0; n < pts.length - 1; n += 1) {
-        const below = pts[n].p;
-        const q = pts[n + 1].p;
-        const lean = Math.max(
-          -0.75,
-          Math.min(
-            0.75,
-            Math.atan2(q.x - below.x, Math.max(q.y - below.y, link * 0.5)),
-          ),
-        );
-        q.x = below.x + Math.sin(lean) * link;
-        q.y = below.y + Math.cos(lean) * link;
-        q.z = Math.max(
-          below.z - link * 0.5,
-          Math.min(below.z + link * 0.5, q.z),
-        );
-      }
+    t.spin +=
+      (-(t.angle - goal) * TAIL.spring -
+        t.spin * TAIL.damp -
+        ax * TAIL.push * TAIL.spring) *
+      dt;
+    t.angle += t.spin * dt;
+    const soft = TAIL.max * 0.6;
+    const over = Math.abs(t.angle) - soft;
+    if (over > 0) {
+      const room = TAIL.max - soft;
+      t.angle = Math.sign(t.angle) * (soft + room * Math.tanh(over / room));
+      if (t.spin * t.angle > 0) t.spin *= 0.9;
+    }
+    pts.forEach(({ p, old }, n) => {
+      const a = t.angle - t.spin * TAIL.curl * n;
+      p.set(
+        bottom.x + Math.sin(a) * link * n,
+        bottom.y + Math.cos(a) * link * n,
+        0,
+      );
+      old.copy(p);
+    });
   }
 
   simulate(dt, wind) {
@@ -983,6 +1028,31 @@ export class PrivacyTag {
     fringe.scale.set(5.6 * k * px, 21 * k * px, 5.6 * k * px);
   }
 
+  hover(delta) {
+    const { hovered, nod } = this;
+    if (
+      hovered &&
+      !this.wasHovered &&
+      this.time - nod.at > HOVER_REST &&
+      !reducedMotion.matches
+    ) {
+      nod.at = this.time;
+      nod.t = 0;
+      nod.dir = this.finger?.x > this.tasselPoints[TASSEL_LINKS].p.x ? -1 : 1;
+      this.lengthV += DIP * this.scale;
+    }
+    this.wasHovered = hovered;
+    this.warmth +=
+      (Number(hovered) - this.warmth) * (1 - Math.exp(-delta * WARM_RATE));
+    const { red, redWarm, gold, goldWarm } = this.colors;
+    this.red.color.lerpColors(red, redWarm, this.warmth * 0.85);
+    this.tassel.band.material.color.lerpColors(
+      gold,
+      goldWarm,
+      this.warmth * 0.6,
+    );
+  }
+
   update(delta, { wind }) {
     const layout = sidePanel.matches ? "side" : "sheet";
     if (layout !== this.layout) {
@@ -1003,6 +1073,7 @@ export class PrivacyTag {
     this.group.visible = this.state !== "off";
     if (this.state === "off") return;
     this.time += delta;
+    this.hover(delta);
     const distance = this.camera.position.z - DEPTH;
     this.pixel =
       (2 * distance * Math.tan((this.camera.fov * Math.PI) / 360)) /
