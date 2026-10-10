@@ -73,6 +73,8 @@ const BEND = 0.2;
 const CURVE_LINKS = 36;
 const CORD_KEEP = 0.975;
 const STRETCH_EASE = 10;
+const DROP_ROCK = 3;
+const DROP_KEEP = 0.35;
 const SHEET_SCALE = 0.72;
 const SIZE = [44, 134, 6];
 const PIVOT = SIZE[0] * 0.42;
@@ -319,6 +321,7 @@ export class PrivacyTag {
     this.nod = { t: Infinity, at: -Infinity, dir: 1 };
     this.tail = null;
     this.stretch = 0;
+    this.falling = false;
     this.touching = new Set();
     this.onBoard = false;
     this.steady = false;
@@ -552,21 +555,37 @@ export class PrivacyTag {
     this.spin = 0;
     this.goal = null;
     if (fresh && this.layout) this.reset(0);
-    // The cord unrolls at once and the tag drops on it, so the elastic catches it with a small bounce.
     if (this.layout) {
-      this.length = this.rope().lengths.on;
+      this.length = Math.max(0.5, this.points[LINKS].p.y - this.anchor.y);
       this.lengthV = 0;
-      // Tucked, the cord lies folded above the screen; unrolling it folded would fling the tag sideways.
-      this.points.forEach(({ p, old }) => {
-        /* eslint-disable no-param-reassign */
-        p.x = this.anchor.x;
-        old.x = this.anchor.x;
-        /* eslint-enable no-param-reassign */
-      });
+      this.falling = true;
     }
   }
 
+  // The tag falls freely on a straight cord until the cord runs out; then the elastic catches it.
+  fall(dt) {
+    const { on } = this.rope().lengths;
+    this.lengthV += GRAVITY * dt;
+    this.length = Math.min(on, this.length + this.lengthV * dt);
+    const caught = this.length >= on;
+    // The cord soaks up most of the fall, so the catch bounces once instead of yo-yoing.
+    const v = this.lengthV * dt * (caught ? DROP_KEEP : 1);
+    this.points.forEach(({ p, old }, n) => {
+      const t = n / LINKS;
+      p.set(this.anchor.x, this.anchor.y + this.length * t, 0);
+      old.set(p.x, p.y - v * t, 0);
+    });
+    this.stepBody(dt);
+    if (!caught) return;
+    this.falling = false;
+    this.lengthV = 0;
+    this.segment = on / LINKS;
+    this.body.pitchV += DROP_ROCK * (Math.random() < 0.5 ? -1 : 1);
+    playCord(false);
+  }
+
   raise() {
+    this.falling = false;
     if (this.state === "on") this.state = "idle";
   }
 
@@ -613,6 +632,7 @@ export class PrivacyTag {
     if (!this.hit(e)) return;
     e.stopPropagation();
     e.preventDefault();
+    this.falling = false;
     const end = this.points[LINKS].p;
     this.drag = {
       id: e.pointerId,
@@ -1081,7 +1101,7 @@ export class PrivacyTag {
 
     const { x, top, length } = this.rope();
     const dt = Math.min(delta, 1 / 30);
-    if (!(this.drag?.holding && this.state === "idle")) {
+    if (!(this.drag?.holding && this.state === "idle") && !this.falling) {
       // Going up it reels in quickly without bouncing; hanging it settles softer.
       const [stiff, damp] = this.state === "on" ? SETTLE : REEL;
       this.lengthV +=
@@ -1114,7 +1134,8 @@ export class PrivacyTag {
     while (this.pending >= STEP) {
       this.pending -= STEP;
       this.remember();
-      this.simulate(STEP, wind);
+      if (this.falling) this.fall(STEP);
+      else this.simulate(STEP, wind);
     }
     this.stepTurn(delta);
 
