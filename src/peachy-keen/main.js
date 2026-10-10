@@ -28,6 +28,7 @@ import IntroTitle from "./intro-title";
 import JiggleText from "./jiggle-text";
 import slideToggle from "./slide-toggle";
 import Gulp from "./fill-wave";
+import IntroGlow from "./intro-glow";
 
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["idle", "free"];
@@ -422,13 +423,22 @@ function showRipeness(delta) {
   if (fill.shown >= 1) onRipe?.();
 }
 
+const aura = new IntroGlow(scene, camera, viewHeight);
+aura.load();
 let fullAt = null;
 let ripeAt = null;
 let leafKicked = false;
-// Runs every frame, so the leaf finishes even after the tap.
+// Runs every frame, so the leaf and the aura finish even after the tap.
 function finishRipening() {
   const now = performance.now();
-  if (fill.full && fullAt === null) fullAt = now;
+  if (fill.full && fullAt === null) {
+    fullAt = now;
+    aura.place(
+      introShape.getBoundingClientRect(),
+      group,
+      peach.uniforms.uBounds.value.w * peach.worldScale(),
+    );
+  }
   if (fill.shown >= 1 && ripeAt === null) ripeAt = now;
   const { uniforms } = peach;
   if (ripeAt !== null)
@@ -440,6 +450,10 @@ function finishRipening() {
     leafKicked = true;
     peach.kickLeaf(2.2 * calm);
   }
+  aura.update(
+    fullAt === null ? -1 : (now - fullAt - LEAF_FILL_MS) / 1000,
+    group,
+  );
 }
 peach.uniforms.uLeafRipe.value = 0;
 
