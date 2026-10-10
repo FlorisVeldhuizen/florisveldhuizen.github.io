@@ -55,7 +55,7 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   /* matches the manifest background and the iOS launch splashes */
-  background: #362c3f;
+  background: #3b0f1e;
 }
 
 @media (display-mode: standalone), (display-mode: fullscreen) {
@@ -522,6 +522,13 @@ button:focus-visible {
   background: url("/peachy-keen/intro-peach.webp") center / 100% 100% no-repeat;
   pointer-events: none;
   transition: opacity 0.35s ease;
+}
+
+.intro-shape.is-settling {
+  transition:
+    opacity 0.35s ease,
+    top 0.8s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .intro-shape canvas {

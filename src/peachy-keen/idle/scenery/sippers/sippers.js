@@ -1204,6 +1204,12 @@ export function createSippers(ctx) {
   });
 
   return {
+    async prepare() {
+      while (prep && !prep.next().done)
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(requestAnimationFrame);
+      finishPrep();
+    },
     update(dt, away = false) {
       s.time += dt;
       const { mesh } = peach;

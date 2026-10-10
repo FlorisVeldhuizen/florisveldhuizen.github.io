@@ -1259,18 +1259,7 @@ function computeStiffness(geometry, map, stemY) {
     stiffness[i] = current[slotOf[i]];
     plant[i] = base[slotOf[i]];
   }
-  [
-    ["stiffness", stiffness],
-    ["plant", plant],
-  ].forEach(([name, values]) => {
-    const attribute = geometry.attributes[name];
-    if (!attribute) {
-      geometry.setAttribute(name, new BufferAttribute(values, 1));
-      return;
-    }
-    attribute.array.set(values);
-    attribute.needsUpdate = true;
-  });
+  const fit = { stiffness, plant, stemBase: null, leafAxis: null };
   const stemBase = new Vector3();
   let count = 0;
   for (let i = 0; i < pos.count; i += 1) {
@@ -1281,7 +1270,7 @@ function computeStiffness(geometry, map, stemY) {
       count += 1;
     }
   }
-  if (!count) return null;
+  if (!count) return fit;
   stemBase.divideScalar(count);
   const reach = 0.3 * (rim - floor);
   const leafCenter = new Vector3();
@@ -1299,7 +1288,9 @@ function computeStiffness(geometry, map, stemY) {
       }
     }
   }
-  return { stemBase, leafAxis: leafCount ? leafCenter.normalize() : null };
+  fit.stemBase = stemBase;
+  fit.leafAxis = leafCount ? leafCenter.normalize() : null;
+  return fit;
 }
 
 export class Peach {
@@ -1489,21 +1480,46 @@ export class Peach {
     this.sharpenTime = 0;
   }
 
-  // Swapping leaf stiffness moves the leaf, so it waits for the squash at game start.
-  fitPlant() {
+  applyPlant(geometry, { stiffness, plant, stemBase, leafAxis }) {
+    [
+      ["stiffness", stiffness],
+      ["plant", plant],
+    ].forEach(([name, values]) => {
+      const attribute = geometry.attributes[name];
+      if (!attribute) {
+        geometry.setAttribute(name, new BufferAttribute(values, 1));
+        return;
+      }
+      attribute.array.set(values);
+      attribute.needsUpdate = true;
+    });
+    if (!stemBase) return;
+    this.uniforms.uStemBase.value.copy(stemBase);
+    if (leafAxis) this.uniforms.uLeafAxis.value.set(...leafAxis.toArray(), 0);
+  }
+
+  // Swapping leaf stiffness moves the leaf, so it is worked out while loading and applied in the squash at game start.
+  planPlant() {
     const { map } = this.material;
     if (!map || map.image === this.plantImage) return;
-    this.plantImage = map.image;
-    const stemBase = computeStiffness(
-      this.mesh.geometry,
-      map,
-      this.uniforms.uStemY.value,
-    );
-    if (stemBase) {
-      this.uniforms.uStemBase.value.copy(stemBase.stemBase);
-      if (stemBase.leafAxis)
-        this.uniforms.uLeafAxis.value.set(...stemBase.leafAxis.toArray(), 0);
-    }
+    if (this.plantPlan?.image === map.image) return;
+    this.plantPlan = {
+      image: map.image,
+      fit: computeStiffness(
+        this.mesh.geometry,
+        map,
+        this.uniforms.uStemY.value,
+      ),
+    };
+  }
+
+  fitPlant() {
+    this.planPlant();
+    const plan = this.plantPlan;
+    if (!plan) return;
+    this.plantPlan = null;
+    this.plantImage = plan.image;
+    this.applyPlant(this.mesh.geometry, plan.fit);
   }
 
   install(root, mesh, map) {
@@ -1521,16 +1537,10 @@ export class Peach {
     computeSmoothNormals(mesh.geometry);
     this.findCrease(mesh.geometry);
     this.plantImage = map?.image;
-    const stemBase = computeStiffness(
+    this.applyPlant(
       mesh.geometry,
-      map,
-      this.uniforms.uStemY.value,
+      computeStiffness(mesh.geometry, map, this.uniforms.uStemY.value),
     );
-    if (stemBase) {
-      this.uniforms.uStemBase.value.copy(stemBase.stemBase);
-      if (stemBase.leafAxis)
-        this.uniforms.uLeafAxis.value.set(...stemBase.leafAxis.toArray(), 0);
-    }
     computeStretch(mesh.geometry);
     const fuzz = generateFuzzNormalMap();
     this.material = new MeshPhysicalMaterial({
@@ -1607,6 +1617,16 @@ export class Peach {
       customDepthMaterial: this.depthMaterial(this.uniforms),
     });
     this.mesh = mesh;
+    // Front faces draw first, so back faces behind them fail the depth test before the skin shader runs.
+    this.material.side = FrontSide;
+    this.material.shadowSide = DoubleSide;
+    const back = new Mesh(mesh.geometry, new MeshPhysicalMaterial());
+    back.renderOrder = 0.25;
+    back.receiveShadow = true;
+    back.raycast = () => {};
+    back.onBeforeRender = () => this.syncBack();
+    mesh.add(back);
+    this.back = back;
     this.fabric = new Mesh(mesh.geometry, this.fabricMaterial());
     this.fabric.visible = false;
     this.fabric.receiveShadow = true;
@@ -1620,6 +1640,21 @@ export class Peach {
     this.band.mesh.receiveShadow = true;
     mesh.add(this.band.mesh);
     this.group.add(model);
+  }
+
+  syncBack() {
+    const front = this.material;
+    const back = this.back.material;
+    const changed =
+      this.backVersion !== front.version ||
+      back.onBeforeCompile !== front.onBeforeCompile;
+    back.copy(front);
+    back.side = BackSide;
+    back.onBeforeCompile = front.onBeforeCompile;
+    if (changed) {
+      this.backVersion = front.version;
+      back.needsUpdate = true;
+    }
   }
 
   followSurface(material) {
@@ -2537,6 +2572,7 @@ export class Peach {
     uniforms.uSkinFade = { value: 0 };
     uniforms.uSkinFadeGlow = { value: new Color() };
     const material = this.material.clone();
+    material.side = DoubleSide;
     material.defines = { ...material.defines, SKIN_FADE: "" };
     material.onBeforeCompile = (shader) => {
       this.material.onBeforeCompile(shader);

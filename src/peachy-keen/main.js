@@ -17,6 +17,8 @@ import { keepAudioUnlocked, loadSounds, setMuted, playLensHit } from "./audio";
 import {
   reducedMotion,
   warmedLights,
+  lightGroups,
+  lightIndex,
   sheet,
   viewHeight,
   viewWidth,
@@ -30,8 +32,8 @@ import { stepFill, drawFill } from "./fill-wave";
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["idle", "free"];
 const SHAPE_FADE_MS = 350;
-// Each step's share of the fill: shape download, skin download, building and warming the scene.
-const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.35 };
+// Each step's share of the fill: shape download, skin download, building and warming the scene, building the helpers.
+const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.25, helpers: 0.1 };
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
@@ -122,10 +124,6 @@ slideToggle(document.querySelector(".intro-modes"));
 const { scene, camera, renderer, lights } = initScene();
 const quality = new QualityGovernor(renderer);
 const backdrop = createBackdrop(scene, renderer);
-setupResizeHandler(camera, renderer, () => {
-  backdrop.resize();
-  lens.resize();
-});
 backdrop.setMotion(!reducedMotion.matches);
 
 const group = new Group();
@@ -136,6 +134,10 @@ const peach = new Peach(group);
 const juice = new Juice(scene);
 const droplets = new Droplets(scene);
 const lens = new Lens(renderer, scene, camera);
+setupResizeHandler(camera, renderer, () => {
+  backdrop.resize();
+  lens.resize();
+});
 juice.onSplat = (position, velocity) => lens.splat(position, velocity);
 lens.onHit = () => playLensHit(1);
 const ui = new UI();
@@ -144,19 +146,7 @@ const privacyTag = new PrivacyTag({ scene, camera, anchorX: cordX });
 if (import.meta.env.DEV) window.pkTag = privacyTag;
 const mood = new MoodLight(scene, renderer, lights);
 
-const settings = new Settings((key, value) => {
-  if (key === "sound") setMuted(!value);
-  if (key === "quality") quality.setMode(value);
-  if (key === "splatter") lens.enabled = value;
-  if (key === "firmness") interaction.setFirmness(value);
-  if (key === "tool") interaction.setTool(value);
-  if (key === "talk") talk.setLevel(value);
-  if (key === "moodLight") mood.set(value);
-  naughty.set(key, value);
-  wild.set(key, value);
-  if (key === "lingerie" && value) interaction.dressUp(true);
-  if (key === "lingerie" && !value) interaction.undress();
-});
+const settings = new Settings();
 
 const interaction = new Interaction({
   scene,
@@ -183,11 +173,24 @@ const wild = new Wild({
 const shock = new Shock(renderer, interaction);
 interaction.on("charge", () => quality.hold(4));
 const skinRings = new SkinRings(scene, interaction);
+settings.onChange = (key, value) => {
+  if (key === "sound") setMuted(!value);
+  if (key === "quality") quality.setMode(value);
+  if (key === "splatter") lens.enabled = value;
+  if (key === "firmness") interaction.setFirmness(value);
+  if (key === "tool") interaction.setTool(value);
+  if (key === "talk") talk.setLevel(value);
+  if (key === "moodLight") mood.set(value);
+  naughty.set(key, value);
+  wild.set(key, value);
+  if (key === "lingerie" && value) interaction.dressUp(true);
+  if (key === "lingerie" && !value) interaction.undress();
+};
 settings.applyAll();
 let idle = null;
 let idleActive = false;
 
-const loaded = { shape: 0, skin: 0, prepare: 0 };
+const loaded = { shape: 0, skin: 0, prepare: 0, helpers: 0 };
 const loadedShare = () =>
   Object.keys(LOAD_SHARE).reduce(
     (sum, k) => sum + LOAD_SHARE[k] * loaded[k],
@@ -330,7 +333,10 @@ function drawEverything() {
   });
   renderer.render(lens.overlay, lens.overlayCamera);
   lens.blobGeometry.instanceCount = 1;
+  renderer.setRenderTarget(lens.target);
   renderer.render(lens.blobScene, lens.overlayCamera);
+  renderer.setRenderTarget(null);
+  lens.blobsDirty = true;
   renderer.render(shock.scene, shock.camera);
   renderer.setScissorTest(false);
   camera.layers.disable(JUICE_LAYER);
@@ -346,10 +352,9 @@ function drawEverything() {
 }
 
 // Every lit pixel pays for each visible light, so lights that are off stay out of the shaders.
-const lightGroups = [[mood.candle, mood.halo], wild.disco.lights];
-const lightIndex = (shown) => (shown[0] ? 1 : 0) + (shown[1] ? 2 : 0);
+lightGroups.push([mood.candle, mood.halo], wild.disco.lights, []);
 // Each light combination is its own shader variant; unwarmed ones fall back to all lights on.
-const ALL_LIGHTS = [true, true];
+const ALL_LIGHTS = [true, true, true];
 let warmExtra = [];
 const showLights = (shown) =>
   lightGroups.forEach((members, n) =>
@@ -358,7 +363,7 @@ const showLights = (shown) =>
       light.visible = shown[n];
     }),
   );
-const lightsShown = [false, false];
+const lightsShown = [false, false, false];
 const showLitGroups = () => {
   lightGroups.forEach((members, n) => {
     lightsShown[n] = members.some((light) => light.intensity > 0);
@@ -373,11 +378,15 @@ async function warmLights(shown) {
   renderer.shadowMap.enabled = true;
   const shadowed = renderer.compileAsync(scene, camera);
   renderer.shadowMap.enabled = false;
+  // A render target is its own shader variant (no tone mapping, linear colour).
+  renderer.setRenderTarget(lens.target);
+  const blobs = renderer.compileAsync(lens.blobScene, lens.overlayCamera);
+  renderer.setRenderTarget(null);
   await Promise.all([
     shadowed,
+    blobs,
     renderer.compileAsync(scene, camera),
     renderer.compileAsync(lens.overlay, lens.overlayCamera),
-    renderer.compileAsync(lens.blobScene, lens.overlayCamera),
     renderer.compileAsync(shock.scene, shock.camera),
   ]);
   // The render loop switches unlit lights off while the compile runs.
@@ -390,7 +399,14 @@ async function warmLights(shown) {
 async function warm(extra = warmExtra) {
   warmExtra = extra;
   warmedLights.clear();
-  const states = [ALL_LIGHTS, [false, false], ...extra];
+  // The golden glow lights only on hover, so it is warmed only with the likely mood and disco groups; other combinations fall back to all lights.
+  const glow =
+    idle && lightGroups[2].length ? [[...idle.likelyLights(), true]] : [];
+  const states = [
+    ALL_LIGHTS,
+    ...[[false, false], ...extra].map(([m, d]) => [m, d, false]),
+    ...glow,
+  ];
   for (let n = 0; n < states.length; n += 1)
     // eslint-disable-next-line no-await-in-loop
     await warmLights(states[n]);
@@ -427,6 +443,7 @@ async function prepareIdle() {
     privacyTag,
   });
   naughty.set("achievements", false);
+  lightGroups[2].push(idle.glow);
   idle.prepare();
   await warm(idle.lightStates());
   await idle.warmFade(warm);
@@ -519,8 +536,16 @@ peach
       onRipe = resolve;
     });
     peach.applySkin(await skinImage);
+    peach.planPlant();
     loaded.skin = 1;
+    // Helpers bake from the full skin, so they build during the ripening fill; the tap waits for them.
+    const settled = idle
+      .settle((fraction) => {
+        loaded.helpers = fraction;
+      })
+      .then(drawEverything);
     await ripe;
+    await settled;
     juice.clear();
     loadSounds();
     keepAudioUnlocked();

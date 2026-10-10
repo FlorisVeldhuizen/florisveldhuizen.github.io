@@ -266,6 +266,13 @@ export class PrivacyTag {
       });
       return { canvas, map, material };
     });
+    // The board is built later, so hidden stand-ins let the load-time warm-up compile its materials.
+    const standIn = new PlaneGeometry(1, 1);
+    [this.wood, ...this.prints.map((p) => p.material)].forEach((material) => {
+      const mesh = new Mesh(standIn, material);
+      mesh.visible = false;
+      this.group.add(mesh);
+    });
 
     this.state = "off";
     this.owned = false;
