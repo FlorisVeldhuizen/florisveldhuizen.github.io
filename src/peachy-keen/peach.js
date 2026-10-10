@@ -54,6 +54,14 @@ const BRIDGE_BINS = 25;
 const BRIDGE_SPAN = "0.25";
 
 const SKIN_FADE_SECONDS = 2.4;
+// Fractions of the peach height.
+const STRETCH_REACH = 0.043;
+const STRETCH_SOFT = 0.0185;
+const CREASE_STRIP = { width: 0.07, top: 0.62 };
+const LEAF_BEND = Math.cos((32 * Math.PI) / 180);
+const RISE_SECONDS = 0.4;
+// Tuned to give the lingerie mesh about 19,000 vertices, enough for the waistband's pull.
+const EDGE_SPLIT = 0.006088;
 const LEAF = {
   HZ: 1.8,
   DAMPING: 0.16,
@@ -239,6 +247,9 @@ const VERTEX_HEADER = `
   attribute float stiffness;
   attribute float plant;
   attribute float stretch;
+  attribute vec3 riseFrom;
+  attribute vec3 riseNormal;
+  uniform float uRise;
   varying float vStretch;
   varying float vPlant;
   uniform vec3 uStemBase;
@@ -256,6 +267,7 @@ const VERTEX_HEADER = `
   varying float vFabricPush;
   float lastFabricPush;
 
+  // jiggleSlope() below holds the hand-worked slopes of this function for the normals; change both together.
   vec3 jiggle(vec3 p, vec3 n) {
     vec3 d = vec3(0.0);
     lastFabricPush = 0.0;
@@ -305,43 +317,169 @@ const VERTEX_HEADER = `
     if (amount > 0.0) d += hits * (limit * tanh(amount / limit) / amount) * hold;
     return d;
   }
+
+  float dSmooth(float a, float b, float x) {
+    float t = clamp((x - a) / (b - a), 0.0, 1.0);
+    return 6.0 * t * (1.0 - t) / (b - a);
+  }
+
+  // Returns jiggle() and its slopes along ta and tb, so the normal needs one call; keep in step with jiggle().
+  vec3 jiggleSlope(vec3 p, vec3 n, vec3 ta, vec3 tb, out vec3 dA, out vec3 dB) {
+    vec3 d = vec3(0.0);
+    dA = vec3(0.0);
+    dB = vec3(0.0);
+    lastFabricPush = 0.0;
+    float hold = 1.0;
+    vec2 holdD = vec2(0.0);
+    if (uLingerie.x > 0.5 && uLingerie.z > 0.0) {
+      float e = 0.004;
+      float tension = (uFabric.x + clamp(abs(uLingerie.y), 0.0, 1.0) * 0.6) * uLingerie.z;
+      vec3 k = n * uBounds.w * uFabricDepth * tension;
+      lastFabricPush = fabricPush(p, uCrease);
+      d += k * lastFabricPush;
+      dA += k * (fabricPush(p + ta * e, uCrease) - lastFabricPush) / e;
+      dB += k * (fabricPush(p + tb * e, uCrease) - lastFabricPush) / e;
+      float gap = (heightOf(p) - waistLine()) / 0.07;
+      float g = exp(-gap * gap);
+      hold = 1.0 - 0.4 * g * uLingerie.z;
+      holdD = vec2(ta.y, tb.y) * 0.8 * uLingerie.z * g * gap / (uBounds.w * 0.07);
+    }
+    if (uGrabPull.w > 0.0) {
+      vec3 r1 = p - uGrab.xyz;
+      float g = length(r1) / uGrab.w;
+      float G = exp(-g * g * 1.2);
+      vec3 gG = -2.4 * G * r1 / (uGrab.w * uGrab.w);
+      vec3 P = uGrabPull.xyz * uGrabPull.w;
+      float k = length(r1) / uGrabDent.w;
+      float K = exp(-k * k * 2.0);
+      vec3 gK = -4.0 * K * r1 / (uGrabDent.w * uGrabDent.w);
+      vec3 Q = uGrabDent.xyz * uGrabPull.w;
+      d += P * G + Q * K;
+      dA += P * dot(gG, ta) + Q * dot(gK, ta);
+      dB += P * dot(gG, tb) + Q * dot(gK, tb);
+    }
+    vec3 hits = vec3(0.0);
+    vec3 hA = vec3(0.0);
+    vec3 hB = vec3(0.0);
+    vec2 tn = vec2(dot(ta, n), dot(tb, n));
+    for (int i = 0; i < ${PEACH_CONFIG.MAX_HITS}; i++) {
+      float t = uTime - uHits[i].w;
+      if (t < 0.0 || t > ${HIT_LIFE.toFixed(1)}) continue;
+      float r = uHitDirs[i].w;
+      vec3 dir = uHitDirs[i].xyz;
+      vec3 q = p - uHits[i].xyz;
+      float ql = max(length(q), 1e-6);
+      float dist = ql / r;
+      vec3 gd = q / (ql * r);
+      vec2 dd = vec2(dot(gd, ta), dot(gd, tb));
+      float onset = 1.0 - exp(-t * 45.0);
+      float hitSide = sign(dot(uHits[i].xyz, uCrease.xyz) - uCrease.w);
+      float fromCrease = (dot(p, uCrease.xyz) - uCrease.w) * hitSide / r;
+      vec2 df = vec2(dot(uCrease.xyz, ta), dot(uCrease.xyz, tb)) * hitSide / r;
+      float sameCheek = smoothstep(-0.05, 0.2, fromCrease);
+      vec2 sameD = dSmooth(-0.05, 0.2, fromCrease) * df;
+      float body = smoothstep(0.0, 0.9, fromCrease);
+      float cheekBody = sameCheek * body;
+      vec2 cheekBodyD = sameD * body + sameCheek * dSmooth(0.0, 0.9, fromCrease) * df;
+      float pad = exp(-dist * dist * dist * 0.6);
+      vec2 padD = -1.8 * dist * dist * pad * dd;
+      float decay = exp(-t * uFirmness.y);
+      float phase = t * uFirmness.x - dist * 0.35;
+      float s = decay * cos(phase);
+      float sf = s > 0.0 ? 1.0 : uBounce.z;
+      float spring = s * sf;
+      vec2 springD = decay * sin(phase) * 0.35 * sf * dd;
+      float rim = max(dist - 0.8, 0.0);
+      vec2 rimD = dist > 0.8 ? dd : vec2(0.0);
+      float R = exp(-rim * rim * 1.4);
+      vec2 RD = -2.8 * rim * R * rimD;
+      float C2 = exp(-t * uFirmness.y * 1.2) * 0.22;
+      float phase2 = t * uFirmness.x - rim * 2.6;
+      float cos2 = cos(phase2);
+      vec2 cos2D = sin(phase2) * 2.6 * rimD;
+      float ripple = (1.0 - pad) * R * C2 * cos2;
+      vec2 rippleD = C2 * (-padD * R * cos2 + (1.0 - pad) * (RD * cos2 + R * cos2D));
+      float dent = pad * spring + ripple;
+      vec2 dentD = padD * spring + pad * springD + rippleD;
+      float wobbleT = exp(-t * uFirmness.y * 0.75) * sin(t * uFirmness.x * 0.5 * uBounce.y) * uFirmness.z;
+      float wobbleX = exp(-dist * dist * 0.2);
+      float wobble = wobbleX * wobbleT;
+      vec2 wobbleD = -0.4 * dist * wobbleX * wobbleT * dd;
+      float front = dist - t * 3.0;
+      float Fe = exp(-front * front * 2.5);
+      float splashK = exp(-t * uFirmness.y * 0.8) * uBounce.x / (1.0 + t * 3.0);
+      float phase3 = t * uFirmness.x - dist * 2.0;
+      float splash = Fe * sin(phase3) * splashK;
+      vec2 splashD = splashK * Fe * (-5.0 * front * sin(phase3) - 2.0 * cos(phase3)) * dd;
+      float cheekT = exp(-t * uFirmness.y * 0.38) * sin(t * uFirmness.x * 0.42 * uBounce.y) * uFirmness.z * 3.2;
+      float cheekX = exp(-dist * dist * 0.08);
+      float cheek = cheekBody * cheekX * cheekT;
+      vec2 cheekD = cheekT * cheekX * (cheekBodyD - cheekBody * 0.16 * dist * dd);
+      float m = mix(0.15, 1.0, sameCheek);
+      vec2 mD = 0.85 * sameD;
+      float sum = dent + wobble + splash;
+      float amp = sum * m + cheek;
+      vec2 ampD = (dentD + wobbleD + splashD) * m + sum * mD + cheekD;
+      float L = length(dir) * 0.3 / r;
+      vec3 qt = q - n * dot(q, n);
+      vec3 st = -qt * dent * L;
+      vec3 stA = -((ta - n * tn.x) * dent + qt * dentD.x) * L;
+      vec3 stB = -((tb - n * tn.y) * dent + qt * dentD.y) * L;
+      hits += (dir * amp + st * sameCheek) * onset;
+      hA += (dir * ampD.x + stA * sameCheek + st * sameD.x) * onset;
+      hB += (dir * ampD.y + stB * sameCheek + st * sameD.y) * onset;
+    }
+    float limit = uBounds.w * 0.07 * uFirmness.w;
+    float amount = length(hits);
+    if (amount > 0.0) {
+      float th = tanh(amount / limit);
+      float f = limit * th / amount;
+      float fd = ((1.0 - th * th) - f) / amount;
+      vec3 u = hits / amount;
+      vec3 hfA = hA * f + hits * fd * dot(u, hA);
+      vec3 hfB = hB * f + hits * fd * dot(u, hB);
+      d += hits * f * hold;
+      dA += hfA * hold + hits * f * holdD.x;
+      dB += hfB * hold + hits * f * holdD.y;
+    }
+    return d;
+  }
 `;
 
 const VERTEX_NORMAL = `
-  vec3 objectNormal = vec3(normal);
-  vec3 jiggled = position;
-  vRestPosition = position;
+  vec3 restPosition = position + riseFrom * (1.0 - uRise);
+  vec3 restNormal = normalize(mix(riseNormal, normal, uRise));
+  vec3 objectNormal = restNormal;
+  vec3 jiggled = restPosition;
+  vRestPosition = restPosition;
   vStretch = stretch;
   vPlant = plant;
   vFabricPush = 0.0;
   if (uJiggleActive > 0.5) {
     float give = 1.0 - stiffness;
-    jiggled = position + jiggle(position, normal) * give;
-    vFabricPush = lastFabricPush * uLingerie.z;
     vec3 helper = abs(objectNormal.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     vec3 tangentA = normalize(cross(objectNormal, helper));
     vec3 tangentB = cross(objectNormal, tangentA);
-    float e = 0.004;
-    vec3 pa = position + tangentA * e;
-    vec3 pb = position + tangentB * e;
-    vec3 da = pa + jiggle(pa, normal) * give - jiggled;
-    vec3 db = pb + jiggle(pb, normal) * give - jiggled;
-    objectNormal = normalize(cross(da, db));
+    vec3 slopeA;
+    vec3 slopeB;
+    jiggled = restPosition + jiggleSlope(restPosition, restNormal, tangentA, tangentB, slopeA, slopeB) * give;
+    vFabricPush = lastFabricPush * uLingerie.z;
+    objectNormal = normalize(cross(tangentA + slopeA * give, tangentB + slopeB * give));
   }
   if (plant > 0.5) {
-    vec3 rel = position - uStemBase;
+    vec3 rel = restPosition - uStemBase;
     float reach = length(rel) / uBounds.w;
     float w = pow(smoothstep(0.1, 0.62, reach), 1.4);
     vec3 th = uLeafBend * w + uLeafAxis.xyz * sin(uTime * 9.0 + reach * 14.0) * 0.05 * uLeafAxis.w * w;
     vec3 follow = uJiggleActive > 0.5 ? jiggle(uStemBase, vec3(0.0, 1.0, 0.0)) : vec3(0.0);
     jiggled = uStemBase + turnBy(rel, th) + follow;
-    objectNormal = turnBy(normal, th);
+    objectNormal = turnBy(restNormal, th);
   }
   vRubTilt = vec4(0.0);
   if (uGrabPull.w > 0.0) {
-    float k = length(position - uGrab.xyz) / uGrabDent.w;
+    float k = length(restPosition - uGrab.xyz) / uGrabDent.w;
     float soften = smoothstep(0.0, uBounds.w * 0.004, length(uGrabDent.xyz)) * exp(-k * k * 1.2);
-    vRubTilt = vec4(normalMatrix * (objectNormal - normal) * soften * 0.9, soften);
+    vRubTilt = vec4(normalMatrix * (objectNormal - restNormal) * soften * 0.9, soften);
   }
   #ifdef USE_TANGENT
     vec3 objectTangent = vec3(tangent.xyz);
@@ -968,63 +1106,6 @@ function generateFuzzNormalMap() {
   return texture;
 }
 
-function subdivide(geometry) {
-  const { position: pos, normal: nor, uv } = geometry.attributes;
-  const index = geometry.index
-    ? Array.from(geometry.index.array)
-    : Array.from({ length: pos.count }, (_, i) => i);
-  const positions = Array.from(pos.array);
-  const normals = Array.from(nor.array);
-  const uvs = uv ? Array.from(uv.array) : null;
-  const midpoints = new Map();
-  const a = new Vector3();
-  const b = new Vector3();
-  const na = new Vector3();
-  const nb = new Vector3();
-  const m = new Vector3();
-  const project = (q, p, n) =>
-    q.clone().addScaledVector(n, -q.clone().sub(p).dot(n));
-
-  const midpoint = (i, j) => {
-    const key = Math.min(i, j) * pos.count + Math.max(i, j);
-    if (midpoints.has(key)) return midpoints.get(key);
-    a.fromBufferAttribute(pos, i);
-    b.fromBufferAttribute(pos, j);
-    na.fromBufferAttribute(nor, i);
-    nb.fromBufferAttribute(nor, j);
-    m.copy(a).add(b).multiplyScalar(0.5);
-    const curved = project(m, a, na)
-      .add(project(m, b, nb))
-      .multiplyScalar(0.5);
-    m.lerp(curved, 0.75);
-    const k = positions.length / 3;
-    positions.push(m.x, m.y, m.z);
-    const n = na.add(nb).normalize();
-    normals.push(n.x, n.y, n.z);
-    if (uvs) {
-      uvs.push((uv.getX(i) + uv.getX(j)) / 2, (uv.getY(i) + uv.getY(j)) / 2);
-    }
-    midpoints.set(key, k);
-    return k;
-  };
-
-  const faces = [];
-  for (let t = 0; t < index.length; t += 3) {
-    const [i, j, k] = [index[t], index[t + 1], index[t + 2]];
-    const ij = midpoint(i, j);
-    const jk = midpoint(j, k);
-    const ki = midpoint(k, i);
-    faces.push(i, ij, ki, ij, j, jk, ki, jk, k, ij, jk, ki);
-  }
-
-  const result = new BufferGeometry();
-  result.setAttribute("position", new Float32BufferAttribute(positions, 3));
-  result.setAttribute("normal", new Float32BufferAttribute(normals, 3));
-  if (uvs) result.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
-  result.setIndex(faces);
-  return result;
-}
-
 function computeSmoothNormals(geometry) {
   const pos = geometry.attributes.position.array;
   const vertexCount = pos.length / 3;
@@ -1070,6 +1151,131 @@ function computeSmoothNormals(geometry) {
   geometry.setAttribute("normal", new BufferAttribute(normals, 3));
 }
 
+const positionSlots = (pos) => {
+  const slots = new Map();
+  const slotOf = new Uint32Array(pos.count);
+  for (let i = 0; i < pos.count; i += 1) {
+    const key = `${Math.round(pos.getX(i) * 1e4)},${Math.round(
+      pos.getY(i) * 1e4,
+    )},${Math.round(pos.getZ(i) * 1e4)}`;
+    if (!slots.has(key)) slots.set(key, slots.size);
+    slotOf[i] = slots.get(key);
+  }
+  return { slotOf, count: slots.size };
+};
+
+// Neighbouring edges split too so no cracks open; midpoints bend 3/4 of the way onto the curved surface.
+function refine(geometry, split) {
+  const { position: pos, normal: nor, uv } = geometry.attributes;
+  const index = geometry.index.array;
+  const { slotOf, count } = positionSlots(pos);
+  const edge = (i, j) => {
+    const a = slotOf[i];
+    const b = slotOf[j];
+    return a < b ? a * count + b : b * count + a;
+  };
+  const keys = new Float64Array(index.length);
+  const marked = new Set();
+  for (let t = 0; t < index.length; t += 3) {
+    for (let k = 0; k < 3; k += 1) {
+      const i = index[t + k];
+      const j = index[t + ((k + 1) % 3)];
+      keys[t + k] = edge(i, j);
+      if (split(i, j)) marked.add(keys[t + k]);
+    }
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let t = 0; t < index.length; t += 3) {
+      const cuts =
+        marked.has(keys[t]) + marked.has(keys[t + 1]) + marked.has(keys[t + 2]);
+      if (cuts === 2) {
+        marked.add(keys[t]);
+        marked.add(keys[t + 1]);
+        marked.add(keys[t + 2]);
+        changed = true;
+      }
+    }
+  }
+
+  const positions = Array.from(pos.array);
+  const normals = Array.from(nor.array);
+  const uvs = uv ? Array.from(uv.array) : null;
+  const parents = [];
+  const midpoints = new Map();
+  const a = new Vector3();
+  const b = new Vector3();
+  const na = new Vector3();
+  const nb = new Vector3();
+  const m = new Vector3();
+  const project = (q, p, n) =>
+    q.clone().addScaledVector(n, -q.clone().sub(p).dot(n));
+  const midpoint = (i, j) => {
+    const key = Math.min(i, j) * pos.count + Math.max(i, j);
+    if (midpoints.has(key)) return midpoints.get(key);
+    a.fromBufferAttribute(pos, i);
+    b.fromBufferAttribute(pos, j);
+    na.fromBufferAttribute(nor, i);
+    nb.fromBufferAttribute(nor, j);
+    m.copy(a).add(b).multiplyScalar(0.5);
+    const curved = project(m, a, na)
+      .add(project(m, b, nb))
+      .multiplyScalar(0.5);
+    m.lerp(curved, 0.75);
+    const k = positions.length / 3;
+    positions.push(m.x, m.y, m.z);
+    const n = na.add(nb).normalize();
+    normals.push(n.x, n.y, n.z);
+    if (uvs) {
+      uvs.push((uv.getX(i) + uv.getX(j)) / 2, (uv.getY(i) + uv.getY(j)) / 2);
+    }
+    parents.push(i, j);
+    midpoints.set(key, k);
+    return k;
+  };
+
+  const faces = [];
+  for (let t = 0; t < index.length; t += 3) {
+    const v = [index[t], index[t + 1], index[t + 2]];
+    const cut = [0, 1, 2].map((k) => marked.has(keys[t + k]));
+    const cuts = cut.filter(Boolean).length;
+    if (cuts === 0) faces.push(...v);
+    else if (cuts === 3) {
+      const [i, j, k] = v;
+      const ij = midpoint(i, j);
+      const jk = midpoint(j, k);
+      const ki = midpoint(k, i);
+      faces.push(i, ij, ki, ij, j, jk, ki, jk, k, ij, jk, ki);
+    } else {
+      const s = cut.indexOf(true);
+      const i = v[s];
+      const j = v[(s + 1) % 3];
+      const k = v[(s + 2) % 3];
+      const ij = midpoint(i, j);
+      faces.push(i, ij, k, ij, j, k);
+    }
+  }
+
+  const result = new BufferGeometry();
+  result.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  result.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+  if (uvs) result.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+  result.setIndex(faces);
+  computeSmoothNormals(result);
+  return { geometry: result, parents: Uint32Array.from(parents) };
+}
+
+function carry(values, parents) {
+  const out = new Float32Array(values.length + parents.length / 2);
+  out.set(values);
+  for (let k = 0; k < parents.length; k += 2) {
+    out[values.length + k / 2] =
+      (values[parents[k]] + values[parents[k + 1]]) / 2;
+  }
+  return out;
+}
+
 async function loadImage(url) {
   const image = new Image();
   image.src = url;
@@ -1108,82 +1314,171 @@ export function sampleTexture(map) {
   };
 }
 
-function computeStretch(geometry) {
+// Spreads by distance on the skin, so the soft-fuzz area is the same on any mesh.
+function computeStretch(geometry, plant) {
   const pos = geometry.attributes.position;
   const { uv } = geometry.attributes;
-  const plant = geometry.attributes.plant?.array;
   const stretch = new Float32Array(pos.count);
-  if (uv) {
-    const index = geometry.index.array;
-    const slots = new Map();
-    const slotOf = new Uint32Array(pos.count);
-    for (let i = 0; i < pos.count; i += 1) {
-      const key = `${pos.getX(i).toFixed(5)},${pos.getY(i).toFixed(5)},${pos.getZ(i).toFixed(5)}`;
-      if (!slots.has(key)) slots.set(key, slots.size);
-      slotOf[i] = slots.get(key);
-    }
-    const worst = new Float32Array(slots.size);
-    const a = new Vector3();
-    const e1 = new Vector3();
-    const e2 = new Vector3();
-    const tu = new Vector3();
-    const tv = new Vector3();
-    for (let t = 0; t < index.length; t += 3) {
-      const [i, j, k] = [index[t], index[t + 1], index[t + 2]];
-      a.fromBufferAttribute(pos, i);
-      e1.fromBufferAttribute(pos, j).sub(a);
-      e2.fromBufferAttribute(pos, k).sub(a);
-      const du1 = uv.getX(j) - uv.getX(i);
-      const dv1 = uv.getY(j) - uv.getY(i);
-      const du2 = uv.getX(k) - uv.getX(i);
-      const dv2 = uv.getY(k) - uv.getY(i);
-      const det = du1 * dv2 - du2 * dv1;
-      if (Math.abs(det) > 1e-12) {
-        tu.copy(e1)
-          .multiplyScalar(dv2)
-          .addScaledVector(e2, -dv1)
-          .divideScalar(det);
-        tv.copy(e2)
-          .multiplyScalar(du1)
-          .addScaledVector(e1, -du2)
-          .divideScalar(det);
-        const p = tu.lengthSq();
-        const q = tu.dot(tv);
-        const r = tv.lengthSq();
-        const spread = Math.sqrt(((p - r) / 2) ** 2 + q * q);
-        const ratio = Math.sqrt(
-          ((p + r) / 2 + spread) / Math.max(1e-12, (p + r) / 2 - spread),
-        );
-        [i, j, k].forEach((v) => {
-          worst[slotOf[v]] = Math.max(worst[slotOf[v]], ratio);
-        });
-      }
-    }
-    let mask = worst.map((w) => Math.min(1, Math.max(0, (w - 1.08) / 0.2)));
-    for (let pass = 0; pass < 6; pass += 1) {
-      const sums = new Float32Array(slots.size);
-      const counts = new Uint16Array(slots.size);
-      const peaks = Float32Array.from(mask);
-      for (let f = 0; f < index.length; f += 3) {
-        for (let k = 0; k < 3; k += 1) {
-          const p = slotOf[index[f + k]];
-          const q = slotOf[index[f + ((k + 1) % 3)]];
-          sums[p] += mask[q];
-          sums[q] += mask[p];
-          counts[p] += 1;
-          counts[q] += 1;
-          peaks[p] = Math.max(peaks[p], mask[q]);
-          peaks[q] = Math.max(peaks[q], mask[p]);
-        }
-      }
-      mask =
-        pass < 3 ? peaks : sums.map((s, n) => (counts[n] ? s / counts[n] : 0));
-    }
-    for (let i = 0; i < pos.count; i += 1) {
-      stretch[i] = plant?.[i] > 0.5 ? 0 : mask[slotOf[i]];
+  if (!uv) return stretch;
+  const index = geometry.index.array;
+  const slots = new Map();
+  const slotOf = new Uint32Array(pos.count);
+  for (let i = 0; i < pos.count; i += 1) {
+    const key = `${pos.getX(i).toFixed(5)},${pos.getY(i).toFixed(5)},${pos.getZ(i).toFixed(5)}`;
+    if (!slots.has(key)) slots.set(key, slots.size);
+    slotOf[i] = slots.get(key);
+  }
+  const worst = new Float32Array(slots.size);
+  const a = new Vector3();
+  const e1 = new Vector3();
+  const e2 = new Vector3();
+  const tu = new Vector3();
+  const tv = new Vector3();
+  for (let t = 0; t < index.length; t += 3) {
+    const [i, j, k] = [index[t], index[t + 1], index[t + 2]];
+    a.fromBufferAttribute(pos, i);
+    e1.fromBufferAttribute(pos, j).sub(a);
+    e2.fromBufferAttribute(pos, k).sub(a);
+    const du1 = uv.getX(j) - uv.getX(i);
+    const dv1 = uv.getY(j) - uv.getY(i);
+    const du2 = uv.getX(k) - uv.getX(i);
+    const dv2 = uv.getY(k) - uv.getY(i);
+    const det = du1 * dv2 - du2 * dv1;
+    if (Math.abs(det) > 1e-12) {
+      tu.copy(e1)
+        .multiplyScalar(dv2)
+        .addScaledVector(e2, -dv1)
+        .divideScalar(det);
+      tv.copy(e2)
+        .multiplyScalar(du1)
+        .addScaledVector(e1, -du2)
+        .divideScalar(det);
+      const p = tu.lengthSq();
+      const q = tu.dot(tv);
+      const r = tv.lengthSq();
+      const spread = Math.sqrt(((p - r) / 2) ** 2 + q * q);
+      const ratio = Math.sqrt(
+        ((p + r) / 2 + spread) / Math.max(1e-12, (p + r) / 2 - spread),
+      );
+      [i, j, k].forEach((v) => {
+        worst[slotOf[v]] = Math.max(worst[slotOf[v]], ratio);
+      });
     }
   }
-  geometry.setAttribute("stretch", new BufferAttribute(stretch, 1));
+  const n = slots.size;
+  const base = worst.map((w) => Math.min(1, Math.max(0, (w - 1.08) / 0.2)));
+  const at = new Float32Array(n * 3);
+  let low = Infinity;
+  let high = -Infinity;
+  for (let i = 0; i < pos.count; i += 1) {
+    at[slotOf[i] * 3] = pos.getX(i);
+    at[slotOf[i] * 3 + 1] = pos.getY(i);
+    at[slotOf[i] * 3 + 2] = pos.getZ(i);
+    low = Math.min(low, pos.getY(i));
+    high = Math.max(high, pos.getY(i));
+  }
+  const reach = STRETCH_REACH * (high - low);
+  const soft = STRETCH_SOFT * (high - low);
+  const limit = Math.max(reach, soft * 2.5);
+  const degree = new Uint32Array(n + 1);
+  for (let f = 0; f < index.length; f += 1) degree[slotOf[index[f]] + 1] += 2;
+  for (let s = 0; s < n; s += 1) degree[s + 1] += degree[s];
+  const fill = degree.slice(0, n);
+  const links = new Uint32Array(degree[n]);
+  for (let f = 0; f < index.length; f += 3) {
+    for (let k = 0; k < 3; k += 1) {
+      const p = slotOf[index[f + k]];
+      const q = slotOf[index[f + ((k + 1) % 3)]];
+      links[fill[p]] = q;
+      fill[p] += 1;
+      links[fill[q]] = p;
+      fill[q] += 1;
+    }
+  }
+  const lengths = new Float32Array(links.length);
+  for (let u = 0; u < n; u += 1) {
+    for (let l = degree[u]; l < degree[u + 1]; l += 1) {
+      const v = links[l];
+      lengths[l] = Math.sqrt(
+        (at[u * 3] - at[v * 3]) ** 2 +
+          (at[u * 3 + 1] - at[v * 3 + 1]) ** 2 +
+          (at[u * 3 + 2] - at[v * 3 + 2]) ** 2,
+      );
+    }
+  }
+  const dist = new Float32Array(n).fill(Infinity);
+  const queue = new Uint32Array(n);
+  const seen = new Uint32Array(n);
+  const ringStart = new Uint32Array(n + 1);
+  let ringNodes = new Uint32Array(n * 32);
+  let ringDist = new Float32Array(n * 32);
+  let filled = 0;
+  for (let s = 0; s < n; s += 1) {
+    let seenCount = 1;
+    let queued = 1;
+    seen[0] = s;
+    queue[0] = s;
+    dist[s] = 0;
+    while (queued) {
+      let best = 0;
+      for (let q = 1; q < queued; q += 1) {
+        if (dist[queue[q]] < dist[queue[best]]) best = q;
+      }
+      const u = queue[best];
+      queued -= 1;
+      queue[best] = queue[queued];
+      for (let l = degree[u]; l < degree[u + 1]; l += 1) {
+        const v = links[l];
+        const d = dist[u] + lengths[l];
+        if (d <= limit && d < dist[v]) {
+          if (dist[v] === Infinity) {
+            seen[seenCount] = v;
+            seenCount += 1;
+            queue[queued] = v;
+            queued += 1;
+          }
+          dist[v] = d;
+        }
+      }
+    }
+    if (filled + seenCount > ringNodes.length) {
+      const grownNodes = new Uint32Array(ringNodes.length * 2);
+      const grownDist = new Float32Array(ringDist.length * 2);
+      grownNodes.set(ringNodes);
+      grownDist.set(ringDist);
+      ringNodes = grownNodes;
+      ringDist = grownDist;
+    }
+    for (let k = 0; k < seenCount; k += 1) {
+      ringNodes[filled] = seen[k];
+      ringDist[filled] = dist[seen[k]];
+      dist[seen[k]] = Infinity;
+      filled += 1;
+    }
+    ringStart[s + 1] = filled;
+  }
+  const peak = new Float32Array(n);
+  for (let s = 0; s < n; s += 1) {
+    for (let k = ringStart[s]; k < ringStart[s + 1]; k += 1) {
+      if (ringDist[k] <= reach) peak[s] = Math.max(peak[s], base[ringNodes[k]]);
+    }
+  }
+  const mask = new Float32Array(n);
+  const spreadWidth = 2 * soft * soft;
+  for (let s = 0; s < n; s += 1) {
+    let sum = 0;
+    let weight = 0;
+    for (let k = ringStart[s]; k < ringStart[s + 1]; k += 1) {
+      const w = Math.exp(-(ringDist[k] * ringDist[k]) / spreadWidth);
+      sum += peak[ringNodes[k]] * w;
+      weight += w;
+    }
+    mask[s] = sum / weight;
+  }
+  for (let i = 0; i < pos.count; i += 1) {
+    stretch[i] = plant?.[i] > 0.5 ? 0 : mask[slotOf[i]];
+  }
+  return stretch;
 }
 
 function computeStiffness(geometry, map, stemY) {
@@ -1341,6 +1636,7 @@ export class Peach {
       uMarkerStyle: { value: new Vector2(0.75, 0) },
       uMarkerShown: { value: 0 },
       uRingIgnite: { value: 0 },
+      uRise: { value: 1 },
       uEnvSpecular: { value: 1 },
       uTime: { value: 0 },
       uJiggleActive: { value: 0 },
@@ -1500,22 +1796,25 @@ export class Peach {
     this.sharpenTime = 0;
   }
 
-  applyPlant(geometry, { stiffness, plant, stemBase, leafAxis }) {
-    [
-      ["stiffness", stiffness],
-      ["plant", plant],
-    ].forEach(([name, values]) => {
-      const attribute = geometry.attributes[name];
-      if (!attribute) {
-        geometry.setAttribute(name, new BufferAttribute(values, 1));
-        return;
-      }
-      attribute.array.set(values);
-      attribute.needsUpdate = true;
+  applyPlant({ stiffness, plant, stemBase, leafAxis }) {
+    [this.body, this.dressed].forEach(({ geometry, parents }) => {
+      [
+        ["stiffness", stiffness],
+        ["plant", plant],
+      ].forEach(([name, values]) => {
+        const carried = carry(values, parents);
+        const attribute = geometry.attributes[name];
+        if (!attribute) {
+          geometry.setAttribute(name, new BufferAttribute(carried, 1));
+          return;
+        }
+        attribute.array.set(carried);
+        attribute.needsUpdate = true;
+      });
     });
     if (!stemBase) return;
     this.uniforms.uStemBase.value.copy(stemBase);
-    const { position } = geometry.attributes;
+    const { position } = this.base.attributes;
     let reach = 0;
     for (let i = 0; i < position.count; i += 1) {
       if (plant[i] > 0.5)
@@ -1539,11 +1838,7 @@ export class Peach {
     if (this.plantPlan?.image === map.image) return;
     this.plantPlan = {
       image: map.image,
-      fit: computeStiffness(
-        this.mesh.geometry,
-        map,
-        this.uniforms.uStemY.value,
-      ),
+      fit: computeStiffness(this.base, map, this.uniforms.uStemY.value),
     };
   }
 
@@ -1553,7 +1848,116 @@ export class Peach {
     if (!plan) return;
     this.plantPlan = null;
     this.plantImage = plan.image;
-    this.applyPlant(this.mesh.geometry, plan.fit);
+    this.applyPlant(plan.fit);
+  }
+
+  // Extra vertices go where the light model shows it: the crease and the leaf curl, and the waistband while lingerie is on.
+  buildShapes(base, plant) {
+    const c = this.uniforms.uCrease.value;
+    const b = this.uniforms.uBounds.value;
+    const pos = base.attributes.position;
+    const nor = base.attributes.normal.array;
+    const bend = (i, j) =>
+      nor[i * 3] * nor[j * 3] +
+      nor[i * 3 + 1] * nor[j * 3 + 1] +
+      nor[i * 3 + 2] * nor[j * 3 + 2];
+    const mid = this.tempA;
+    const detailed = (i, j) => {
+      if ((plant[i] > 0.5 || plant[j] > 0.5) && bend(i, j) <= LEAF_BEND)
+        return true;
+      mid
+        .fromBufferAttribute(pos, i)
+        .add(this.tempB.fromBufferAttribute(pos, j))
+        .multiplyScalar(0.5);
+      const across = Math.abs(mid.dot(c) - c.w) / b.w;
+      return (
+        across < CREASE_STRIP.width &&
+        (mid.y - b.y) / b.w + 0.5 < CREASE_STRIP.top
+      );
+    };
+    this.body = refine(base, detailed);
+
+    const { slotOf, count } = positionSlots(pos);
+    const edgeOf = (i, j) =>
+      Math.min(slotOf[i], slotOf[j]) * count + Math.max(slotOf[i], slotOf[j]);
+    const edges = new Map();
+    let lengths = 0;
+    let angles = 0;
+    const index = base.index.array;
+    for (let t = 0; t < index.length; t += 3) {
+      for (let k = 0; k < 3; k += 1) {
+        const i = index[t + k];
+        const j = index[t + ((k + 1) % 3)];
+        const key = edgeOf(i, j);
+        if (!edges.has(key)) {
+          const length = mid
+            .fromBufferAttribute(pos, i)
+            .distanceTo(this.tempB.fromBufferAttribute(pos, j));
+          const angle = Math.acos(Math.min(1, Math.max(-1, bend(i, j))));
+          edges.set(key, [length, angle]);
+          lengths += length;
+          angles += angle;
+        }
+      }
+    }
+    const weight = angles / lengths;
+    this.dressed = refine(base, (i, j) => {
+      const [length, angle] = edges.get(edgeOf(i, j));
+      return detailed(i, j) || length * (angle + weight * length) > EDGE_SPLIT;
+    });
+    this.riseAttributes(base.attributes.position.count);
+  }
+
+  // The lingerie mesh can sit exactly on the body mesh's surface and light, so the swap between them blends instead of jumping.
+  riseAttributes(baseCount) {
+    const bodyNormals = this.body.geometry.attributes.normal.array;
+    const bodyMid = new Map();
+    for (let k = 0; k < this.body.parents.length; k += 2) {
+      const i = this.body.parents[k];
+      const j = this.body.parents[k + 1];
+      bodyMid.set(
+        Math.min(i, j) * baseCount + Math.max(i, j),
+        baseCount + k / 2,
+      );
+    }
+    const { geometry, parents } = this.dressed;
+    const pos = geometry.attributes.position.array;
+    const from = new Float32Array(pos.length);
+    const normal = new Float32Array(pos.length);
+    normal.set(bodyNormals.subarray(0, baseCount * 3));
+    for (let k = 0; k < parents.length; k += 2) {
+      const i = parents[k];
+      const j = parents[k + 1];
+      const v = (baseCount + k / 2) * 3;
+      const twin = bodyMid.get(Math.min(i, j) * baseCount + Math.max(i, j));
+      for (let c = 0; c < 3; c += 1) {
+        if (twin === undefined) {
+          from[v + c] = (pos[i * 3 + c] + pos[j * 3 + c]) / 2 - pos[v + c];
+          normal[v + c] = bodyNormals[i * 3 + c] + bodyNormals[j * 3 + c];
+        } else normal[v + c] = bodyNormals[twin * 3 + c];
+      }
+    }
+    geometry.setAttribute("riseFrom", new BufferAttribute(from, 3));
+    geometry.setAttribute("riseNormal", new BufferAttribute(normal, 3));
+    this.body.geometry.setAttribute(
+      "riseFrom",
+      new BufferAttribute(new Float32Array(bodyNormals.length), 3),
+    );
+    this.body.geometry.setAttribute(
+      "riseNormal",
+      new BufferAttribute(Float32Array.from(bodyNormals), 3),
+    );
+  }
+
+  useShape({ geometry }) {
+    const old = this.mesh.geometry;
+    if (old === geometry) return;
+    let root = this.group;
+    while (root.parent) root = root.parent;
+    root.traverse((node) => {
+      // eslint-disable-next-line no-param-reassign
+      if (node.geometry === old) node.geometry = geometry;
+    });
   }
 
   install(root, mesh, map) {
@@ -1565,17 +1969,24 @@ export class Peach {
     model.position.sub(box.getCenter(this.tempA));
     model.rotation.y = (PEACH_CONFIG.MODEL_ROTATION_DEGREES * Math.PI) / 180;
 
-    computeSmoothNormals(mesh.geometry);
-    // eslint-disable-next-line no-param-reassign
-    mesh.geometry = subdivide(mesh.geometry);
-    computeSmoothNormals(mesh.geometry);
-    this.findCrease(mesh.geometry);
+    this.base = mesh.geometry;
+    computeSmoothNormals(this.base);
+    this.findCrease(this.base);
     this.plantImage = map?.image;
-    this.applyPlant(
-      mesh.geometry,
-      computeStiffness(mesh.geometry, map, this.uniforms.uStemY.value),
-    );
-    computeStretch(mesh.geometry);
+    const plant = computeStiffness(this.base, map, this.uniforms.uStemY.value);
+    this.buildShapes(this.base, plant.plant);
+    this.applyPlant(plant);
+    const stretch = computeStretch(this.base, plant.plant);
+    [this.body, this.dressed].forEach(({ geometry, parents }) => {
+      geometry.setAttribute(
+        "stretch",
+        new BufferAttribute(carry(stretch, parents), 1),
+      );
+      boxesFor(geometry);
+    });
+    // eslint-disable-next-line no-param-reassign
+    mesh.geometry = this.body.geometry;
+    this.findCrease(mesh.geometry);
     const fuzz = generateFuzzNormalMap();
     this.material = new MeshPhysicalMaterial({
       map,
@@ -1644,7 +2055,6 @@ export class Peach {
     };
     mesh.material = this.material;
     mesh.raycast = raycastNearest;
-    boxesFor(mesh.geometry);
     Object.assign(mesh, {
       castShadow: true,
       receiveShadow: true,
@@ -2548,6 +2958,14 @@ export class Peach {
 
   setLingerie(on, pull, visible) {
     const shown = on && visible > 0;
+    if (this.body) {
+      this.dressedWanted = shown;
+      if (shown && this.mesh.geometry !== this.dressed.geometry) {
+        this.useShape(this.dressed);
+        this.rise = 0;
+        this.uniforms.uRise.value = 0;
+      }
+    }
     this.bows?.update(shown, pull, Math.min(1, visible));
     this.band?.update(shown, pull, Math.min(1, visible));
     if (this.fabric) this.fabric.visible = shown;
@@ -2771,6 +3189,21 @@ export class Peach {
     this.updateFabricWobble(delta);
     this.updateFabricSpring(delta);
     this.updateLeaf(delta);
+    this.updateRise(delta);
+  }
+
+  updateRise(delta) {
+    if (!this.body || this.mesh.geometry !== this.dressed.geometry) return;
+    const step = delta / RISE_SECONDS;
+    this.rise = Math.min(
+      1,
+      Math.max(0, this.rise + (this.dressedWanted ? step : -step)),
+    );
+    this.uniforms.uRise.value = this.rise * this.rise * (3 - 2 * this.rise);
+    if (!this.dressedWanted && this.rise === 0) {
+      this.useShape(this.body);
+      this.uniforms.uRise.value = 1;
+    }
   }
 
   updateFabricWobble(delta) {

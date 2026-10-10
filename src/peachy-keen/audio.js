@@ -1939,7 +1939,14 @@ function rebuildContext() {
 function unlockAudio() {
   if (stalled || ctx?.state === "closed") rebuildContext();
   const c = context();
-  if (c.state !== "running") c.resume().catch(() => {});
+  if (c.state !== "running") {
+    c.resume().catch(() => {});
+    // iOS only finishes starting its audio once a sound starts inside the touch itself.
+    const silence = c.createBufferSource();
+    silence.buffer = c.createBuffer(1, 1, c.sampleRate);
+    silence.connect(c.destination);
+    silence.start();
+  }
   loadSounds();
 }
 
