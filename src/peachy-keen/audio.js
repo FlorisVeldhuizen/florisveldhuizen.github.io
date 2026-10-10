@@ -1206,6 +1206,8 @@ const LOOP_SECONDS = LOOP_STEPS * STEP;
 const SWING = 0.18;
 const DISCO_LOOKAHEAD = 0.3;
 export const DISCO_FADE = 2.8;
+// Matches the disco lights' fade-in time constant in wild.js.
+const DISCO_RISE = 0.5;
 const DISCO_LEVEL = 0.42;
 const MUFFLE_OPEN = 20000;
 const MUFFLE_CLOSED = 220;
@@ -1803,7 +1805,8 @@ export function startDisco() {
   }
   context();
   const bus = ctx.createGain();
-  bus.gain.value = DISCO_LEVEL;
+  bus.gain.value = 0;
+  bus.gain.setTargetAtTime(DISCO_LEVEL, ctx.currentTime, DISCO_RISE);
   const muffle = ctx.createBiquadFilter();
   muffle.type = "lowpass";
   muffle.frequency.value = MUFFLE_OPEN;

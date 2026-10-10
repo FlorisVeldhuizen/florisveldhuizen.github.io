@@ -1308,7 +1308,7 @@ export class Interaction {
       this.peach.setLingerie(false, 0, 0);
       return;
     }
-    if (g.worn && g.dressing) this.updateDressing(delta);
+    if (g.worn && g.dressing && !this.holdStill) this.updateDressing(delta);
     const steps = Math.ceil(delta / PHYSICS_CONFIG.SUBSTEP);
     const h = delta / steps;
     for (let i = 0; i < steps; i += 1) {

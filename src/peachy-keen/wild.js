@@ -177,6 +177,7 @@ class Disco {
       return light;
     });
     this.on = false;
+    this.waiting = false;
     this.fade = 0;
     this.amount = 0;
     this.weight = 0;
@@ -188,16 +189,23 @@ class Disco {
 
   set(on) {
     this.on = on;
-    if (on) startDisco();
-    else stopDisco();
+    if (!on) stopDisco();
+    else if (!this.i.holdStill) startDisco();
   }
 
   update(dt) {
     const { i } = this;
-    if (this.on) this.fade += (1 - this.fade) * (1 - Math.exp(-dt * 2));
+    // While loading, the peach on screen is still the flat picture.
+    const on = this.on && !i.holdStill;
+    if (this.on && i.holdStill) this.waiting = true;
+    else if (this.waiting) {
+      this.waiting = false;
+      if (this.on) startDisco();
+    }
+    if (on) this.fade += (1 - this.fade) * (1 - Math.exp(-dt * 2));
     else this.fade = Math.max(0, this.fade - dt / DISCO_FADE);
     this.amount = this.fade * this.fade * (3 - 2 * this.fade);
-    if (!this.on && !this.fade) {
+    if (!on && !this.fade) {
       if (this.mirror.holder.visible) {
         this.lights.forEach((l) => {
           // eslint-disable-next-line no-param-reassign
@@ -221,7 +229,7 @@ class Disco {
     pink.intensity = this.amount * (22 + kick * 40);
     cyan.intensity = this.amount * (22 + (1 - kick) * 30);
     spot.intensity = this.amount * kick * 10;
-    this.updateBall(dt, beat, kick);
+    this.updateBall(dt, beat, kick, on);
 
     const free =
       i.phase === "live" &&
@@ -232,8 +240,8 @@ class Disco {
     if (index !== this.lastBeat && index >= 0) {
       this.lastBeat = index;
       if (index % 16 === 15)
-        this.spinning = this.on && this.weight > 0.95 && !i.grab;
-      if (free && this.on) this.hit(index);
+        this.spinning = on && this.weight > 0.95 && !i.grab;
+      if (free && on) this.hit(index);
     }
     const move = choreography(beat, this.move);
     const w = this.weight * this.amount;
@@ -243,13 +251,12 @@ class Disco {
     i.pose.yaw = this.spinning && beat % 16 >= 15 ? move.yaw : move.yaw * w;
   }
 
-  updateBall(dt, beat, kick) {
+  updateBall(dt, beat, kick, on) {
     const { holder, ball, glints } = this.mirror;
     const cam = this.camera;
     holder.visible = true;
     this.dropVelocity +=
-      (((this.on ? 0 : 1 - this.amount) - this.drop) * 60 -
-        this.dropVelocity * 7) *
+      (((on ? 0 : 1 - this.amount) - this.drop) * 60 - this.dropVelocity * 7) *
       dt;
     this.drop += this.dropVelocity * dt;
     const depth = cam.userData.baseZ - BALL_DEPTH;
