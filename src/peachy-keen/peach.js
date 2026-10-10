@@ -8,6 +8,7 @@ import {
   CanvasTexture,
   Vector3,
   Vector4,
+  Matrix3,
   Matrix4,
   Box3,
   Color,
@@ -60,6 +61,12 @@ const STRETCH_SOFT = 0.0185;
 const CREASE_STRIP = { width: 0.07, top: 0.62 };
 const LEAF_BEND = Math.cos((32 * Math.PI) / 180);
 const RISE_SECONDS = 0.4;
+// Flesh near the stem holds still like a real stem cavity; distances are fractions of the peach height.
+const STEM_FIRM = { hold: 0.75, inner: 0.08, outer: 0.22 };
+// Stalk vertices carry this plant value; the stalk keeps its shape where the leaf bends and squashes.
+const STALK = 2;
+// Where the stalk leaves the skin, as a fraction of the peach height above the stem base.
+const STALK_COLLAR = 0.07;
 // Tuned to give the lingerie mesh about 19,000 vertices, enough for the waistband's pull.
 const EDGE_SPLIT = 0.006088;
 const LEAF = {
@@ -255,6 +262,8 @@ const VERTEX_HEADER = `
   uniform vec3 uStemBase;
   uniform vec3 uLeafBend;
   uniform vec4 uLeafAxis;
+  uniform mat3 uStemFrame;
+  uniform mat3 uStemFrameNormal;
   vec3 turnBy(vec3 v, vec3 th) {
     float a = length(th);
     if (a < 1e-5) return v;
@@ -469,11 +478,12 @@ const VERTEX_NORMAL = `
   if (plant > 0.5) {
     vec3 rel = restPosition - uStemBase;
     float reach = length(rel) / uBounds.w;
-    float w = pow(smoothstep(0.1, 0.62, reach), 1.4);
+    float w = pow(smoothstep(0.1, 0.62, reach), 1.4) * step(plant, ${STALK - 0.5});
     vec3 th = uLeafBend * w + uLeafAxis.xyz * sin(uTime * 9.0 + reach * 14.0) * 0.05 * uLeafAxis.w * w;
-    vec3 follow = uJiggleActive > 0.5 ? jiggle(uStemBase, vec3(0.0, 1.0, 0.0)) : vec3(0.0);
-    jiggled = uStemBase + turnBy(rel, th) + follow;
-    objectNormal = turnBy(restNormal, th);
+    vec3 follow = uJiggleActive > 0.5 ? jiggle(uStemBase, vec3(0.0, 1.0, 0.0)) * ${(1 - STEM_FIRM.hold).toFixed(2)} : vec3(0.0);
+    vec3 collar = vec3(0.0, uBounds.w * ${STALK_COLLAR}, 0.0);
+    jiggled = uStemBase + collar + uStemFrame * (turnBy(rel, th) - collar) + follow;
+    objectNormal = normalize(uStemFrameNormal * turnBy(restNormal, th));
   }
   vRubTilt = vec4(0.0);
   if (uGrabPull.w > 0.0) {
@@ -1505,6 +1515,46 @@ function computeStretch(geometry, plant) {
   return stretch;
 }
 
+// The stalk and its cut end are the plant islands that reach no further from the stem base than the island rooted at it.
+function tagStalk(geometry, plant, stemBase, floorY) {
+  const pos = geometry.attributes.position;
+  const index = geometry.index.array;
+  const island = new Uint32Array(pos.count).map((_, i) => i);
+  const root = (i) => {
+    let r = i;
+    while (island[r] !== r) {
+      island[r] = island[island[r]];
+      r = island[r];
+    }
+    return r;
+  };
+  for (let t = 0; t < index.length; t += 3) {
+    const a = root(index[t]);
+    island[root(index[t + 1])] = a;
+    island[root(index[t + 2])] = a;
+  }
+  const far = new Map();
+  const rooted = new Set();
+  for (let i = 0; i < pos.count; i += 1) {
+    if (plant[i]) {
+      const r = root(i);
+      const d = stemBase.distanceTo(new Vector3().fromBufferAttribute(pos, i));
+      far.set(r, Math.max(far.get(r) ?? 0, d));
+      if (pos.getY(i) < floorY) rooted.add(r);
+    }
+  }
+  let stalkReach = 0;
+  rooted.forEach((r) => {
+    stalkReach = Math.max(stalkReach, far.get(r));
+  });
+  for (let i = 0; i < pos.count; i += 1) {
+    if (plant[i] && far.get(root(i)) <= stalkReach * 1.08) {
+      // eslint-disable-next-line no-param-reassign
+      plant[i] = STALK;
+    }
+  }
+}
+
 function computeStiffness(geometry, map, stemY) {
   const pos = geometry.attributes.position;
   const { uv } = geometry.attributes;
@@ -1537,20 +1587,28 @@ function computeStiffness(geometry, map, stemY) {
       island[root(index[t + 2])] = a;
     }
     const plant = new Map();
+    let lowest = Infinity;
+    let highest = -Infinity;
+    for (let i = 0; i < pos.count; i += 1) {
+      lowest = Math.min(lowest, pos.getY(i));
+      highest = Math.max(highest, pos.getY(i));
+    }
     for (let i = 0; i < pos.count; i += 1) {
       const [r, g, b] = sample(uv.getX(i), uv.getY(i));
       const dark = Math.max(r, g, b) < 0.5;
       const leaf = g - r > 0.07 || (dark && g >= 0.6 * r);
       const stem = dark && pos.getY(i) > stemY;
-      const tally = plant.get(root(i)) || [0, 0];
+      const tally = plant.get(root(i)) || [0, 0, -Infinity];
       tally[0] += leaf || stem ? 1 : 0;
       tally[1] += 1;
+      tally[2] = Math.max(tally[2], pos.getY(i));
       plant.set(root(i), tally);
     }
-    // The leaf underside is dark red like the crease, so rigidity follows the leaf's UV island.
+    // Rigidity follows the leaf's UV island (its underside is dark red); low islands only pass on the blurry preview.
+    const middle = (lowest + highest) / 2;
     for (let i = 0; i < pos.count; i += 1) {
-      const [hits, total] = plant.get(root(i));
-      if (hits >= total * 0.3) base[slotOf[i]] = 1;
+      const [hits, total, top] = plant.get(root(i));
+      if (hits >= total * 0.3 && top > middle) base[slotOf[i]] = 1;
     }
   }
 
@@ -1608,6 +1666,30 @@ function computeStiffness(geometry, map, stemY) {
   }
   if (!count) return fit;
   stemBase.divideScalar(count);
+  geometry.computeBoundingBox();
+  const size = geometry.boundingBox.max.y - geometry.boundingBox.min.y;
+  for (let i = 0; i < pos.count; i += 1) {
+    if (!plant[i]) {
+      const d =
+        Math.hypot(
+          pos.getX(i) - stemBase.x,
+          pos.getY(i) - stemBase.y,
+          pos.getZ(i) - stemBase.z,
+        ) / size;
+      const t = Math.min(
+        1,
+        Math.max(
+          0,
+          (d - STEM_FIRM.inner) / (STEM_FIRM.outer - STEM_FIRM.inner),
+        ),
+      );
+      stiffness[i] = Math.max(
+        stiffness[i],
+        STEM_FIRM.hold * (1 - t * t * (3 - 2 * t)),
+      );
+    }
+  }
+  tagStalk(geometry, plant, stemBase, floor + 0.01 * (rim - floor));
   const reach = 0.3 * (rim - floor);
   const leafCenter = new Vector3();
   let leafCount = 0;
@@ -1727,6 +1809,8 @@ export class Peach {
     this.uniforms.uStemBase = { value: new Vector3(0, 1e4, 0) };
     this.uniforms.uLeafBend = { value: new Vector3() };
     this.uniforms.uLeafAxis = { value: new Vector4(1, 0, 0, 0) };
+    this.uniforms.uStemFrame = { value: new Matrix3() };
+    this.uniforms.uStemFrameNormal = { value: new Matrix3() };
     this.inverseWorld = new Matrix4();
     this.tempA = new Vector3();
     this.tempB = new Vector3();
@@ -2087,9 +2171,9 @@ export class Peach {
         .replace("#include <colorspace_fragment>", MARKER_FRAGMENT);
       /* eslint-enable no-param-reassign */
     };
-    mesh.material = this.material;
-    mesh.raycast = raycastNearest;
     Object.assign(mesh, {
+      material: this.material,
+      raycast: raycastNearest,
       castShadow: true,
       receiveShadow: true,
       customDepthMaterial: this.depthMaterial(this.uniforms),
@@ -3100,6 +3184,40 @@ export class Peach {
     this.leaf.free = 1;
   }
 
+  // Cancels the uneven part of the squash, so the stalk keeps its shape.
+  updateStemFrame() {
+    this.stemFrame ??= {
+      m4: new Matrix4(),
+      inGroup: new Matrix3(),
+      even: new Matrix3(),
+    };
+    const F = this.stemFrame;
+    const { scale, matrixWorld } = this.group;
+    const mean = Math.cbrt(Math.abs(scale.x * scale.y * scale.z)) || 1;
+    F.inGroup.setFromMatrix4(
+      F.m4.copy(matrixWorld).invert().multiply(this.mesh.matrixWorld),
+    );
+    const { uStemFrame, uStemFrameNormal } = this.uniforms;
+    uStemFrame.value
+      .copy(F.inGroup)
+      .invert()
+      .multiply(
+        F.even.set(
+          mean / scale.x,
+          0,
+          0,
+          0,
+          mean / scale.y,
+          0,
+          0,
+          0,
+          mean / scale.z,
+        ),
+      )
+      .multiply(F.inGroup);
+    uStemFrameNormal.value.copy(uStemFrame.value).invert().transpose();
+  }
+
   updateLeaf(delta) {
     if (!this.mesh || delta <= 0) return;
     // The intro stills show the leaf without breeze, so it follows the sway hold.
@@ -3125,6 +3243,7 @@ export class Peach {
     const L = this.leaf;
     const { uStemBase, uLeafBend, uLeafAxis, uBounds } = this.uniforms;
     this.mesh.updateWorldMatrix(true, false);
+    this.updateStemFrame();
     const anchor = L.a
       .copy(uStemBase.value)
       .applyMatrix4(this.mesh.matrixWorld);

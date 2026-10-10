@@ -24,10 +24,13 @@ const POSES = {
 };
 
 const VERTEX = `
+  attribute float plant;
   varying vec3 vN;
   varying vec2 vUv;
+  varying float vPlant;
   void main() {
     vUv = uv;
+    vPlant = plant;
     vN = normalize(normalMatrix * normal);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
@@ -38,10 +41,11 @@ const FRAGMENT = `
   uniform float uRaw;
   varying vec3 vN;
   varying vec2 vUv;
+  varying float vPlant;
   void main() {
     vec4 t = texture2D(map, vUv);
     vec3 base = mix(t.rgb, pow(t.rgb, vec3(2.2)), uRaw);
-    float leaf = smoothstep(0.02, 0.12, base.g - base.r);
+    float leaf = max(smoothstep(0.02, 0.12, base.g - base.r), step(0.5, vPlant));
     vec3 n = normalize(vN) * (gl_FrontFacing ? 1.0 : -1.0);
     vec3 L = normalize(vec3(-0.5, 0.62, 0.62));
     float wrap = clamp((dot(n, L) + 0.45) / 1.45, 0.0, 1.0);
