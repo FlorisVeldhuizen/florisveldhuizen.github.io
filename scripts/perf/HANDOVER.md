@@ -69,7 +69,7 @@ The peach is about 90% of the room's GPU time (its skin fragment shader). Cheap 
 
 ## Open ideas, most promising first
 
-0. Peach vertex count and vertex work: see `PEACH-VERTEX-PLAN.md`.
+0. Peach vertex count and vertex work: done on 2026-10-10, see `PEACH-VERTEX-PLAN.md` for what changed and what to check.
 
 1. All-helpers room (5.4 ms): spread over three.js scene upkeep. `updateMatrixWorld` walks about 400 objects, 165 inside hidden groups. Skipping hidden subtrees is risky: code reads world matrices of hidden objects.
 2. One-time stutters when a helper is bought mid-game (owned helpers are now prepared at load): the first Moon costs one 100 ms frame at 4x CPU (`usePeachShape` in `sky.js`), the first Fractal 67 to 83 ms. Other helpers stay under 50 ms.
