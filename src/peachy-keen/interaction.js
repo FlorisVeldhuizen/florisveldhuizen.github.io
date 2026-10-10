@@ -2164,7 +2164,12 @@ export class Interaction {
     const p = this.pointer;
     const held =
       !this.carrying &&
-      (this.grab || this.recoil || (p.pressed && p.downOnPeach && !p.rubbing));
+      (this.grab ||
+        this.recoil ||
+        (p.pressed &&
+          p.downOnPeach &&
+          !p.rubbing &&
+          this.toolName !== "coins"));
     // Holding still eases the sway back to the rest pose; letting go grows it again over two seconds.
     this.swayWake = this.holdStill
       ? Math.max(0, this.swayWake - delta / 0.4)
