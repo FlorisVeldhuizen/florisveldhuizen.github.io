@@ -24,6 +24,13 @@ const SWAY_HZ = 0.6;
 const SETTLE = 0.15;
 const PUSH = 1.5 * 0.055;
 const SUB = 1 / 240;
+// A slow push on the three longest waves, a little off their own pace, so the surface never settles flat.
+const AMBIENT = [0, 0.09, 0.12, 0.12];
+const AMBIENT_PACE = [0, 0.9, 0.75, 0.7];
+// When loading reports nothing for a while, the peach keeps sipping a little ahead, never more than a share of what is left.
+const SIP_AFTER = 1.2;
+const SIP_RATE = 0.02;
+const SIP_MAX = 0.08;
 const FEATHER = [
   [4.5, 0.12],
   [3, 0.3],
@@ -129,6 +136,8 @@ export default class Gulp {
     this.velocity = 0;
     this.target = 0;
     this.loaded = 0;
+    this.real = 0;
+    this.progressAt = 0;
     this.pendingJump = 0;
     this.gulpTarget = 0;
     this.gulpJump = 0;
@@ -224,6 +233,11 @@ export default class Gulp {
         -omega * omega * this.modes[n] - 2 * zeta * omega * this.modeVel[n];
       if (n === 2) force += COUPLE * this.squashAcc;
       if (n === 1) force += COUPLE * 0.4 * this.side * this.squashAcc;
+      if (n < AMBIENT.length)
+        force +=
+          AMBIENT[n] *
+          (1 - this.shown ** 8) *
+          Math.sin(omega * AMBIENT_PACE[n] * this.clock + n * 1.7);
       this.modeVel[n] += force * dt;
       this.modes[n] += this.modeVel[n] * dt;
     }
@@ -249,12 +263,22 @@ export default class Gulp {
   step(delta, loaded) {
     if (!this.ready || delta <= 0) return;
     this.clock += delta;
-    if (loaded > this.loaded) {
-      this.pendingJump += loaded - this.loaded;
-      this.loaded = loaded;
+    if (loaded > this.real) {
+      this.real = loaded;
+      this.progressAt = this.clock;
+    }
+    const waiting = this.clock - this.progressAt - SIP_AFTER;
+    const sip =
+      waiting > 0
+        ? Math.min(SIP_RATE * waiting, SIP_MAX, (1 - this.real) * 0.3)
+        : 0;
+    if (this.real + sip > this.loaded) {
+      this.pendingJump += this.real + sip - this.loaded;
+      this.loaded = this.real + sip;
     }
     if (this.pendingJump > 0.0005 && this.clock - this.lastGulp >= GULP_GAP) {
-      const kick = (0.3 + this.pendingJump * 1.1) * this.calm;
+      const jump = this.pendingJump;
+      const kick = (0.3 * Math.min(1, jump / 0.04) + jump * 1.1) * this.calm;
       this.squashVel -= kick * 0.3;
       this.squashAt = this.clock + STRETCH_SECONDS;
       this.squashKick = kick;
@@ -362,13 +386,11 @@ export default class Gulp {
     layer.globalAlpha = 1;
     layer.globalCompositeOperation = "source-in";
     layer.drawImage(this.body, 0, 0, S, S);
-    // A touch lighter just under the surface and deeper at the bottom, so it reads as liquid.
+    // A touch deeper towards the bottom, so it reads as liquid.
     layer.globalCompositeOperation = "source-atop";
     const top = this.surfaceY(S / 2, time);
     const bottom = RENDER_BOTTOM * S;
     const shade = layer.createLinearGradient(0, top - 10, 0, bottom);
-    shade.addColorStop(0, "rgba(255, 226, 205, 0.2)");
-    shade.addColorStop(0.12, "rgba(255, 226, 205, 0)");
     shade.addColorStop(0.6, "rgba(120, 20, 50, 0)");
     shade.addColorStop(1, "rgba(120, 20, 50, 0.16)");
     layer.fillStyle = shade;

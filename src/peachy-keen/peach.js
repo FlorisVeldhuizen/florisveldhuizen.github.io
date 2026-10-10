@@ -966,8 +966,7 @@ const FRAGMENT_COLOR = `
     float leafUnripe = uLeafRipe >= 1.0 ? 0.0 : smoothstep(leafFront - 0.02, leafFront + 0.02, length(fromStem) / uLeafReach + leafWave);
     unripe = mix(unripe, leafUnripe, leafPart);
     float juice = (1.0 - unripe) * (1.0 - leafPart) * (1.0 - smoothstep(1.0, 1.15, uRipe));
-    vec3 ripeColour = mix(diffuseColor.rgb, vec3(1.0, 0.886, 0.804), juice * 0.2 * (1.0 - smoothstep(0.0, 0.07, below)));
-    ripeColour = mix(ripeColour, vec3(0.47, 0.078, 0.196), juice * 0.16 * (1.0 - smoothstep(0.0, 0.45, ripeHeight)));
+    vec3 ripeColour = mix(diffuseColor.rgb, vec3(0.47, 0.078, 0.196), juice * 0.16 * (1.0 - smoothstep(0.0, 0.45, ripeHeight)));
     float unripeGray = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
     diffuseColor.rgb = mix(ripeColour, vec3(unripeGray) * vec3(0.5, 0.42, 0.58) * 0.55, unripe);
   }

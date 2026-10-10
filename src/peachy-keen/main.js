@@ -28,13 +28,12 @@ import IntroTitle from "./intro-title";
 import JiggleText from "./jiggle-text";
 import slideToggle from "./slide-toggle";
 import Gulp from "./fill-wave";
-import IntroGlow from "./intro-glow";
 
 const MODE_KEY = "peachy-keen-mode";
 const MODES = ["idle", "free"];
 const SHAPE_FADE_MS = 350;
 // Each step's share of the fill: shape download, skin download, building and warming the scene, building the helpers.
-const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.25, helpers: 0.1 };
+const LOAD_SHARE = { shape: 0.25, skin: 0.15, prepare: 0.45, helpers: 0.15 };
 const LOADING_WORDS = {
   shape: [
     "Ripening",
@@ -252,6 +251,12 @@ const loadedShare = () =>
     (sum, k) => sum + LOAD_SHARE[k] * loaded[k],
     0,
   );
+// Sent straight to the worker, so progress made between frozen frames still reaches the still.
+const setLoaded = (key, fraction) => {
+  loaded[key] = fraction;
+  // eslint-disable-next-line no-use-before-define
+  fillWorker?.postMessage({ target: loadedShare() });
+};
 const fill = {
   shown: 0,
   velocity: 0,
@@ -417,22 +422,13 @@ function showRipeness(delta) {
   if (fill.shown >= 1) onRipe?.();
 }
 
-const aura = new IntroGlow(scene, camera, viewHeight);
-aura.load();
 let fullAt = null;
 let ripeAt = null;
 let leafKicked = false;
-// Runs every frame, so the leaf and the aura finish even after the tap.
+// Runs every frame, so the leaf finishes even after the tap.
 function finishRipening() {
   const now = performance.now();
-  if (fill.full && fullAt === null) {
-    fullAt = now;
-    aura.place(
-      introShape.getBoundingClientRect(),
-      group,
-      peach.uniforms.uBounds.value.w * peach.worldScale(),
-    );
-  }
+  if (fill.full && fullAt === null) fullAt = now;
   if (fill.shown >= 1 && ripeAt === null) ripeAt = now;
   const { uniforms } = peach;
   if (ripeAt !== null)
@@ -444,10 +440,6 @@ function finishRipening() {
     leafKicked = true;
     peach.kickLeaf(2.2 * calm);
   }
-  aura.update(
-    fullAt === null ? -1 : (now - fullAt - LEAF_FILL_MS) / 1000,
-    group,
-  );
 }
 peach.uniforms.uLeafRipe.value = 0;
 
@@ -542,6 +534,7 @@ const showLitGroups = () => {
   );
 };
 
+let onWarmed = null;
 async function warmLights(shown) {
   showLights(shown);
   renderer.shadowMap.enabled = true;
@@ -564,6 +557,7 @@ async function warmLights(shown) {
   drawEverything();
   warmedLights.add(lightIndex(shown));
   boot.progress();
+  onWarmed?.();
 }
 
 async function warm(extra = warmExtra) {
@@ -614,8 +608,17 @@ async function prepareIdle() {
   naughty.set("achievements", false);
   lightGroups[2].push(idle.glow);
   idle.prepare();
+  setLoaded("prepare", 0.1);
+  // Each light state compiles twice, plain and with the shop's fade; reporting each one keeps the gulps coming.
+  const compiles = 2 * (3 + idle.lightStates().length);
+  let compiled = 0;
+  onWarmed = () => {
+    compiled += 1;
+    setLoaded("prepare", Math.min(0.95, 0.1 + (0.85 * compiled) / compiles));
+  };
   await warm(idle.lightStates());
   await idle.warmFade(warm);
+  onWarmed = null;
   idle.ready();
 }
 
@@ -680,18 +683,18 @@ intro.addEventListener("click", (e) => {
 });
 
 const skinImage = Peach.fetchSkin((fraction) => {
-  loaded.skin = fraction;
+  setLoaded("skin", fraction);
 });
 peach
   .load((fraction) => {
-    loaded.shape = fraction;
+    setLoaded("shape", fraction);
   })
   .then(async () => {
-    loaded.shape = 1;
+    setLoaded("shape", 1);
     interaction.prepareHalves();
     idleReady = prepareIdle();
     await idleReady;
-    loaded.prepare = 1;
+    setLoaded("prepare", 1);
     group.visible = true;
     intro.classList.add("has-shape");
     sayWords(LOADING_WORDS.ripen);
@@ -706,11 +709,11 @@ peach
     });
     peach.applySkin(await skinImage);
     peach.planPlant();
-    loaded.skin = 1;
+    setLoaded("skin", 1);
     // Helpers bake from the full skin, so they build during the ripening fill; the tap waits for them.
     const settled = idle
       .settle((fraction) => {
-        loaded.helpers = fraction;
+        setLoaded("helpers", fraction);
       })
       .then(drawEverything);
     await ripe;
