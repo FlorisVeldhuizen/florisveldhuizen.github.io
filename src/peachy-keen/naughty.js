@@ -1,5 +1,6 @@
 import { playDing, playHeartbeat } from "./audio";
 import { reducedMotion } from "./util";
+import { calmIn, whenCalm } from "./calm";
 
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
@@ -98,6 +99,7 @@ class Achievements {
     } catch {
       // Storage can be blocked; unlocks then last for this visit only.
     }
+    if (!this.queue.length) this.since = performance.now();
     this.queue.push(id);
     this.next();
   }
@@ -105,11 +107,26 @@ class Achievements {
   next() {
     if (this.busy || !this.queue.length) return;
     this.busy = true;
-    const [title, text] = ACHIEVEMENTS[this.queue.shift()];
+    if (calmIn(this.since) > 0) {
+      whenCalm(this.since, () => {
+        this.busy = false;
+        this.next();
+      });
+      return;
+    }
+    const [[title, text], ...rest] = this.queue
+      .splice(0)
+      .map((id) => ACHIEVEMENTS[id]);
+    const others =
+      rest.length > 3
+        ? `and ${rest.length} more`
+        : `and ${rest.map(([name]) => name).join(", ")}`;
     this.el.replaceChildren();
-    element("small", "", this.el).textContent = "Achievement unlocked";
+    element("small", "", this.el).textContent = rest.length
+      ? `${rest.length + 1} achievements unlocked`
+      : "Achievement unlocked";
     element("strong", "", this.el).textContent = title;
-    element("span", "", this.el).textContent = text;
+    element("span", "", this.el).textContent = rest.length ? others : text;
     playDing();
     animate(
       this.el,

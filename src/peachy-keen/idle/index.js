@@ -20,6 +20,7 @@ import { bottleEarned, rubLearned } from "./data/cravings";
 import { TREE_BY_ID } from "./data/tree";
 import { format } from "./numbers";
 import { playDing, playBuy, playNotes } from "../audio";
+import { whenCalm } from "../calm";
 import { PHYSICS_CONFIG } from "../config";
 import { clamp, reducedMotion } from "../util";
 import { warmsSettled } from "./scenery/extras/kit";
@@ -191,9 +192,11 @@ export function createIdle({
   game.on("trophy", (t) => {
     trophies.push(t);
     if (trophies.length > 1) return;
-    setTimeout(() => {
+    const since = performance.now();
+    const show = () => {
       const [first, ...rest] = trophies;
       trophies = [];
+      const options = { sound: playDing, since };
       if (rest.length)
         popups.toast(
           `${rest.length + 1} trophies`,
@@ -201,14 +204,17 @@ export function createIdle({
           rest.length > 3
             ? `and ${rest.length} more`
             : `and ${rest.map((r) => r.name).join(", ")}`,
+          "trophy",
+          options,
         );
-      else popups.toast("Trophy", first.name, first.about);
-      playDing();
-    }, 60);
+      else popups.toast("Trophy", first.name, first.about, "trophy", options);
+    };
+    setTimeout(() => whenCalm(since, show), 60);
   });
   game.on("discover", (seed) => {
-    popups.toast("New tree", seed.name, seed.about, "seed");
-    playNotes([659, 880, 1109], { gap: 0.09, volume: 0.06 });
+    popups.toast("New tree", seed.name, seed.about, "seed", {
+      sound: () => playNotes([659, 880, 1109], { gap: 0.09, volume: 0.06 }),
+    });
   });
   game.on("harvest", () => playNotes([523, 784], { gap: 0.06, volume: 0.06 }));
   game.on("butterflies", () => {

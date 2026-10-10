@@ -2,6 +2,7 @@ import { el, animate } from "./dom";
 import { iconSvg } from "./icons";
 import { format } from "./numbers";
 import { reducedMotion } from "../util";
+import { calmIn, whenCalm } from "../calm";
 
 const POP_GAP_MS = 70;
 const TOAST_MS = 4000;
@@ -81,15 +82,32 @@ export class Popups {
     ).finished.then(() => box.remove());
   }
 
-  toast(kicker, title, text, kind = "trophy") {
-    this.waiting.push([kicker, title, text, kind]);
+  toast(
+    kicker,
+    title,
+    text,
+    kind = "trophy",
+    { sound, since = performance.now() } = {},
+  ) {
+    this.waiting.push({ kicker, title, text, kind, sound, since });
     if (this.waiting.length > TOAST_QUEUE) this.waiting.shift();
     this.next();
   }
 
   next() {
-    if (this.showing || this.modal.open || !this.waiting.length) return;
-    const [kicker, title, text, kind] = this.waiting.shift();
+    if (this.showing || this.calming || this.modal.open || !this.waiting.length)
+      return;
+    const { since } = this.waiting[0];
+    if (calmIn(since) > 0) {
+      this.calming = true;
+      whenCalm(since, () => {
+        this.calming = false;
+        this.next();
+      });
+      return;
+    }
+    const { kicker, title, text, kind, sound } = this.waiting.shift();
+    sound?.();
     this.showing = true;
     const box = el("div", `ui toast-card is-${kind}`, this.toasts);
     el("small", "", box).textContent = kicker;
