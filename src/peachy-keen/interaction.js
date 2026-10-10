@@ -495,8 +495,8 @@ export class Interaction {
   }
 
   snapOn() {
-    this.wobbleAll(0.08);
-    this.squashVelocity.x += 1.24;
+    this.wobbleAll(0.05);
+    this.squashVelocity.x += 0.8;
     this.squashAxis.set(0, 1);
     playSettle();
     buzz(22);
