@@ -3478,3 +3478,62 @@ body.is-dnd:not(.is-shopping) .free-toys {
     transition: opacity 0.2s ease;
   }
 }
+
+.credits summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.credits summary::-webkit-details-marker {
+  display: none;
+}
+
+.credits summary::after {
+  content: "Show";
+  min-width: 52px;
+  padding: 3px 12px;
+  border: 1px solid var(--blush-faint);
+  border-radius: 999px;
+  color: var(--blush-dim);
+  font-size: 14px;
+  text-align: center;
+}
+
+.credits[open] summary::after {
+  content: "Hide";
+}
+
+.credits-list {
+  grid-template-columns: max-content 1fr;
+  gap: 0;
+  margin: 12px 0 10px;
+}
+
+.credits-list dt,
+.credits-list dd {
+  padding: 7px 0;
+  border-top: 1px solid var(--blush-faint);
+}
+
+.credits-list dt {
+  padding-right: 16px;
+}
+
+.credits-list dd {
+  text-align: left;
+}
+
+.credits-list a {
+  color: inherit;
+  text-decoration-color: var(--blush-faint);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.credits .shop-note {
+  font-size: 13.5px;
+}

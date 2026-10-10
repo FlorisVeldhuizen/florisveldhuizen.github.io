@@ -1,4 +1,5 @@
 import { el, setText } from "../dom";
+import { FREESOUND_CREDITS, OWN_SOUNDS } from "../data/credits";
 import { HELPERS } from "../data/helpers";
 import { SKIN_NAMES } from "../skins";
 
@@ -49,6 +50,33 @@ function switchRow(parent, label, read, write) {
       b.textContent = read() ? "On" : "Off";
     },
   };
+}
+
+function credits(root) {
+  el("h3", "shop-title", root, "Credits");
+  const box = el("details", "credits", root);
+  el("summary", "", box).textContent = "Sounds";
+  const list = el("dl", "stats credits-list", box);
+  const row = (label) => {
+    el("dt", "", list).textContent = label;
+    return el("dd", "", list);
+  };
+  OWN_SOUNDS.forEach((label) => {
+    row(label).textContent = "rayquinox";
+  });
+  FREESOUND_CREDITS.forEach(([label, sources]) => {
+    const dd = row(label);
+    sources.forEach(([name, id, account = name], n) => {
+      if (n) dd.append(", ");
+      const a = el("a", "", dd);
+      a.href = `https://freesound.org/people/${account}/sounds/${id}/`;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = name;
+    });
+  });
+  el("p", "shop-note", box).textContent =
+    "Linked recordings come from Freesound and are public domain (CC0).";
 }
 
 export class OptionsView {
@@ -143,6 +171,7 @@ export class OptionsView {
         onYes: () => game.hardReset(),
       }),
     );
+    credits(root);
     if (import.meta.env.DEV) this.buildDev(root);
     this.sync();
   }
