@@ -342,10 +342,116 @@
         <p id="intro-status" class="intro-status" aria-live="polite">
           Ripening
         </p>
+        <div id="intro-help" class="intro-help" hidden>
+          <p id="intro-help-text"></p>
+          <button type="button" id="intro-retry">Try again</button>
+        </div>
       </div>
       <p class="intro-copyright">© 2026 Maanraket. All rights reserved.</p>
     </div>
 
+    <script>
+      // A classic script, so a game bundle that never arrives or never starts still gets a way out.
+      (() => {
+        const SLOW_MS = 20000;
+        const intro = document.getElementById("intro");
+        const status = document.getElementById("intro-status");
+        const help = document.getElementById("intro-help");
+        const helpText = document.getElementById("intro-help-text");
+        const retry = document.getElementById("intro-retry");
+        const offline = () => navigator.onLine === false;
+        let booted = false;
+        let done = false;
+        let failed = false;
+        let timer = 0;
+        const showHelp = (text, canRetry = true) => {
+          helpText.textContent = text;
+          retry.hidden = !canRetry;
+          help.hidden = false;
+          intro.classList.add("has-fonts");
+        };
+        const wait = () => {
+          clearTimeout(timer);
+          timer = setTimeout(
+            () =>
+              showHelp(
+                offline()
+                  ? "Waiting for a connection."
+                  : "This is taking longer than usual.",
+              ),
+            SLOW_MS,
+          );
+        };
+        retry.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          retry.disabled = true;
+          // A broken file in the offline cache would come back on reload.
+          if (failed && !offline() && window.caches) {
+            try {
+              const names = await caches.keys();
+              await Promise.all(
+                names
+                  .filter((n) => n.startsWith("peachy-keen"))
+                  .map((n) => caches.delete(n)),
+              );
+            } catch {}
+          }
+          location.reload();
+        });
+        window.peachyBoot = {
+          get failed() {
+            return failed;
+          },
+          booted() {
+            booted = true;
+          },
+          progress() {
+            if (done || failed) return;
+            help.hidden = true;
+            wait();
+          },
+          ready() {
+            done = true;
+            clearTimeout(timer);
+            help.hidden = true;
+          },
+          fail(graphics = false) {
+            if (done || failed) return;
+            failed = true;
+            clearTimeout(timer);
+            intro.classList.add("is-stuck");
+            if (graphics) {
+              status.textContent = "This browser can't draw the peach.";
+              showHelp(
+                "Try another browser, or turn on hardware acceleration.",
+                false,
+              );
+            } else if (offline()) {
+              status.textContent = "No connection.";
+              showHelp(
+                "The peach needs the internet to load. Nothing is lost.",
+              );
+            } else {
+              status.textContent = "This peach didn't ripen.";
+              showHelp("Nothing is lost. Try again for a fresh one.");
+            }
+          },
+        };
+        addEventListener("error", (e) => {
+          if (!booted) peachyBoot.fail(/WebGL/.test(e.message));
+        });
+        // A script that fails to download fires its error only on the element, so listen in the capture phase.
+        addEventListener(
+          "error",
+          (e) => {
+            if (!booted && e.target instanceof HTMLScriptElement)
+              peachyBoot.fail();
+          },
+          true,
+        );
+        wait();
+      })();
+    </script>
     <script type="module" src="main.js"></script>
   </body>
 </html>

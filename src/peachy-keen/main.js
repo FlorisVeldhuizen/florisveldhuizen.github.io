@@ -34,6 +34,25 @@ const MODES = ["idle", "free"];
 const SHAPE_FADE_MS = 350;
 // Each step's share of the fill: shape download, skin download, building and warming the scene, building the helpers.
 const LOAD_SHARE = { shape: 0.4, skin: 0.25, prepare: 0.25, helpers: 0.1 };
+const LOADING_WORDS = {
+  shape: [
+    "Ripening",
+    "Picking the ripest one",
+    "Brushing the fuzz",
+    "Warming up in the sun",
+  ],
+  shop: [
+    "Opening the shop",
+    "Stacking the crates",
+    "Polishing the counter",
+    "Sweeping the orchard",
+  ],
+  ripen: ["Ripening", "Getting juicy", "Waking the helpers", "Almost ripe"],
+};
+// Every line stays at least LINE_MS so it can be read; a step that runs long moves on after NEXT_LINE_MS.
+const LINE_MS = 2400;
+const NEXT_LINE_MS = 3600;
+const boot = window.peachyBoot;
 
 const intro = document.getElementById("intro");
 const introTitle = new IntroTitle(document.getElementById("intro-title"));
@@ -61,13 +80,47 @@ function writeStatus(text) {
 }
 
 function setStatus(text) {
-  if (introStatus.textContent === text) return;
+  if (boot.failed || introStatus.textContent === text) return;
   writeStatus(text);
   introStatus.animate([{ opacity: 0 }, { opacity: 1 }], {
     duration: 350,
     easing: "ease-out",
   });
 }
+let words = LOADING_WORDS.shape;
+let wordAt = 0;
+let line = words[0];
+let lineAt = performance.now();
+let momentUntil = 0;
+const lineTimer = setInterval(() => {
+  const now = performance.now();
+  if (now < momentUntil) return;
+  if (words[wordAt] !== line && now - lineAt >= LINE_MS) {
+    line = words[wordAt];
+    lineAt = Infinity;
+    // Shader compiles can hold the page for seconds, so a line's time starts once it is on screen.
+    requestAnimationFrame(() => {
+      lineAt = performance.now();
+    });
+  } else if (
+    words[wordAt] === line &&
+    wordAt < words.length - 1 &&
+    now - lineAt >= NEXT_LINE_MS
+  )
+    wordAt += 1;
+  setStatus(line);
+}, 200);
+function sayWords(list) {
+  words = list;
+  wordAt = 0;
+}
+function sayNow(text) {
+  sayWords([text]);
+  line = text;
+  lineAt = performance.now();
+  setStatus(text);
+}
+
 const showText = () => intro.classList.add("has-fonts");
 document.fonts.load("italic 560 44px Fraunces").then(showText, showText);
 setTimeout(showText, 2000);
@@ -111,7 +164,7 @@ modeButtons.forEach((b) =>
     mode = picked;
     showMode();
     if (!startGame) return;
-    setStatus(readyText());
+    sayNow(readyText());
     // eslint-disable-next-line no-use-before-define
     if (!interaction.holdStill) interaction.nudge(0.6);
   }),
@@ -222,11 +275,20 @@ if (fillCanvas.transferControlToOffscreen) {
       canvas,
       size: fillSize(),
       epoch: waveEpoch,
-      image: RIPE_RENDER,
     },
     [canvas],
   );
+  // The worker sits outside the service worker's scope, so the page fetches the image for it.
+  fetch(RIPE_RENDER)
+    .then((res) => res.blob())
+    .then(
+      (image) => fillWorker?.postMessage({ image }),
+      () => fillWorker?.postMessage({ noImage: true }),
+    );
   fillWorker.onmessage = ({ data }) => Object.assign(fill, data);
+  fillWorker.onerror = () => {
+    fillWorker = null;
+  };
   window.addEventListener("resize", () =>
     fillWorker?.postMessage({ size: fillSize() }),
   );
@@ -235,14 +297,20 @@ if (fillCanvas.transferControlToOffscreen) {
   ripeRender.src = RIPE_RENDER;
 }
 
+let lastTarget = 0;
 function showRipeness(delta) {
   const target = loadedShare();
+  if (target !== lastTarget) {
+    lastTarget = target;
+    boot.progress();
+  }
   const time = waveTime();
   if (fillWorker) fillWorker.postMessage({ target });
   else {
-    if (ripeRender.complete) stepFill(fill, target, delta);
+    // A missing ripe image or a failed worker still lets the level rise, so loading can finish.
+    if (ripeRender.complete || !fillContext) stepFill(fill, target, delta);
     const size = fillSize();
-    if (!stillGone && ripeRender.complete && size) {
+    if (!stillGone && fillContext && ripeRender.naturalWidth && size) {
       if (fillCanvas.width !== size) {
         fillCanvas.width = size;
         fillCanvas.height = size;
@@ -277,14 +345,9 @@ function showRipeness(delta) {
   if (fill.shown >= 1) onRipe?.();
 }
 
-let statusTimer = 0;
 function sayForAMoment(text) {
-  const before = introStatus.textContent;
   setStatus(text);
-  clearTimeout(statusTimer);
-  statusTimer = setTimeout(() => {
-    if (!started) setStatus(before);
-  }, 1400);
+  momentUntil = performance.now() + 1400;
 }
 
 const clearColor = new Color();
@@ -394,6 +457,7 @@ async function warmLights(shown) {
   // ANGLE on Metal builds a shader on its first draw, not at compile, so draw every variant into one pixel.
   drawEverything();
   warmedLights.add(lightIndex(shown));
+  boot.progress();
 }
 
 async function warm(extra = warmExtra) {
@@ -421,8 +485,7 @@ renderer.domElement.addEventListener("webglcontextrestored", async () => {
 
 // Building the shop and compiling its shaders freezes the page, so it happens before the tap.
 async function prepareIdle() {
-  const status = introStatus.textContent;
-  setStatus("Opening the shop");
+  sayWords(LOADING_WORDS.shop);
   const { createIdle } = await import("./idle");
   idle = createIdle({
     interaction,
@@ -448,7 +511,6 @@ async function prepareIdle() {
   await warm(idle.lightStates());
   await idle.warmFade(warm);
   idle.ready();
-  setStatus(status);
 }
 
 const HUD = [".score", ".hints", ".settings-dock", ".bottle"];
@@ -526,7 +588,7 @@ peach
     loaded.prepare = 1;
     group.visible = true;
     intro.classList.add("has-shape");
-    setStatus("Ripening");
+    sayWords(LOADING_WORDS.ripen);
     setTimeout(() => {
       interaction.holdStill = false;
       stillGone = true;
@@ -555,6 +617,7 @@ peach
       // The shop panel reserves its space as it appears; the fading intro keeps its place.
       intro.style.padding = getComputedStyle(intro).padding;
       started = true;
+      clearInterval(lineTimer);
       idleActive = true;
       interaction.holdStill = false;
       saveMode(mode);
@@ -577,7 +640,8 @@ peach
       interaction.bottle.screen.x -= 220;
     };
 
-    setStatus(readyText());
+    boot.ready();
+    sayWords([readyText()]);
     intro.classList.add("is-ready");
     interaction.nudge(1.4);
     const invite = setInterval(() => {
@@ -585,6 +649,12 @@ peach
       else interaction.nudge(0.35);
     }, 3500);
     startGame = start;
+  })
+  .catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error("Peachy keen failed to load:", error);
+    clearInterval(lineTimer);
+    boot.fail();
   });
 
 const SHADOW_HOLD = 1.5;
@@ -618,7 +688,8 @@ const frameClip = () => {
   const shown = Math.min(h, sheet.top + CLIP_MARGIN);
   return clipBox.set(0, h - shown, w, shown);
 };
-renderer.setAnimationLoop(() => {
+let frameFailed = false;
+function frame() {
   if (warming) return;
   const shop = idle?.shop() ?? 0;
   quality.setCap(shop > 1 ? quality.max * FULL_SHEET_RESOLUTION : undefined);
@@ -690,7 +761,22 @@ renderer.setAnimationLoop(() => {
   lens.render([juice, droplets], clip);
   shock.render();
   if (clip) renderer.setScissorTest(false);
+}
+// three stops asking for frames once one throws, which freezes the game.
+renderer.setAnimationLoop(() => {
+  try {
+    frame();
+  } catch (error) {
+    if (!frameFailed) {
+      // eslint-disable-next-line no-console
+      console.error("Peachy keen frame failed:", error);
+      frameFailed = true;
+    }
+    if (!started) boot.fail();
+  }
 });
+
+boot.booted();
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {

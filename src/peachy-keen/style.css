@@ -640,6 +640,47 @@ button:focus-visible {
   }
 }
 
+.intro.is-stuck {
+  cursor: default;
+}
+
+.intro.is-stuck .intro-modes {
+  display: none;
+}
+
+.intro-help {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  animation: help-in 0.5s ease-out;
+}
+
+.intro-help[hidden] {
+  display: none;
+}
+
+@keyframes help-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.intro-help p {
+  max-width: 30ch;
+  margin: 0;
+  color: var(--blush-dim);
+  font-size: 15px;
+}
+
+.intro-help button {
+  padding: 8px 22px;
+  border: 1px solid var(--blush);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--blush);
+  font-size: 16px;
+}
+
 .intro-modes {
   justify-content: center;
   margin: 0;
