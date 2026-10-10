@@ -544,7 +544,7 @@ export class PrivacyTag {
   }
 
   get hovered() {
-    return this.state === "idle" && this.peek;
+    return (this.state === "idle" || this.state === "on") && this.peek;
   }
 
   hang() {
@@ -695,11 +695,8 @@ export class PrivacyTag {
     const last = this.finger;
     this.finger = { x: e.clientX, y: e.clientY, t: e.timeStamp };
     this.steady = false;
-    // Tucked away, hovering the grab area lets the cord drop a little: it can be pulled.
-    this.peek =
-      this.state === "idle" &&
-      !e.target.closest?.(".ui, .panel, .intro") &&
-      this.hit(e);
+    // Tucked away, hovering the grab area also lets the cord drop a little: it can be pulled.
+    this.peek = !e.target.closest?.(".ui, .panel, .intro") && this.hit(e);
     const shown = this.state === "on" || this.state === "idle";
     const stale = !last || e.timeStamp - last.t > STALE_MS;
     if (!shown || stale || e.target.closest?.(".ui, .panel")) {
@@ -1059,7 +1056,7 @@ export class PrivacyTag {
       nod.at = this.time;
       nod.t = 0;
       nod.dir = this.finger?.x > this.tasselPoints[TASSEL_LINKS].p.x ? -1 : 1;
-      this.lengthV += DIP * this.scale;
+      if (this.state === "idle") this.lengthV += DIP * this.scale;
     }
     this.wasHovered = hovered;
     this.warmth +=
