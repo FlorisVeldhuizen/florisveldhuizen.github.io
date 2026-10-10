@@ -196,7 +196,12 @@ juice.onSplat = (position, velocity) => lens.splat(position, velocity);
 lens.onHit = () => playLensHit(1);
 const ui = new UI();
 const talk = new Talk();
-const privacyTag = new PrivacyTag({ scene, camera, anchorX: cordX });
+const privacyTag = new PrivacyTag({
+  scene,
+  camera,
+  // eslint-disable-next-line no-use-before-define
+  anchorX: () => interaction.bottle.homeX ?? cordX(),
+});
 if (import.meta.env.DEV) window.pkTag = privacyTag;
 const mood = new MoodLight(scene, renderer, lights);
 
