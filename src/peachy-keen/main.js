@@ -231,7 +231,10 @@ interaction.on("charge", () => quality.hold(4));
 const skinRings = new SkinRings(scene, interaction);
 settings.onChange = (key, value) => {
   if (key === "sound") setMuted(!value);
-  if (key === "quality") quality.setMode(value);
+  if (key === "quality") {
+    quality.setMode(value);
+    peach.setQuality(value);
+  }
   if (key === "splatter") lens.enabled = value;
   if (key === "firmness") interaction.setFirmness(value);
   if (key === "tool") interaction.setTool(value);

@@ -1127,7 +1127,6 @@ function generateFuzzNormalMap() {
   const texture = new CanvasTexture(canvas);
   texture.wrapS = RepeatWrapping;
   texture.wrapT = RepeatWrapping;
-  texture.anisotropy = 8;
   return texture;
 }
 
@@ -1635,6 +1634,7 @@ export class Peach {
     this.group = group;
     this.mesh = null;
     this.material = null;
+    this.fuzzAnisotropy = 4;
     this.hitSlot = 0;
     this.printSlot = 0;
     this.lastHitTime = -Infinity;
@@ -1741,6 +1741,14 @@ export class Peach {
       slots[n].set(at.x, at.y, at.z, ((link ? -1 : 1) * r) / scale);
     }
     this.uniforms.uOilCount.value = count;
+  }
+
+  setQuality(mode) {
+    this.fuzzAnisotropy = { sharp: 8, fast: 1 }[mode] ?? 4;
+    const fuzz = this.material?.normalMap;
+    if (!fuzz || fuzz.anisotropy === this.fuzzAnisotropy) return;
+    fuzz.anisotropy = this.fuzzAnisotropy;
+    fuzz.needsUpdate = true;
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -2013,6 +2021,7 @@ export class Peach {
     mesh.geometry = this.body.geometry;
     this.findCrease(mesh.geometry);
     const fuzz = generateFuzzNormalMap();
+    fuzz.anisotropy = this.fuzzAnisotropy;
     this.material = new MeshPhysicalMaterial({
       map,
       color: new Color(PEACH_CONFIG.SKIN_TINT),
