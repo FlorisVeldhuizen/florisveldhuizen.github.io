@@ -537,6 +537,11 @@ button:focus-visible {
   height: 100%;
 }
 
+/* The fill canvas draws the grey peach itself, so it can squash with each gulp. */
+.intro-shape.is-filling {
+  background-image: none;
+}
+
 .intro.has-shape .intro-shape {
   opacity: 0;
 }

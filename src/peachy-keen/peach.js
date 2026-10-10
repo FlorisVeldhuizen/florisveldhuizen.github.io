@@ -240,6 +240,7 @@ const VERTEX_HEADER = `
   attribute float plant;
   attribute float stretch;
   varying float vStretch;
+  varying float vPlant;
   uniform vec3 uStemBase;
   uniform vec3 uLeafBend;
   uniform vec4 uLeafAxis;
@@ -311,6 +312,7 @@ const VERTEX_NORMAL = `
   vec3 jiggled = position;
   vRestPosition = position;
   vStretch = stretch;
+  vPlant = plant;
   vFabricPush = 0.0;
   if (uJiggleActive > 0.5) {
     float give = 1.0 - stiffness;
@@ -387,9 +389,13 @@ const FRAGMENT_HEADER = `
   uniform sampler2D uSkinLow;
   uniform float uSkinSharp;
   uniform float uRipe;
-  uniform float uRipeMotion;
   uniform vec3 uRipeFrame;
   uniform float uRipeTime;
+  uniform float uRipeModes[8];
+  uniform vec2 uRipeSpan;
+  uniform float uLeafRipe;
+  uniform float uLeafReach;
+  varying float vPlant;
   uniform vec3 uRingCenter;
   uniform vec3 uRingAxisX;
   uniform vec3 uRingAxisY;
@@ -804,17 +810,28 @@ const FRAGMENT_COLOR = `
     float swell = smoothstep(0.2, 1.4, vFabricPush) * (1.0 - leaf);
     diffuseColor.rgb *= mix(vec3(1.0), vec3(1.03, 0.72, 0.75), squeeze * 0.8) * mix(vec3(1.0), vec3(1.05, 0.95, 0.94), swell * 0.5);
   }
-  if (uRipe < 1.0) {
+  if (uRipe < 1.15 || uLeafRipe < 1.0) {
     // Measured on screen like the intro still: x and y projected to the depth of the peach centre.
     vec2 ripeScreen = -vViewPosition.xy / vViewPosition.z * uRipeFrame.x;
     float ripeAcross = ripeScreen.x / uRipeFrame.y;
     float ripeHeight = (ripeScreen.y - uRipeFrame.z) / uRipeFrame.y + 0.5;
-    float ripeSwing = 1.0 + uRipeMotion * 1.5;
-    float ripeWave = (sin(ripeAcross * 15.0 + uRipeTime * 3.0) * 0.015 + sin(ripeAcross * 12.0 - uRipeTime * 2.2) * 0.01) * ripeSwing;
-    float ripeLine = uRipe * 1.2 - 0.1 + ripeWave + sin(uRipeTime * 1.4) * 0.03 * ripeAcross;
-    float unripe = smoothstep(ripeLine - 0.004, ripeLine + 0.004, ripeHeight);
+    float spanT = clamp((ripeAcross - uRipeSpan.x) / (uRipeSpan.y - uRipeSpan.x), 0.0, 1.0);
+    float slosh = 0.0;
+    for (int i = 0; i < 8; i++) slosh += uRipeModes[i] * cos(float(i + 1) * PI * spanT);
+    float ripeLine = uRipe * 1.02 - 0.02 + sin(uRipeTime * 1.4) * 0.02 * ripeAcross + slosh;
+    float below = ripeLine - ripeHeight;
+    float unripe = smoothstep(-0.0005, 0.0096, -below);
+    float leafPart = max(leaf, step(0.5, vPlant));
+    vec3 fromStem = vRestPosition - uStemBase;
+    float leafWave = sin(atan(fromStem.z, fromStem.x) * 5.0 + uRipeTime * 3.0) * 0.03;
+    float leafFront = uLeafRipe * 1.08 - 0.04;
+    float leafUnripe = uLeafRipe >= 1.0 ? 0.0 : smoothstep(leafFront - 0.02, leafFront + 0.02, length(fromStem) / uLeafReach + leafWave);
+    unripe = mix(unripe, leafUnripe, leafPart);
+    float juice = (1.0 - unripe) * (1.0 - leafPart) * (1.0 - smoothstep(1.0, 1.15, uRipe));
+    vec3 ripeColour = mix(diffuseColor.rgb, vec3(1.0, 0.886, 0.804), juice * 0.2 * (1.0 - smoothstep(0.0, 0.07, below)));
+    ripeColour = mix(ripeColour, vec3(0.47, 0.078, 0.196), juice * 0.16 * (1.0 - smoothstep(0.0, 0.45, ripeHeight)));
     float unripeGray = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(unripeGray) * vec3(0.5, 0.42, 0.58) * 0.55, unripe);
+    diffuseColor.rgb = mix(ripeColour, vec3(unripeGray) * vec3(0.5, 0.42, 0.58) * 0.55, unripe);
   }
 `;
 
@@ -1370,9 +1387,12 @@ export class Peach {
       uSkinLow: { value: null },
       uSkinSharp: { value: 1 },
       uRipe: { value: 1 },
-      uRipeMotion: { value: 0 },
       uRipeFrame: { value: new Vector3(1, 1, 0) },
       uRipeTime: { value: 0 },
+      uRipeModes: { value: new Array(8).fill(0) },
+      uRipeSpan: { value: new Vector2(-0.6, 0.6) },
+      uLeafRipe: { value: 1 },
+      uLeafReach: { value: 1 },
       uSkinGlint: { value: new Color() },
       uSkinPattern: { value: new Vector4() },
       uSkinDeep: { value: new Color() },
@@ -1495,6 +1515,20 @@ export class Peach {
     });
     if (!stemBase) return;
     this.uniforms.uStemBase.value.copy(stemBase);
+    const { position } = geometry.attributes;
+    let reach = 0;
+    for (let i = 0; i < position.count; i += 1) {
+      if (plant[i] > 0.5)
+        reach = Math.max(
+          reach,
+          Math.hypot(
+            position.getX(i) - stemBase.x,
+            position.getY(i) - stemBase.y,
+            position.getZ(i) - stemBase.z,
+          ),
+        );
+    }
+    if (reach) this.uniforms.uLeafReach.value = reach;
     if (leafAxis) this.uniforms.uLeafAxis.value.set(...leafAxis.toArray(), 0);
   }
 
@@ -2599,6 +2633,18 @@ export class Peach {
     fade.mesh.visible = true;
     fade.time = 0;
     fade.beats = [...beats];
+  }
+
+  kickLeaf(strength) {
+    if (!this.leaf) return;
+    const { uLeafAxis } = this.uniforms;
+    const lift = new Vector3(
+      uLeafAxis.value.x,
+      uLeafAxis.value.y,
+      uLeafAxis.value.z,
+    ).cross(new Vector3(0, 1, 0));
+    if (lift.lengthSq() < 1e-6) return;
+    this.leaf.bendVel.addScaledVector(lift.normalize(), strength);
   }
 
   updateLeaf(delta) {
