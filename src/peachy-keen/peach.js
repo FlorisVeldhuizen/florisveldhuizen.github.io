@@ -1064,34 +1064,36 @@ function drawPrint(shape) {
 }
 
 function generateFuzzNormalMap() {
-  const size = 512;
+  const size = 1024;
+  const bytes = new Uint8Array(size * size * 4);
+  // getRandomValues fills at most 65536 bytes per call.
+  for (let i = 0; i < bytes.length; i += 65536) {
+    crypto.getRandomValues(bytes.subarray(i, i + 65536));
+  }
+  const height = new Float32Array(size * size);
+  for (let i = 0; i < height.length; i += 1) {
+    const b = i * 4;
+    height[i] =
+      (0.3 / 255) *
+      (bytes[b] +
+        0.5 * bytes[b + 1] +
+        0.25 * bytes[b + 2] +
+        0.125 * bytes[b + 3]);
+  }
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   const image = ctx.createImageData(size, size);
-  const noise = (x, y) => {
-    const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123;
-    return v - Math.floor(v);
-  };
-  const fbm = (x, y) => {
-    let value = 0;
-    let amplitude = 1;
-    let frequency = 1;
-    for (let i = 0; i < 4; i += 1) {
-      value += amplitude * noise(x * frequency, y * frequency);
-      amplitude *= 0.5;
-      frequency *= 2;
-    }
-    return value * 0.3;
-  };
   for (let y = 0; y < size; y += 1) {
+    const row = y * size;
+    const below = ((y + 1) % size) * size;
     for (let x = 0; x < size; x += 1) {
-      const h0 = fbm(x / size, y / size);
-      const nx = h0 - fbm((x + 1) / size, y / size);
-      const ny = h0 - fbm(x / size, (y + 1) / size);
+      const h0 = height[row + x];
+      const nx = h0 - height[row + ((x + 1) % size)];
+      const ny = h0 - height[below + x];
       const len = Math.sqrt(nx * nx + ny * ny + 1);
-      const i = (y * size + x) * 4;
+      const i = (row + x) * 4;
       image.data[i] = (nx / len / 2 + 0.5) * 255;
       image.data[i + 1] = (ny / len / 2 + 0.5) * 255;
       image.data[i + 2] = (1 / len / 2 + 0.5) * 255;
@@ -1102,6 +1104,7 @@ function generateFuzzNormalMap() {
   const texture = new CanvasTexture(canvas);
   texture.wrapS = RepeatWrapping;
   texture.wrapT = RepeatWrapping;
+  texture.anisotropy = 8;
   return texture;
 }
 
