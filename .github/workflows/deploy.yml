@@ -49,3 +49,26 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # The standalone peachy-keen repo is a copy of src/peachy-keen; Cloudflare deploys it on push.
+  sync-peachy-keen:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Clone the standalone repo
+        env:
+          DEPLOY_KEY: ${{ secrets.PEACHY_KEEN_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/peachy_keen
+          chmod 600 ~/.ssh/peachy_keen
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/peachy_keen -o IdentitiesOnly=yes"
+          git clone git@github.com:FlorisVeldhuizen/peachy-keen.git ../peachy-keen
+          git -C ../peachy-keen config core.sshCommand "$GIT_SSH_COMMAND"
+          git -C ../peachy-keen config user.name FlorisVeldhuizen
+          git -C ../peachy-keen config user.email 10500846+FlorisVeldhuizen@users.noreply.github.com
+      - name: Sync
+        run: scripts/sync-peachy-keen.sh HEAD
