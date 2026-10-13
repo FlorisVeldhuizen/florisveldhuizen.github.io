@@ -10,11 +10,30 @@
   ],
   "plugins": ["prettier"],
   "parserOptions": {
-    "ecmaVersion": 12,
+    "ecmaVersion": "latest",
     "sourceType": "module"
   },
   "rules": {
     "prettier/prettier": "error",
-    "import/no-unresolved": ["error", { "ignore": ["\\?url$"] }]
-  }
+    "import/no-unresolved": ["error", { "ignore": ["\\?url$"] }],
+    "import/prefer-default-export": "off",
+    "no-param-reassign": ["error", { "props": false }],
+    "no-bitwise": "off",
+    "no-continue": "off",
+    "max-classes-per-file": "off",
+    "class-methods-use-this": "off"
+  },
+  "overrides": [
+    {
+      "files": ["scripts/**"],
+      "env": { "node": true },
+      "rules": {
+        "no-console": "off",
+        "no-await-in-loop": "off",
+        "no-restricted-syntax": "off",
+        "no-underscore-dangle": "off",
+        "import/no-unresolved": ["error", { "ignore": ["^playwright$"] }]
+      }
+    }
+  ]
 }
