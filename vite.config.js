@@ -29,7 +29,6 @@ export default defineConfig({
         walking_p5: resolve(__dirname, "src/walking_p5/index.html"),
         wavy_trees: resolve(__dirname, "src/wavy_trees/index.html"),
         buildings: resolve(__dirname, "src/buildings/index.html"),
-        peachy_keen: resolve(__dirname, "src/peachy-keen/index.html"),
       },
     },
   },

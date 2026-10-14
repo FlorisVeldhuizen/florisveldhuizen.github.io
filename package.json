@@ -9,11 +9,9 @@
   "private": false,
   "type": "module",
   "scripts": {
-    "lint": "eslint src/peachy-keen scripts --ext .js,.mjs",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "perf": "node scripts/perf/run.mjs"
+    "preview": "vite preview"
   },
   "devDependencies": {
     "eslint": "^8.57.0",
@@ -31,8 +29,7 @@
     "paper": "^0.12.15",
     "pathfinding": "^0.4.18",
     "phaser": "^3.60.0",
-    "seedrandom": "^3.0.5",
-    "three": "^0.159.0"
+    "seedrandom": "^3.0.5"
   },
   "resolutions": {
     "minimatch": "^3.1.3",
