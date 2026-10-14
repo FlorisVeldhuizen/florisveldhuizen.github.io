@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Jiggle Peach</title>
+    <meta http-equiv="refresh" content="0; url=https://jigglepeach.com" />
+    <link rel="canonical" href="https://jigglepeach.com" />
+    <script>
+      navigator.serviceWorker
+        ?.getRegistrations()
+        .then((all) => all.forEach((r) => r.unregister()));
+      window.location.replace("https://jigglepeach.com");
+    </script>
+  </head>
+  <body>
+    <p>
+      Jiggle Peach moved to
+      <a href="https://jigglepeach.com">jigglepeach.com</a>.
+    </p>
+  </body>
+</html>
